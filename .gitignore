@@ -21,3 +21,7 @@ Thumbs.db
 # Vite
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
+
+# Local-only working docs (per-developer plans, Claude instructions)
+/plan/
+CLAUDE.local.md
