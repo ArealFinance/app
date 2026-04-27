@@ -27,40 +27,23 @@ body {
 	min-height: 100dvh;
 	position: relative;
 	overflow-x: hidden;
-}
-
-/* Page-wide aurora — single dominant light source in the upper-left corner
- * (per Figma macet), spreading diagonally toward darker lower-right. Uses the
- * exact Figma palette: #C977FF (light pink-purple) for the bright spot core,
- * #1200E3 (deep blue-purple) for the ambient mid-tone. */
-body::before {
-	content: '';
-	position: fixed;
-	inset: 0;
-	background:
-		/* Main light source — focused, intense upper-left bloom. */
-		radial-gradient(
-			ellipse 600px 700px at 0% -5%,
-			rgba(201, 119, 255, 0.85) 0%,
-			rgba(168, 132, 255, 0.45) 20%,
-			rgba(120, 80, 220, 0.15) 45%,
-			transparent 65%
-		),
-		/* Concentrated right halo around the crystal. */
-		radial-gradient(
-			ellipse 450px 500px at 100% 15%,
-			rgba(201, 119, 255, 0.55) 0%,
-			rgba(168, 132, 255, 0.2) 30%,
-			transparent 60%
-		),
-		/* Subtle deep-purple ambient at the very top. */
-		radial-gradient(
-			ellipse 80% 30% at 50% 0%,
-			rgba(18, 0, 227, 0.18) 0%,
-			transparent 70%
-		);
-	pointer-events: none;
-	z-index: 0;
+	/* Two aurora light pools (Figma exports), in flow so they scroll with the page:
+	 *   • hero-bg.png — top-centre bloom, sits above the hero.
+	 *   • footer-bg.png — bottom-left bloom, sits behind the footer.
+	 * Solid base colour (#070C1C / --color-bg) fills the middle. */
+	background-color: var(--color-bg);
+	background-image:
+		url('/images/aurora/hero-bg.png'),
+		url('/images/aurora/footer-bg.png');
+	background-position:
+		top center,
+		bottom center;
+	background-size:
+		100% auto,
+		100% auto;
+	background-repeat:
+		no-repeat,
+		no-repeat;
 }
 
 body > * {

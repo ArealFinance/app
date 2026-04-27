@@ -151,6 +151,11 @@
 	</section>
 
 	<section class="markets-section">
+		<!-- Inner L-shape frame (#181A29, lighter shade), built from two overlapping
+		     rounded rects: TAB (upper-left) + MAIN (lower full-width). Cards sit on top. -->
+		<span class="markets-frame markets-frame-tab" aria-hidden="true"></span>
+		<span class="markets-frame markets-frame-main" aria-hidden="true"></span>
+
 		<header class="markets-head">
 			<span class="markets-dot markets-dot-protocol" aria-hidden="true"></span>
 			<span class="markets-label">Protocol</span>
@@ -179,6 +184,9 @@
 	</section>
 
 	<section class="markets-section">
+		<span class="markets-frame markets-frame-tab" aria-hidden="true"></span>
+		<span class="markets-frame markets-frame-main" aria-hidden="true"></span>
+
 		<header class="markets-head">
 			<span class="markets-dot markets-dot-stocks" aria-hidden="true"></span>
 			<span class="markets-label">Stocks</span>
@@ -222,13 +230,37 @@
 		padding: calc(var(--space-16) + var(--space-12)) 0 calc(var(--space-24) + var(--space-20));
 	}
 
+	/* Figma layout: outer container 1214×298, bg #080A0F, rounded 24.
+	 * Inside: an L-shape "Union" frame (bg #181A29, rounded 20) made of TAB
+	 * (163×290 upper-left) + MAIN (full-width × 246, lower). Cards sit ON the
+	 * Union frame with their own #080A0F bg (3-layer depth). */
 	.markets-section {
 		position: relative;
 		z-index: 1;
-		padding: var(--space-4);
+		height: 298px;
 		background-color: var(--color-surface);
 		border-radius: var(--radius-xl);
-		margin-bottom: var(--space-4);
+		margin-bottom: var(--space-2);
+	}
+
+	.markets-frame {
+		position: absolute;
+		background: var(--color-surface-inset); /* #181A29 */
+		border-radius: 20px;
+		z-index: 0;
+		pointer-events: none;
+	}
+	.markets-frame-tab {
+		top: 4px;
+		left: 4px;
+		width: 163px;
+		height: 290px;
+	}
+	.markets-frame-main {
+		top: 51px;
+		left: 4px;
+		right: 4px;
+		height: 246px;
 	}
 
 	.hero-headline {
@@ -360,16 +392,25 @@
 		pointer-events: none;
 	}
 
+	/* Header — absolute inside Tab area, top:14, left:22 (Figma container coords).
+	 * dot 10×10, gap 6, "PROTOCOL" Halvar Bold 14, gap 6, badge "4" 25×24. */
 	.markets-head {
+		position: absolute;
+		z-index: 1;
+		top: 14px;
+		left: 22px;
 		display: inline-flex;
 		align-items: center;
-		gap: var(--space-2);
-		padding: var(--space-2) var(--space-2) var(--space-3);
-		font-family: var(--font-sans);
+		gap: 6px;
+		height: 24px;
+		margin: 0;
+		padding: 0;
+		font-family: var(--font-sans); /* Halvar Breitschrift */
 		font-size: var(--text-base); /* 14 */
 		font-weight: var(--font-weight-bold);
+		line-height: 1.2; /* matches Figma 120% */
 		text-transform: uppercase;
-		letter-spacing: var(--tracking-tight);
+		letter-spacing: var(--tracking-tight); /* -0.6 */
 		color: var(--color-text);
 	}
 
@@ -400,16 +441,24 @@
 		padding: 0 var(--space-1);
 		background: linear-gradient(180deg, var(--color-purple-500), var(--color-purple-700));
 		color: var(--color-white-900);
-		font-family: var(--font-body);
-		font-size: var(--text-base);
-		font-weight: var(--font-weight-bold);
+		font-family: var(--font-body); /* Inter */
+		font-size: var(--text-base); /* 14 */
+		font-weight: var(--font-weight-semibold); /* 600 per Figma */
 		letter-spacing: var(--tracking-tight);
-		border-radius: var(--radius-sm);
+		border-radius: var(--radius-sm); /* 8 */
 		font-variant-numeric: tabular-nums;
 		text-transform: none;
 	}
 
+	/* Cards row — absolute, top:59 left:12 right:12, height 230 (Figma).
+	 * 4 cards with 8px gap. Cards have their own bg #080A0F = contrast on Union. */
 	.markets-grid {
+		position: absolute;
+		z-index: 1;
+		top: 59px;
+		left: 12px;
+		right: 12px;
+		height: 230px;
 		display: grid;
 		grid-template-columns: repeat(4, minmax(0, 1fr));
 		gap: var(--space-2);
@@ -429,8 +478,25 @@
 		display: block;
 	}
 
+	/* Responsive: below 1024px the absolute Figma layout breaks — fall back to
+	 * flow layout (stacked header + 2 or 1 column grid). The L-shape Union frame
+	 * is only meaningful at desktop, so we hide it on smaller viewports. */
 	@media (max-width: 1024px) {
+		.markets-section {
+			height: auto;
+			padding: 14px 12px;
+		}
+		.markets-frame-tab,
+		.markets-frame-main {
+			display: none;
+		}
+		.markets-head {
+			position: static;
+			margin-bottom: 14px;
+		}
 		.markets-grid {
+			position: static;
+			height: auto;
 			grid-template-columns: repeat(2, minmax(0, 1fr));
 		}
 	}

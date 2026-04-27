@@ -155,7 +155,7 @@
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		border-radius: var(--radius-md);
+		border-radius: 17px;
 		overflow: hidden;
 	}
 	.card-avatar :global(img),
@@ -190,26 +190,25 @@
 		flex-wrap: nowrap;
 	}
 
-	/* Chips share base look */
+	/* Chips share base look — Figma: Inter Semi Bold 14px, tracking -0.6px,
+	 * height 24px, padding 6px horizontal, bg rgba(113,115,144,0.2), radius 8px. */
 	.chip {
 		display: inline-flex;
 		align-items: center;
 		gap: 4px;
-		height: 22px;
+		height: 24px;
 		padding: 0 6px;
 		background-color: var(--color-gray-900-20);
 		border-radius: var(--radius-sm); /* 8 */
 		font-family: var(--font-body);
-		font-weight: var(--font-weight-medium);
-		font-size: 12px;
+		font-weight: var(--font-weight-semibold);
+		font-size: var(--text-base); /* 14 */
 		letter-spacing: var(--tracking-tight);
 		white-space: nowrap;
 	}
 
 	.chip-symbol {
 		color: var(--color-text-muted);
-		text-transform: uppercase;
-		letter-spacing: var(--tracking-wide);
 	}
 
 	.chip-tvl {
@@ -220,7 +219,6 @@
 	}
 	.chip-tvl-value {
 		color: var(--color-green-700);
-		font-weight: var(--font-weight-bold);
 	}
 
 	/* Price section */
@@ -235,8 +233,8 @@
 
 	.card-price-label {
 		font-family: var(--font-body);
-		font-weight: var(--font-weight-medium);
-		font-size: var(--text-2xs); /* 10 */
+		font-weight: var(--font-weight-semibold);
+		font-size: var(--text-sm); /* 13 */
 		text-transform: uppercase;
 		letter-spacing: var(--tracking-wide);
 		color: var(--color-text-muted);
@@ -272,14 +270,15 @@
 
 	.chip-delta {
 		font-family: var(--font-mono);
-		font-size: 12px;
-		font-weight: var(--font-weight-bold);
+		font-size: var(--text-sm); /* 13 — Figma Geist Mono SemiBold 13 */
+		font-weight: var(--font-weight-semibold);
+		letter-spacing: var(--tracking-snug);
 		border-radius: var(--radius-md); /* 12 */
 		height: 24px;
 	}
 	.chip-delta-success {
 		background-color: rgba(117, 227, 140, 0.1);
-		color: var(--color-green-500);
+		color: #75e38c;
 	}
 	.chip-delta-danger {
 		background-color: var(--color-danger-tint);
@@ -299,8 +298,9 @@
 		border-radius: var(--radius-md);
 		height: 24px;
 		font-family: var(--font-body);
-		font-weight: var(--font-weight-medium);
-		font-size: 12px;
+		font-weight: var(--font-weight-semibold);
+		font-size: var(--text-sm); /* 13 — Figma Inter SemiBold 13 */
+		letter-spacing: var(--tracking-snug);
 	}
 
 	.chip-empty {
