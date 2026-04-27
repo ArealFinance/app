@@ -34,7 +34,7 @@
 					{/snippet}
 					Connect wallet
 				</Button>
-				<Button variant="outline" href="https://x.com/arealfinance" rel="noopener noreferrer" target="_blank">
+				<Button variant="outline" href="https://x.com/Areal_Finance" rel="noopener noreferrer" target="_blank">
 					{#snippet iconLeft()}
 						<img class="error-btn-icon error-btn-icon-x" src="/images/404/x-logo.svg" alt="" aria-hidden="true" />
 					{/snippet}
