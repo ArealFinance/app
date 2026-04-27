@@ -4,9 +4,13 @@
 	import Footer from './Footer.svelte';
 	import type { NavItem } from './Header.svelte';
 	import type { FooterColumn, FooterLink } from './Footer.svelte';
+	import { WalletDialog, WalletPanel } from '$lib/components/wallet';
+	import { wallet } from '$lib/stores/wallet.svelte';
+	import { walletDialog } from '$lib/stores/walletDialog.svelte';
 
 	type Props = {
 		currentPath?: string;
+		/** Override (e.g. for Storybook). Live store address is used by default. */
 		walletAddress?: string;
 		walletStatus?: 'connected' | 'disconnected';
 		showDemoBanner?: boolean;
@@ -38,18 +42,26 @@
 		hideFooter = false,
 		children
 	}: Props = $props();
+
+	// Default wiring: prop overrides win (stories), otherwise pull from store.
+	const liveAddress = $derived(walletAddress ?? wallet.address ?? undefined);
+	const liveStatus = $derived(
+		walletStatus ?? (wallet.isConnected ? 'connected' : 'disconnected')
+	);
+	const liveOnConnect = $derived(onConnect ?? (() => walletDialog.open('connect')));
+	const liveOnWalletClick = $derived(onWalletClick ?? (() => walletDialog.open('panel')));
 </script>
 
 <div class="shell">
 	{#if !hideHeader}
 		<Header
 			{currentPath}
-			{walletAddress}
-			{walletStatus}
+			walletAddress={liveAddress}
+			walletStatus={liveStatus}
 			{showDemoBanner}
 			{nav}
-			{onConnect}
-			{onWalletClick}
+			onConnect={liveOnConnect}
+			onWalletClick={liveOnWalletClick}
 		/>
 	{/if}
 
@@ -66,6 +78,9 @@
 		/>
 	{/if}
 </div>
+
+<WalletDialog />
+<WalletPanel />
 
 <style>
 	.shell {

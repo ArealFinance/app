@@ -1,6 +1,8 @@
 <script lang="ts">
 	import AppShell from '$lib/components/sections/AppShell.svelte';
-	import { Button, toast } from '$lib/components/ui';
+	import { Button } from '$lib/components/ui';
+	import { wallet } from '$lib/stores/wallet.svelte';
+	import { walletDialog } from '$lib/stores/walletDialog.svelte';
 	import {
 		AngleDownSmall,
 		AngleUpSmall,
@@ -184,8 +186,12 @@
 				</button>
 			</div>
 
-			<Button variant="inverse" full onclick={() => toast.info('Wallet connect — TBD')}>
-				Connect Wallet
+			<Button
+				variant="inverse"
+				full
+				onclick={() => (wallet.isConnected ? walletDialog.open('panel') : walletDialog.open('connect'))}
+			>
+				{wallet.isConnected ? 'Swap' : 'Connect Wallet'}
 			</Button>
 		</section>
 

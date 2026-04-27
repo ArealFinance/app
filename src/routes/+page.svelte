@@ -109,8 +109,6 @@
 
 <AppShell
 	currentPath="/"
-	walletAddress={demoAddress}
-	onWalletClick={() => toast.info('Wallet menu — TBD')}
 	onSubscribe={(email) => toast.success(`Subscribed: ${email}`)}
 >
 	<section class="hero">
