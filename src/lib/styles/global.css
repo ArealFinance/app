@@ -51,6 +51,11 @@ body > * {
 	z-index: 1;
 }
 
+/* 404 / error pages only show the top aurora — Figma macet has no bottom bloom. */
+body.route-error {
+	background-image: url('/images/aurora/hero-bg.png');
+}
+
 a {
 	color: inherit;
 	text-decoration: none;

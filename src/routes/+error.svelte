@@ -5,6 +5,12 @@
 
 	const isNotFound = $derived(page.status === 404);
 	const headline = $derived(isNotFound ? 'Page not found' : `Error ${page.status}`);
+
+	// 404 macet has only the top aurora — disable body's footer-bg while mounted.
+	$effect(() => {
+		document.body.classList.add('route-error');
+		return () => document.body.classList.remove('route-error');
+	});
 </script>
 
 <svelte:head>
@@ -50,9 +56,6 @@
 </div>
 
 <style>
-	/* No local background — the page sits on top of body's hero-bg (top) +
-	 * footer-bg (bottom) layers from global.css, which already produces the
-	 * top+bottom aurora the Figma macet calls for. */
 	.error-page {
 		position: relative;
 		height: 100dvh;
