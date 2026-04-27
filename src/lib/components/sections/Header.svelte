@@ -126,11 +126,14 @@
 		max-width: var(--container-max);
 		height: var(--header-height-desktop);
 		padding: 0 var(--space-2) 0 var(--space-6);
-		background-color: var(--color-surface-glass);
+		/* Figma: vertical gradient pill on top of backdrop-blur. Two stacked layers
+		 * in the macet — we use the inner gradient (#1C1F30 → #111322) which is the
+		 * dominant visible one. */
+		background: linear-gradient(180deg, #1c1f30 0%, #111322 100%);
 		border: 1px solid var(--color-border);
 		border-radius: var(--radius-xl);
-		backdrop-filter: blur(12px);
-		-webkit-backdrop-filter: blur(12px);
+		backdrop-filter: blur(16px);
+		-webkit-backdrop-filter: blur(16px);
 	}
 
 	.header-left {

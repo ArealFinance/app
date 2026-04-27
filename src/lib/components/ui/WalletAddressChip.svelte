@@ -123,11 +123,24 @@
 		gap: 6px;
 	}
 
+	/* size="md" = hero CTA variant: Halvar Bold 14, white text centred, transparent bg
+	 * with a 1px dark border (#181A29). Different typography than header chip (sm). */
 	.chip-size-md {
 		height: 48px;
 		padding: 0 var(--space-4);
-		font-size: var(--text-base);
-		border-radius: var(--radius-button);
+		font-family: var(--font-sans); /* Halvar Breitschrift */
+		font-weight: var(--font-weight-bold);
+		font-size: var(--text-base); /* 14 */
+		letter-spacing: var(--tracking-tight); /* -0.6 */
+		color: var(--color-text); /* #FBF2FF */
+		background-color: transparent;
+		border-color: var(--color-border-strong); /* #181A29 = --color-dark-700 */
+		border-radius: var(--radius-lg); /* 20 — matches Figma rounded-20 */
+		justify-content: center;
+		text-align: center;
+	}
+	.chip-size-md:hover {
+		background-color: rgba(255, 255, 255, 0.05);
 	}
 
 	.chip-dot {
@@ -164,6 +177,6 @@
 	}
 
 	.chip-icon {
-		color: var(--color-text);
+		color: var(--color-purple-200); /* #EADAFF — same tint as address text */
 	}
 </style>

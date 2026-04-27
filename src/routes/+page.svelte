@@ -300,14 +300,14 @@
 	}
 
 	/* Pill = rounded-rect bg + clean sparkline SVG fitting the pill aspect (100×51).
-	 * Visual width 2.08em matches Figma 100px. No negative margin — visual breath
-	 * around the pill matters more than collapsing layout width to Figma's narrow slot. */
+	 * Figma stacks Rectangle 39622 (#6D76B3 solid) + Rectangle 39623 (rgba 0.31)
+	 * — visible result is solid #6D76B3 (the bottom layer shows through the alpha). */
 	.hero-glyph-pill {
 		position: relative;
 		display: inline-block;
 		width: 2.08em; /* 100 / 48 */
 		height: 1.06em; /* 51 / 48 */
-		background-color: rgba(109, 118, 179, 0.31);
+		background-color: #6d76b3;
 		border-radius: 0.42em; /* 20 / 48 */
 		flex-shrink: 0;
 		overflow: hidden;
