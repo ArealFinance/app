@@ -12,7 +12,7 @@
  * Re-run whenever you edit scripts/icons.json (add/remove icons) or upgrade
  * @zappicon/react.
  */
-import { readFileSync, writeFileSync, mkdirSync, existsSync, rmSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 
@@ -218,7 +218,10 @@ function generateIndex(icons) {
 }
 
 // ---------- main ----------
-if (existsSync(outDir)) rmSync(outDir, { recursive: true });
+// Do NOT wipe outDir — that would delete hand-authored icons (e.g. brand
+// marks not in Zappicon) and the Storybook stories file. Each generated icon
+// just overwrites its own .svelte. The index.ts is rebuilt below from
+// whatever .svelte files end up in the directory.
 mkdirSync(outDir, { recursive: true });
 
 const generated = [];
@@ -242,7 +245,14 @@ for (const name of iconsConfig.icons) {
 	generated.push({ name, outName, variants: Object.keys(variants).length });
 }
 
-writeFileSync(resolve(outDir, 'index.ts'), generateIndex(iconsConfig.icons.filter(n => !missing.includes(n))));
+// Build index from all .svelte files actually in the directory (Zappicon-
+// generated AND any hand-authored ones), minus stories/test files.
+const iconFiles = readdirSync(outDir)
+	.filter((f) => f.endsWith('.svelte') && !f.endsWith('.stories.svelte') && !f.endsWith('.test.svelte'))
+	.map((f) => f.replace(/\.svelte$/, ''))
+	.sort();
+const indexLines = iconFiles.map((name) => `export { default as ${name} } from './${name}.svelte';`);
+writeFileSync(resolve(outDir, 'index.ts'), indexLines.join('\n') + '\n');
 
 console.log(`✓ generated ${generated.length} icon components in src/lib/icons/`);
 for (const g of generated) console.log(`  · ${g.outName} (${g.variants} variants)`);
