@@ -1,5 +1,7 @@
 <script lang="ts">
+	import '$lib/styles/global.css';
 	import favicon from '$lib/assets/favicon.svg';
+	import { Toaster } from '$lib/components/ui';
 
 	let { children } = $props();
 </script>
@@ -9,3 +11,5 @@
 </svelte:head>
 
 {@render children()}
+
+<Toaster />

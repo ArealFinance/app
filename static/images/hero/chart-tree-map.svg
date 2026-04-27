@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none">
+	<title>chart-tree-map</title>
+	<!-- Top-left smaller square (lightest) -->
+	<rect x="2.5" y="2.5" width="19" height="19" rx="4" fill="#A984F3" />
+	<!-- Top-right wide rectangle (medium) -->
+	<rect x="25.5" y="18.5" width="20" height="11" rx="4" fill="#9E60F6" />
+	<!-- Bottom-right wide rectangle (darkest) -->
+	<rect x="25.5" y="33.5" width="20" height="11" rx="4" fill="#602FDC" />
+</svg>

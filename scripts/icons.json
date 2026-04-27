@@ -1,0 +1,30 @@
+{
+	"comment": "Curated list of Zappicon icons used in the app. Run `node scripts/generate-icons.mjs` after editing.",
+	"defaultVariant": "regular",
+	"icons": [
+		"arrow-up-small",
+		"arrow-down-small",
+		"arrow-left-small",
+		"arrow-right-small",
+		"arrow-up-right-small",
+		"angle-up-small",
+		"angle-down-small",
+		"angle-left-small",
+		"angle-right-small",
+		"caret-left",
+		"caret-right",
+		"chart-pie-simple",
+		"chart-line",
+		"wallet-simple",
+		"house",
+		"send-alt",
+		"plus",
+		"minus",
+		"xmark",
+		"xmark-circle",
+		"clipboard",
+		"gear",
+		"bolt",
+		"repeat"
+	]
+}

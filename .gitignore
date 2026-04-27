@@ -25,3 +25,11 @@ vite.config.ts.timestamp-*
 # Local-only working docs (per-developer plans, Claude instructions)
 /plan/
 CLAUDE.local.md
+
+# Commercial fonts (Halvar Breitschrift) — must NOT be distributed via public repo.
+# Source: ~/Downloads/Halvar\ Breitschrit  →  static/fonts/halvar/  (woff2)
+# Production deploy must obtain fonts via private channel (CDN, R2, CI fetch).
+/static/fonts/halvar/
+
+*storybook.log
+storybook-static
