@@ -173,17 +173,19 @@
 		gap: var(--space-4);
 	}
 
-	/* Diagonal-purple aurora — same composite vibe as the connect dialog but
-	 * rotated so the bloom anchors top-left. CSS approximation; can be swapped
-	 * for a Figma PNG export if the user provides one. */
+	/* Figma-exported blur composite — the bright purple bloom is baked into the
+	 * top of the PNG and fades to transparent toward the bottom, so cover-sizing
+	 * places the bloom over the toolbar where the macet wants it. */
 	.wallet-panel-aurora {
 		position: absolute;
 		inset: 0;
 		pointer-events: none;
-		background:
-			radial-gradient(ellipse 80% 60% at 30% 0%, rgba(201, 119, 255, 0.45) 0%, transparent 65%),
-			radial-gradient(ellipse 60% 50% at 70% 5%, rgba(26, 0, 255, 0.3) 0%, transparent 70%),
-			radial-gradient(ellipse 50% 40% at 50% 0%, rgba(89, 79, 208, 0.3) 0%, transparent 70%);
+		background-image: url('/images/wallet/panel-blur.png');
+		background-size: cover;
+		background-position: top center;
+		background-repeat: no-repeat;
+		mix-blend-mode: screen;
+		opacity: 0.7;
 	}
 
 	.wallet-panel > :not(.wallet-panel-aurora) {
