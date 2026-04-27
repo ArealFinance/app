@@ -15,40 +15,46 @@
 	<div class="error-bg" aria-hidden="true"></div>
 
 	<div class="error-content">
-		<Logo height={27} />
+		<header class="error-top">
+			<Logo height={27} />
+		</header>
 
-		<img class="error-hero" src="/images/404/hero.png" alt="404" />
+		<main class="error-main">
+			<img class="error-hero" src="/images/404/hero.png" alt="404" />
 
-		<h1 class="error-title">{headline}</h1>
+			<h1 class="error-title">{headline}</h1>
 
-		<p class="error-desc">
-			Areal is being rebuilt from the ground up — new design, fully on-chain, Solana-native.
-			Same vision for yield-bearing RWAs. On mainnet soon.
-		</p>
+			<p class="error-desc">
+				Areal is being rebuilt from the ground up — new design, fully on-chain, Solana-native.
+				Same vision for yield-bearing RWAs. On mainnet soon.
+			</p>
 
-		<div class="error-actions">
-			<Button variant="inverse" href="/">
-				{#snippet iconLeft()}
-					<img class="error-btn-icon" src="/images/404/house-simple.svg" alt="" aria-hidden="true" />
-				{/snippet}
-				Connect wallet
-			</Button>
-			<Button variant="outline" href="https://x.com/arealfinance" rel="noopener noreferrer" target="_blank">
-				{#snippet iconLeft()}
-					<img class="error-btn-icon error-btn-icon-x" src="/images/404/x-logo.svg" alt="" aria-hidden="true" />
-				{/snippet}
-				Follow on X
-			</Button>
-		</div>
+			<div class="error-actions">
+				<Button variant="inverse" href="/">
+					{#snippet iconLeft()}
+						<img class="error-btn-icon" src="/images/404/house-simple.svg" alt="" aria-hidden="true" />
+					{/snippet}
+					Connect wallet
+				</Button>
+				<Button variant="outline" href="https://x.com/arealfinance" rel="noopener noreferrer" target="_blank">
+					{#snippet iconLeft()}
+						<img class="error-btn-icon error-btn-icon-x" src="/images/404/x-logo.svg" alt="" aria-hidden="true" />
+					{/snippet}
+					Follow on X
+				</Button>
+			</div>
+		</main>
 
-		<p class="error-copy">2026 © Areal Protocol. All Rights Reserved</p>
+		<footer class="error-bottom">
+			<p class="error-copy">2026 © Areal Protocol. All Rights Reserved</p>
+		</footer>
 	</div>
 </div>
 
 <style>
 	.error-page {
 		position: relative;
-		min-height: 100dvh;
+		height: 100dvh;
 		display: flex;
 		justify-content: center;
 		overflow: hidden;
@@ -68,26 +74,51 @@
 		pointer-events: none;
 	}
 
+	/* 3-row grid (top / middle / bottom) so logo pins to the top, copyright pins
+	 * to the bottom, and the hero block centres in whatever's left. The middle
+	 * row is min-height: 0 to allow the hero img to shrink. */
 	.error-content {
 		position: relative;
 		z-index: 1;
 		width: 100%;
 		max-width: var(--container-max);
-		min-height: 100dvh;
-		padding: var(--space-16) var(--space-4) var(--space-12);
+		height: 100%;
+		padding: var(--space-6) var(--space-4);
+		display: grid;
+		grid-template-rows: auto minmax(0, 1fr) auto;
+		justify-items: center;
+		gap: var(--space-4);
+	}
+
+	.error-top {
+		display: flex;
+		justify-content: center;
+	}
+
+	.error-main {
 		display: flex;
 		flex-direction: column;
 		align-items: center;
-		gap: var(--space-6);
+		justify-content: center;
+		gap: var(--space-4);
+		min-height: 0;
 	}
 
-	/* Single composite (crystal + glow + 4·4 numerals) exported from Figma. */
+	.error-bottom {
+		display: flex;
+		justify-content: center;
+	}
+
+	/* Hero composite (crystal + 4·4) — width capped at 482px (Figma) AND height
+	 * capped at 45% of the viewport so it always leaves room for the title /
+	 * description / CTAs underneath. The img keeps its 983:964 aspect ratio
+	 * automatically because both width and height are auto. */
 	.error-hero {
 		display: block;
-		width: 100%;
-		max-width: 482px; /* Figma 481.58 */
+		width: auto;
 		height: auto;
-		margin: var(--space-12) 0 var(--space-8);
+		max-width: min(482px, 100%);
+		max-height: 45vh;
 		pointer-events: none;
 		user-select: none;
 	}
@@ -120,7 +151,7 @@
 		display: flex;
 		flex-direction: column;
 		gap: var(--space-2);
-		margin-top: var(--space-4);
+		margin-top: var(--space-2);
 	}
 
 	/* Per Figma both buttons are 245×48 — fixed width keeps the stacked CTAs aligned. */
@@ -140,8 +171,7 @@
 	}
 
 	.error-copy {
-		margin: auto 0 0;
-		padding-top: var(--space-12);
+		margin: 0;
 		font-family: var(--font-body);
 		font-size: var(--text-base);
 		font-weight: var(--font-weight-semibold);
@@ -150,18 +180,25 @@
 		text-align: center;
 	}
 
-	@media (max-width: 768px) {
-		.error-content {
-			padding: var(--space-10) var(--space-4) var(--space-8);
-			gap: var(--space-4);
-		}
+	/* Short viewports (laptops, landscape mobile): drop the hero further so the
+	 * CTAs never get pushed below the fold. */
+	@media (max-height: 720px) {
 		.error-hero {
-			max-width: 320px;
-			margin: var(--space-8) 0 var(--space-6);
+			max-height: 38vh;
 		}
+		.error-content {
+			padding: var(--space-4) var(--space-4);
+			gap: var(--space-3);
+		}
+	}
+
+	@media (max-width: 768px) {
 		.error-actions :global(.btn) {
 			width: 100%;
 			max-width: 245px;
+		}
+		.error-desc {
+			max-width: 320px;
 		}
 	}
 </style>
