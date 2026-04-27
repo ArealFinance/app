@@ -3,6 +3,7 @@
 	import { Button, toast } from '$lib/components/ui';
 	import {
 		AngleDownSmall,
+		AngleUpSmall,
 		ArrowUpDownSimple,
 		Gear,
 		Check,
@@ -11,8 +12,60 @@
 		Bolt
 	} from '$lib/icons';
 
+	type Token = {
+		id: string;
+		symbol: string;
+		bg: string;
+		iconSrc?: string;
+		iconLetter?: string;
+	};
+
+	const TOKENS: Token[] = [
+		{
+			id: 'rwt',
+			symbol: 'RWT',
+			bg: 'linear-gradient(135deg, #a56eff 0%, #602fdc 100%)',
+			iconSrc: '/images/tokens/rwt-mark.svg'
+		},
+		{ id: 'usdt', symbol: 'USDt', bg: '#009393', iconSrc: '/images/tokens/usdt-t.svg' },
+		{ id: 'trx', symbol: 'TRX', bg: '#d84347', iconLetter: 'T' },
+		{ id: 'ton', symbol: 'TON', bg: '#0098ea', iconLetter: 'T' },
+		{ id: 'sprk', symbol: 'SPRK', bg: '#4265ff', iconLetter: 'S' }
+	];
+
+	type Side = 'from' | 'to';
+
+	let fromToken = $state<Token>(TOKENS[0]);
+	let toToken = $state<Token>(TOKENS[1]);
 	let fromAmount = $state('');
 	let toAmount = $state('');
+	let openSide = $state<Side | null>(null);
+
+	function pickToken(side: Side, token: Token) {
+		if (side === 'from') fromToken = token;
+		else toToken = token;
+		openSide = null;
+	}
+
+	function toggleDropdown(side: Side, e: MouseEvent) {
+		e.stopPropagation();
+		openSide = openSide === side ? null : side;
+	}
+
+	function flipSides() {
+		[fromToken, toToken] = [toToken, fromToken];
+		[fromAmount, toAmount] = [toAmount, fromAmount];
+	}
+
+	// Click anywhere outside the open dropdown closes it.
+	$effect(() => {
+		if (!openSide) return;
+		const close = () => {
+			openSide = null;
+		};
+		document.addEventListener('click', close);
+		return () => document.removeEventListener('click', close);
+	});
 
 	const features = [
 		{ icon: Check, label: 'Best rates across all liquidity pools' },
@@ -27,6 +80,16 @@
 	<meta name="description" content="Exchange tokens at the best rates on Solana." />
 </svelte:head>
 
+{#snippet tokenLogo(token: Token, size: 'sm' | 'lg')}
+	<span class="swap-token-logo swap-token-logo-{size}" style:background={token.bg}>
+		{#if token.iconSrc}
+			<img src={token.iconSrc} alt="" aria-hidden="true" />
+		{:else}
+			<span class="swap-token-mark">{token.iconLetter ?? token.symbol[0]}</span>
+		{/if}
+	</span>
+{/snippet}
+
 <AppShell currentPath="/swap">
 	<div class="swap-page">
 		<h1 class="swap-headline">Exchange tokens at the best rates</h1>
@@ -40,49 +103,79 @@
 			</header>
 
 			<div class="swap-stack">
-				<div class="swap-row">
-					<button type="button" class="swap-token-chip">
-						<span class="swap-token-logo" style:background-color="#4265FF">
-							<span class="swap-token-mark">S</span>
-						</span>
-						<span class="swap-token-meta">
-							<span class="swap-token-side">From</span>
-							<span class="swap-token-symbol">SPRK</span>
-						</span>
-						<AngleDownSmall size={16} />
-					</button>
-					<input
-						class="swap-amount"
-						type="text"
-						inputmode="decimal"
-						placeholder="0.00"
-						bind:value={fromAmount}
-						aria-label="Amount to swap from"
-					/>
-				</div>
+				{#each [{ side: 'from', label: 'From', token: fromToken, amount: fromAmount }, { side: 'to', label: 'To', token: toToken, amount: toAmount }] as row (row.side)}
+					{@const isOpen = openSide === row.side}
+					<div class="swap-row" class:is-open={isOpen}>
+						<button
+							type="button"
+							class="swap-token-chip"
+							class:is-open={isOpen}
+							onclick={(e) => toggleDropdown(row.side as Side, e)}
+							aria-haspopup="listbox"
+							aria-expanded={isOpen}
+						>
+							{@render tokenLogo(row.token, 'sm')}
+							<span class="swap-token-meta">
+								<span class="swap-token-side">{row.label}</span>
+								<span class="swap-token-symbol">{row.token.symbol}</span>
+							</span>
+							{#if isOpen}
+								<AngleUpSmall size={16} />
+							{:else}
+								<AngleDownSmall size={16} />
+							{/if}
+						</button>
 
-				<div class="swap-row">
-					<button type="button" class="swap-token-chip">
-						<span class="swap-token-logo" style:background-color="#009393">
-							<img src="/images/tokens/usdt-t.svg" alt="" aria-hidden="true" />
-						</span>
-						<span class="swap-token-meta">
-							<span class="swap-token-side">To</span>
-							<span class="swap-token-symbol">USDt</span>
-						</span>
-						<AngleDownSmall size={16} />
-					</button>
-					<input
-						class="swap-amount"
-						type="text"
-						inputmode="decimal"
-						placeholder="0.00"
-						bind:value={toAmount}
-						aria-label="Amount to receive"
-					/>
-				</div>
+						{#if row.side === 'from'}
+							<input
+								class="swap-amount"
+								type="text"
+								inputmode="decimal"
+								placeholder="0.00"
+								bind:value={fromAmount}
+								aria-label="Amount to swap from"
+							/>
+						{:else}
+							<input
+								class="swap-amount"
+								type="text"
+								inputmode="decimal"
+								placeholder="0.00"
+								bind:value={toAmount}
+								aria-label="Amount to receive"
+							/>
+						{/if}
 
-				<button class="swap-toggle" type="button" aria-label="Swap from and to">
+						{#if isOpen}
+							<div
+								class="swap-dropdown"
+								role="listbox"
+								tabindex="-1"
+								onclick={(e) => e.stopPropagation()}
+								onkeydown={(e) => {
+									if (e.key === 'Escape') openSide = null;
+								}}
+							>
+								{#each TOKENS as token (token.id)}
+									{@const isSelected = row.token.id === token.id}
+									<button
+										type="button"
+										class="swap-option"
+										class:is-selected={isSelected}
+										role="option"
+										aria-selected={isSelected}
+										onclick={() => pickToken(row.side as Side, token)}
+									>
+										{@render tokenLogo(token, 'lg')}
+										<span class="swap-option-symbol">{token.symbol}</span>
+									</button>
+								{/each}
+							</div>
+						{/if}
+					</div>
+				{/each}
+
+				<button class="swap-toggle" type="button" aria-label="Swap from and to" onclick={flipSides}>
 					<span class="swap-toggle-outer" aria-hidden="true"></span>
 					<span class="swap-toggle-inner" aria-hidden="true"></span>
 					<span class="swap-toggle-icon">
@@ -144,8 +237,8 @@
 		width: 100%;
 		max-width: 500px;
 		padding: var(--space-4);
-		background-color: var(--color-surface-inset); /* #181A29 */
-		border-radius: var(--radius-xl); /* 24 */
+		background-color: var(--color-surface-inset);
+		border-radius: var(--radius-xl);
 		display: flex;
 		flex-direction: column;
 		gap: var(--space-3);
@@ -161,7 +254,7 @@
 	.swap-card-title {
 		margin: 0;
 		font-family: var(--font-sans);
-		font-size: var(--text-md); /* 16 */
+		font-size: var(--text-md);
 		font-weight: var(--font-weight-bold);
 		letter-spacing: var(--tracking-tight);
 		text-transform: uppercase;
@@ -174,7 +267,7 @@
 		justify-content: center;
 		width: 32px;
 		height: 32px;
-		background-color: var(--color-bg); /* #070C1C — deeper than card */
+		background-color: var(--color-bg);
 		color: var(--color-text);
 		border-radius: var(--radius-md);
 		cursor: pointer;
@@ -184,7 +277,7 @@
 		background-color: var(--color-dark-700);
 	}
 
-	/* From / To row container — bg one shade darker than the card so it nests visually. */
+	/* From / To row container — bg one shade darker than the card so it nests. */
 	.swap-row {
 		position: relative;
 		display: grid;
@@ -192,8 +285,11 @@
 		align-items: center;
 		gap: var(--space-3);
 		padding: var(--space-3);
-		background-color: var(--color-bg); /* #070C1C */
+		background-color: var(--color-bg);
 		border-radius: var(--radius-lg);
+	}
+	.swap-row.is-open {
+		z-index: 10;
 	}
 
 	.swap-token-chip {
@@ -201,13 +297,14 @@
 		align-items: center;
 		gap: var(--space-2);
 		padding: var(--space-2) var(--space-3);
-		background-color: var(--color-surface-inset); /* #181A29 — back up to card shade */
+		background-color: var(--color-surface-inset);
 		border-radius: var(--radius-md);
 		color: var(--color-text);
 		cursor: pointer;
 		transition: background-color var(--motion-base) var(--ease-out);
 	}
-	.swap-token-chip:hover {
+	.swap-token-chip:hover,
+	.swap-token-chip.is-open {
 		background-color: var(--color-dark-700);
 		filter: brightness(1.1);
 	}
@@ -216,11 +313,18 @@
 		display: inline-flex;
 		align-items: center;
 		justify-content: center;
+		flex-shrink: 0;
+		overflow: hidden;
+	}
+	.swap-token-logo-sm {
 		width: 32px;
 		height: 32px;
 		border-radius: 12px;
-		flex-shrink: 0;
-		overflow: hidden;
+	}
+	.swap-token-logo-lg {
+		width: 40px;
+		height: 40px;
+		border-radius: 14px;
 	}
 	.swap-token-logo img {
 		width: 60%;
@@ -233,6 +337,9 @@
 		font-weight: var(--font-weight-bold);
 		color: var(--color-white-900);
 		line-height: 1;
+	}
+	.swap-token-logo-lg .swap-token-mark {
+		font-size: 20px;
 	}
 
 	.swap-token-meta {
@@ -273,6 +380,60 @@
 		color: var(--color-text-muted);
 	}
 
+	/* Token picker dropdown — opens from the From/To row, lists all available
+	 * tokens. Each option pads its row and shows a purple glow when selected. */
+	.swap-dropdown {
+		position: absolute;
+		top: calc(100% + var(--space-2));
+		left: 0;
+		right: 0;
+		grid-column: 1 / -1;
+		z-index: 20;
+		padding: var(--space-2);
+		background-color: var(--color-surface-inset);
+		border-radius: var(--radius-lg);
+		box-shadow: var(--shadow-overlay);
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-2);
+		max-height: 320px;
+		overflow-y: auto;
+	}
+
+	.swap-option {
+		display: flex;
+		align-items: center;
+		gap: var(--space-3);
+		padding: var(--space-3);
+		background-color: var(--color-bg);
+		border: 2px solid transparent;
+		border-radius: var(--radius-lg);
+		color: var(--color-text);
+		cursor: pointer;
+		text-align: left;
+		transition:
+			background-color var(--motion-base) var(--ease-out),
+			border-color var(--motion-base) var(--ease-out),
+			box-shadow var(--motion-base) var(--ease-out);
+	}
+	.swap-option:hover {
+		background-color: var(--color-dark-700);
+	}
+	.swap-option.is-selected {
+		border-color: var(--color-purple-300);
+		box-shadow:
+			0 0 0 4px rgba(165, 110, 255, 0.2),
+			0 0 16px rgba(165, 110, 255, 0.5);
+	}
+
+	.swap-option-symbol {
+		font-family: var(--font-sans);
+		font-size: var(--text-lg); /* 18 */
+		font-weight: var(--font-weight-bold);
+		letter-spacing: var(--tracking-tight);
+		color: var(--color-text);
+	}
+
 	/* Wraps the From row + To row so the swap toggle can absolutely-position
 	 * itself at the centre of the stack regardless of row content height. */
 	.swap-stack {
@@ -282,9 +443,6 @@
 		gap: var(--space-2);
 	}
 
-	/* Toggle button — Figma builds this as two rotated rects. The outer rotated
-	 * 45deg gives the diamond outline, the inner rotated -45deg sits as a
-	 * normal-looking square on top of it. */
 	.swap-toggle {
 		position: absolute;
 		left: 50%;
@@ -302,14 +460,14 @@
 	.swap-toggle-outer {
 		position: absolute;
 		inset: 0;
-		background-color: var(--color-bg); /* #070C1C */
+		background-color: var(--color-bg);
 		border-radius: 12px;
 		transform: rotate(45deg);
 	}
 	.swap-toggle-inner {
 		position: absolute;
 		inset: 6px;
-		background-color: var(--color-surface-inset); /* #181A29 */
+		background-color: var(--color-surface-inset);
 		border-radius: 8px;
 		transform: rotate(-45deg);
 	}
@@ -328,17 +486,14 @@
 		width: 100%;
 		max-width: 500px;
 		padding: var(--space-4) var(--space-5);
-		background-color: var(--color-surface); /* #080A0F */
-		border-radius: var(--radius-lg); /* 20 */
+		background-color: var(--color-surface);
+		border-radius: var(--radius-lg);
 		overflow: hidden;
 		display: flex;
 		flex-direction: column;
 		gap: var(--space-4);
 	}
 
-	/* Figma-exported blur composite (the multi-layer purple/pink bloom can't be
-	 * replicated in CSS gradients). screen blend lifts the bright pink-purple
-	 * area off the dark card surface without overpainting the upper portion. */
 	.dex-aurora {
 		position: absolute;
 		inset: 0;
@@ -360,7 +515,7 @@
 	.dex-title {
 		margin: 0;
 		font-family: var(--font-sans);
-		font-size: var(--text-lg); /* 18 */
+		font-size: var(--text-lg);
 		font-weight: var(--font-weight-bold);
 		letter-spacing: var(--tracking-tight);
 		text-transform: uppercase;
@@ -393,7 +548,7 @@
 
 	.dex-item-label {
 		font-family: var(--font-body);
-		font-size: var(--text-sm); /* 13 */
+		font-size: var(--text-sm);
 		font-weight: var(--font-weight-semibold);
 		line-height: var(--leading-normal);
 		letter-spacing: var(--tracking-snug);
