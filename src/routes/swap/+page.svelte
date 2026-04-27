@@ -336,18 +336,19 @@
 		gap: var(--space-4);
 	}
 
-	/* Approximation of the Figma multi-blur composite — radial purple bloom anchored
-	 * to the right side of the card. The full Figma stack has 11 layers with mix-blend
-	 * exclusion + plus-lighter that we can't replicate in pure CSS; this captures the
-	 * dominant visible vibe (right-side purple/blue glow). */
+	/* Figma-exported blur composite (the multi-layer purple/pink bloom can't be
+	 * replicated in CSS gradients). screen blend lifts the bright pink-purple
+	 * area off the dark card surface without overpainting the upper portion. */
 	.dex-aurora {
 		position: absolute;
 		inset: 0;
 		pointer-events: none;
-		background:
-			radial-gradient(ellipse 60% 80% at 100% 60%, rgba(201, 119, 255, 0.45) 0%, transparent 70%),
-			radial-gradient(ellipse 40% 60% at 90% 40%, rgba(26, 0, 255, 0.3) 0%, transparent 70%),
-			radial-gradient(ellipse 50% 70% at 65% 80%, rgba(89, 79, 208, 0.25) 0%, transparent 70%);
+		background-image: url('/images/swap/dex-blur.png');
+		background-size: cover;
+		background-position: center;
+		background-repeat: no-repeat;
+		mix-blend-mode: screen;
+		opacity: 0.7;
 	}
 
 	.dex-title,
