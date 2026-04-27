@@ -83,17 +83,18 @@
 		gap: 0;
 	}
 
-	/* Decorative aurora — single radial bloom anchored to bottom-centre. The full
-	 * Figma stack has a 12-layer purple/blue blur composite that we approximate
-	 * here; can be swapped for a PNG export if pixel-fidelity becomes important. */
+	/* Figma-exported blur composite. screen blend lifts the bright pink-purple
+	 * bloom off the dark card surface without overpainting the upper portion. */
 	.wallet-dialog-aurora {
 		position: absolute;
 		inset: 0;
 		pointer-events: none;
-		background:
-			radial-gradient(ellipse 80% 60% at 30% 110%, rgba(201, 119, 255, 0.65) 0%, transparent 65%),
-			radial-gradient(ellipse 70% 50% at 70% 105%, rgba(26, 0, 255, 0.45) 0%, transparent 70%),
-			radial-gradient(ellipse 60% 40% at 50% 95%, rgba(89, 79, 208, 0.35) 0%, transparent 70%);
+		background-image: url('/images/wallet/dialog-blur.png');
+		background-size: cover;
+		background-position: center;
+		background-repeat: no-repeat;
+		mix-blend-mode: screen;
+		opacity: 0.7;
 	}
 
 	.wallet-dialog > :not(.wallet-dialog-aurora) {
