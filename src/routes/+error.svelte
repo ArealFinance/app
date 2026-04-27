@@ -12,8 +12,6 @@
 </svelte:head>
 
 <div class="error-page">
-	<div class="error-bg" aria-hidden="true"></div>
-
 	<div class="error-content">
 		<header class="error-top">
 			<Logo height={27} />
@@ -52,26 +50,15 @@
 </div>
 
 <style>
+	/* No local background — the page sits on top of body's hero-bg (top) +
+	 * footer-bg (bottom) layers from global.css, which already produces the
+	 * top+bottom aurora the Figma macet calls for. */
 	.error-page {
 		position: relative;
 		height: 100dvh;
 		display: flex;
 		justify-content: center;
 		overflow: hidden;
-	}
-
-	/* Decorative purple/blue blur composite — reuses the footer aurora PNG flipped
-	 * vertically so the bright bands hover top + bottom of the 404 view. */
-	.error-bg {
-		position: absolute;
-		inset: 0;
-		background-image: url('/images/aurora/footer-bg.png');
-		background-position: center;
-		background-size: cover;
-		background-repeat: no-repeat;
-		transform: scaleY(-1);
-		opacity: 0.9;
-		pointer-events: none;
 	}
 
 	/* 3-row grid (top / middle / bottom) so logo pins to the top, copyright pins
