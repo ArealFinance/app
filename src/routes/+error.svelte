@@ -17,11 +17,7 @@
 	<div class="error-content">
 		<Logo height={27} />
 
-		<div class="error-hero">
-			<img class="error-crystal error-crystal-blur" src="/images/hero/crystal-composite.png" alt="" aria-hidden="true" />
-			<img class="error-crystal error-crystal-sharp" src="/images/hero/crystal-composite.png" alt="" aria-hidden="true" />
-			<img class="error-44" src="/images/404/44.svg" alt="404" />
-		</div>
+		<img class="error-hero" src="/images/404/hero.png" alt="404" />
 
 		<h1 class="error-title">{headline}</h1>
 
@@ -85,44 +81,15 @@
 		gap: var(--space-6);
 	}
 
+	/* Single composite (crystal + glow + 4·4 numerals) exported from Figma. */
 	.error-hero {
-		position: relative;
+		display: block;
 		width: 100%;
 		max-width: 482px; /* Figma 481.58 */
-		aspect-ratio: 482 / 338;
-		margin: var(--space-12) 0 var(--space-8);
-	}
-
-	.error-crystal {
-		position: absolute;
-		top: 0;
-		left: 50%;
-		width: 256px;
-		height: 281px;
-		object-fit: contain;
-		transform: translateX(-50%) rotate(-15deg);
-		pointer-events: none;
-	}
-
-	.error-crystal-blur {
-		filter: blur(36px);
-		opacity: 0.9;
-	}
-
-	.error-crystal-sharp {
-		/* Sharp copy is offset ~17px to the right per Figma to create a subtle
-		 * glow/double-shadow against the blurred backdrop layer. */
-		transform: translateX(calc(-50% + 17px)) rotate(-15deg);
-	}
-
-	.error-44 {
-		position: absolute;
-		bottom: 0;
-		left: 50%;
-		transform: translateX(-50%);
-		width: 100%;
 		height: auto;
-		display: block;
+		margin: var(--space-12) 0 var(--space-8);
+		pointer-events: none;
+		user-select: none;
 	}
 
 	.error-title {
@@ -191,10 +158,6 @@
 		.error-hero {
 			max-width: 320px;
 			margin: var(--space-8) 0 var(--space-6);
-		}
-		.error-crystal {
-			width: 180px;
-			height: 198px;
 		}
 		.error-actions :global(.btn) {
 			width: 100%;
