@@ -13,6 +13,8 @@ export type { IconButtonVariant, IconButtonSize } from './IconButton.svelte';
 export { default as Input } from './Input.svelte';
 export type { InputVariant, InputSize } from './Input.svelte';
 
+export { default as Modal } from './Modal.svelte';
+
 export { default as WalletAddressChip } from './WalletAddressChip.svelte';
 export type { WalletChipSize, WalletChipStatus } from './WalletAddressChip.svelte';
 
