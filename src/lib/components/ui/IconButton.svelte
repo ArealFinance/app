@@ -1,6 +1,6 @@
 <script lang="ts" module>
 	export type IconButtonVariant = 'ghost' | 'subtle' | 'solid' | 'inset';
-	export type IconButtonSize = 'sm' | 'md' | 'lg';
+	export type IconButtonSize = 'sm' | 'md' | 'lg' | 'xl';
 </script>
 
 <script lang="ts">
@@ -93,6 +93,14 @@
 		height: 44px;
 		font-size: 16px;
 		border-radius: var(--radius-md);
+	}
+	/* xl — footer send square (Figma: 80×80, 16-radius, 2px border) */
+	.icon-btn-size-xl {
+		width: 80px;
+		height: 80px;
+		font-size: 20px;
+		border-radius: 16px;
+		border-width: 2px;
 	}
 
 	/* ---------- variants ---------- */

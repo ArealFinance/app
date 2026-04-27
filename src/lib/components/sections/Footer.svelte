@@ -13,7 +13,7 @@
 </script>
 
 <script lang="ts">
-	import { Input, IconButton, StatusPill } from '$lib/components/ui';
+	import { IconButton } from '$lib/components/ui';
 	import { SendAlt, AngleUpSmall } from '$lib/icons';
 	import Logo from './Logo.svelte';
 
@@ -133,23 +133,26 @@
 
 		<form class="footer-subscribe" onsubmit={handleSubmit}>
 			<div class="footer-subscribe-input">
-				<div class="footer-subscribe-label">Contact Us</div>
-				<Input
-					bind:value={email}
+				<label class="footer-subscribe-label" for="footer-email">Contact Us</label>
+				<input
+					id="footer-email"
+					class="footer-subscribe-control"
 					type="email"
 					placeholder="Your Email address"
-					variant="ghost"
-					size="lg"
+					bind:value={email}
 					required
 				/>
 			</div>
-			<IconButton variant="solid" size="lg" type="submit" aria-label="Subscribe">
-				<SendAlt size={20} />
+			<IconButton variant="solid" size="xl" type="submit" aria-label="Subscribe">
+				<SendAlt size={28} />
 			</IconButton>
 		</form>
 
 		<div class="footer-legal">
-			<StatusPill variant="dot" tone="success" size="md">Stable</StatusPill>
+			<span class="footer-status">
+				<span class="footer-status-dot" aria-hidden="true"></span>
+				<span class="footer-status-label">Stable</span>
+			</span>
 			<nav class="footer-legal-links" aria-label="Legal">
 				{#each legalLinks as link}
 					<a href={link.href}>{link.label}</a>
@@ -191,28 +194,35 @@
 
 	.footer-copy {
 		margin: 0;
-		font-size: var(--text-sm);
-		color: var(--color-text-muted);
-		line-height: var(--leading-relaxed);
+		font-family: var(--font-body);
+		font-size: var(--text-base); /* 14 */
+		font-weight: var(--font-weight-semibold);
+		letter-spacing: var(--tracking-tight);
+		color: rgba(255, 255, 255, 0.3);
+		line-height: var(--leading-normal);
 	}
 
+	/* Halvar Breit Bold 18 white per Figma — bigger and brighter than typical column heads. */
 	.footer-col-head {
 		display: inline-flex;
 		align-items: center;
 		gap: var(--space-2);
 		margin-bottom: var(--space-4);
-		font-size: var(--text-sm);
+		font-family: var(--font-sans);
+		font-size: var(--text-lg); /* 18 */
 		font-weight: var(--font-weight-bold);
+		letter-spacing: var(--tracking-tight);
 		text-transform: uppercase;
-		letter-spacing: var(--tracking-wide);
 		color: var(--color-text);
+		line-height: var(--leading-normal);
 	}
 
+	/* Square 10×10 colored badge before the title (Documentation/About/Discover). */
 	.footer-col-dot {
 		display: inline-block;
-		width: 8px;
-		height: 8px;
-		border-radius: var(--radius-full);
+		width: 10px;
+		height: 10px;
+		border-radius: var(--radius-xs);
 		background-color: var(--color-text-muted);
 	}
 
@@ -226,7 +236,10 @@
 	}
 
 	.footer-col-list a {
-		font-size: var(--text-sm);
+		font-family: var(--font-body);
+		font-size: var(--text-base); /* 14 */
+		font-weight: var(--font-weight-semibold);
+		letter-spacing: var(--tracking-tight);
 		color: var(--color-text-muted);
 		text-decoration: none;
 		transition: color var(--motion-base) var(--ease-out);
@@ -239,14 +252,16 @@
 		justify-self: end;
 	}
 
-	/* Subscribe — composes ghost Input + solid IconButton */
+	/* Subscribe — Onest 44 placeholder + 80×80 send. Container per Figma: surface-muted bg
+	 * with 2px translucent border, 24-radius. Generous padding so the giant input breathes. */
 	.footer-subscribe {
 		display: flex;
 		gap: var(--space-3);
-		align-items: stretch;
-		padding: var(--space-3);
+		align-items: center;
+		padding: var(--space-2);
+		padding-left: var(--space-6);
 		background-color: var(--color-surface-muted);
-		border: 1px solid var(--color-border);
+		border: 2px solid var(--color-border);
 		border-radius: var(--radius-xl);
 	}
 
@@ -256,13 +271,33 @@
 		flex-direction: column;
 		justify-content: center;
 		min-width: 0;
+		gap: var(--space-1);
 	}
 
 	.footer-subscribe-label {
-		font-size: var(--text-xs);
-		color: var(--color-text-muted);
-		padding: 0 var(--space-5);
-		margin-bottom: -4px;
+		font-family: 'Onest', var(--font-body);
+		font-size: var(--text-base); /* 14 */
+		font-weight: var(--font-weight-medium);
+		letter-spacing: var(--tracking-tight);
+		color: var(--color-text);
+	}
+
+	.footer-subscribe-control {
+		width: 100%;
+		background: transparent;
+		border: 0;
+		outline: none;
+		padding: 0;
+		font-family: 'Onest', var(--font-body);
+		font-size: var(--text-3xl); /* 44 */
+		font-weight: var(--font-weight-regular);
+		line-height: var(--leading-normal);
+		letter-spacing: var(--tracking-tight);
+		color: var(--color-text);
+	}
+	.footer-subscribe-control::placeholder {
+		color: var(--color-text);
+		opacity: 1;
 	}
 
 	.footer-legal {
@@ -271,8 +306,37 @@
 		justify-content: space-between;
 		gap: var(--space-4);
 		padding-top: var(--space-4);
-		border-top: 1px solid var(--color-border);
+		border-top: 1px solid rgba(255, 255, 255, 0.1);
 		flex-wrap: wrap;
+	}
+
+	/* "● STABLE" status: solid pill bg, Geist Mono 13 #44D8BA, glowing teal dot. */
+	.footer-status {
+		display: inline-flex;
+		align-items: center;
+		gap: var(--space-2);
+		height: 28px;
+		padding: 0 var(--space-3);
+		background-color: rgba(255, 255, 255, 0.07);
+		border-radius: var(--radius-pill);
+	}
+
+	.footer-status-dot {
+		width: 8px;
+		height: 8px;
+		border-radius: var(--radius-full);
+		background-color: var(--color-teal-900);
+		box-shadow: var(--glow-teal);
+	}
+
+	.footer-status-label {
+		font-family: var(--font-mono);
+		font-size: var(--text-sm); /* 13 */
+		font-weight: var(--font-weight-semibold);
+		letter-spacing: var(--tracking-tight);
+		text-transform: uppercase;
+		line-height: 1;
+		color: var(--color-teal-900);
 	}
 
 	.footer-legal-links {
@@ -282,9 +346,13 @@
 	}
 
 	.footer-legal-links a {
-		font-size: var(--text-sm);
-		color: var(--color-text-muted);
+		font-family: var(--font-body);
+		font-size: var(--text-base); /* 14 */
+		font-weight: var(--font-weight-semibold);
+		letter-spacing: var(--tracking-tight);
+		color: rgba(255, 255, 255, 0.3);
 		text-decoration: none;
+		transition: color var(--motion-base) var(--ease-out);
 	}
 	.footer-legal-links a:hover {
 		color: var(--color-text);
@@ -304,6 +372,13 @@
 		.footer-scrolltop {
 			grid-column: 1 / -1;
 			justify-self: start;
+		}
+		.footer-subscribe {
+			padding-left: var(--space-4);
+		}
+		/* 44px placeholder is desktop-only — collapse to body large on mobile. */
+		.footer-subscribe-control {
+			font-size: var(--text-md);
 		}
 		.footer-legal {
 			flex-direction: column;
