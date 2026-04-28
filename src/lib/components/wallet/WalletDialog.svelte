@@ -73,14 +73,13 @@
 		width: 444px;
 		max-width: 100%;
 		min-height: 393px;
-		padding: var(--space-6) var(--space-6) var(--space-12);
+		/* Figma: caption at (32, 26), Areal mark at (32, 69). Side gutter 32 = space-8. */
+		padding: 26px 32px 24px;
 		background-color: var(--color-surface); /* #080A0F */
 		border-radius: var(--radius-xl); /* 20 */
 		overflow: hidden;
-		display: grid;
-		grid-template-columns: 1fr;
-		grid-template-rows: auto auto auto auto auto auto;
-		gap: 0;
+		display: flex;
+		flex-direction: column;
 	}
 
 	/* Figma-exported blur composite. screen blend lifts the bright pink-purple
@@ -97,7 +96,10 @@
 		opacity: 0.7;
 	}
 
-	.wallet-dialog > :not(.wallet-dialog-aurora) {
+	/* Lift everything above the aurora layer EXCEPT the close button — it sets
+	 * its own position: absolute and giving it a `position: relative` here would
+	 * override that and drop it back into the flex flow. */
+	.wallet-dialog > :not(.wallet-dialog-aurora):not(.wallet-dialog-close) {
 		position: relative;
 		z-index: 1;
 	}
@@ -109,22 +111,25 @@
 		letter-spacing: 1px;
 		text-transform: uppercase;
 		color: var(--color-purple-200); /* #EADAFF */
-		margin-bottom: var(--space-6);
+		/* Figma gap: caption baseline ~26+15=41, mark top ~69 → ~28px to mark. */
+		margin-bottom: 28px;
 	}
 
 	.wallet-dialog-close {
 		position: absolute;
-		top: var(--space-4);
-		right: var(--space-4);
+		top: 19px;
+		right: 19px;
+		z-index: 2;
 		display: inline-flex;
 		align-items: center;
 		justify-content: center;
-		width: 32px;
-		height: 32px;
+		width: 24px;
+		height: 24px;
 		background: transparent;
 		border: 0;
+		padding: 0;
 		color: var(--color-text);
-		border-radius: var(--radius-md);
+		border-radius: var(--radius-sm);
 		cursor: pointer;
 		transition: background-color var(--motion-base) var(--ease-out);
 	}
@@ -136,11 +141,11 @@
 		display: block;
 		width: 36px;
 		height: 36px;
-		margin-bottom: var(--space-3);
+		margin-bottom: var(--space-6);
 	}
 
 	.wallet-dialog-title {
-		margin: 0 0 var(--space-4);
+		margin: 0 0 var(--space-6);
 		font-family: var(--font-sans);
 		font-size: var(--text-xl); /* 24 */
 		font-weight: var(--font-weight-bold);
@@ -150,6 +155,9 @@
 		color: var(--color-text);
 	}
 
+	/* Figma stacks the helper text on TWO rows: copy first, then the
+	 * Phantom/Solflare line with brand glyphs. flex-column achieves that
+	 * without forcing inline spans into the same row. */
 	.wallet-dialog-help {
 		margin: 0 0 var(--space-5);
 		font-family: var(--font-body);
@@ -158,12 +166,14 @@
 		line-height: var(--leading-normal);
 		letter-spacing: -0.4px;
 		color: var(--color-text);
+		display: flex;
+		flex-direction: column;
+		gap: 4px;
 	}
 	.wallet-dialog-help-line {
 		display: inline-flex;
 		align-items: center;
 		gap: 6px;
-		margin-top: 4px;
 	}
 	.wallet-dialog-help-line strong {
 		font-weight: var(--font-weight-bold);
@@ -174,9 +184,11 @@
 		object-fit: contain;
 	}
 
-	/* White CTA — Halvar Bold 14 dark, 20-radius. Disabled state during the
-	 * awaiting-signature phase keeps the visual but prevents double-click. */
+	/* White CTA — Halvar Bold 14 dark, 20-radius. margin-top: auto pushes the
+	 * CTA + status-pill block to the bottom edge of the modal so the layout
+	 * matches the macet regardless of what's above. */
 	.wallet-dialog-cta {
+		margin-top: auto;
 		display: inline-flex;
 		align-items: center;
 		justify-content: center;
@@ -205,9 +217,9 @@
 	}
 
 	.wallet-dialog-status {
-		justify-self: center;
-		margin-top: var(--space-3);
-		padding: 6px var(--space-3) 5px;
+		align-self: center;
+		margin-top: 18px;
+		padding: 6px 10px 5px;
 		min-width: 180px;
 		background-color: rgba(0, 0, 0, 0.3);
 		border-radius: var(--radius-md);
