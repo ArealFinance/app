@@ -192,9 +192,14 @@
 		opacity: 0.55;
 	}
 
+	/* Lift everything above the aurora layer. position: relative without
+	 * z-index keeps each child INSIDE the panel's single stacking context,
+	 * so the disconnect popover (z-index: 10 deep in the bar) can actually
+	 * rise above its siblings — particularly .wallet-panel-list, which is
+	 * later in DOM order and would otherwise paint over the popover and
+	 * eat its clicks. */
 	.wallet-panel > :not(.wallet-panel-aurora) {
 		position: relative;
-		z-index: 1;
 	}
 
 	/* Top toolbar: address chip + logout btn + connected pill + close X. */
