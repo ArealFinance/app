@@ -279,19 +279,11 @@
 		background-color: rgba(0, 0, 0, 0.5);
 	}
 
-	/* Inline confirm popover anchored under the logout button.
-	 *
-	 * Figma calls for `rgba(0,0,0,0.6) + backdrop-filter: blur(6px)`. backdrop-
-	 * filter doesn't fire reliably here — the popover sits 4 layers deep
-	 * (modal-frame → wallet-panel with overflow:hidden+border-radius → bar →
-	 * logout-anchor) and the modal-backdrop already paints its own blur on
-	 * top of the page. Each ancestor introduces a compositing barrier that
-	 * tries to break the filter chain.
-	 *
-	 * Pragmatic fallback: opaque dark surface (surface-inset, slightly lighter
-	 * than the panel) with a 1px white-8% border + drop shadow. Reads as a
-	 * raised tile, hides the rows behind it cleanly, and works in every
-	 * browser regardless of context isolation. */
+	/* Inline confirm popover anchored under the logout button. Frosted-glass
+	 * per Figma: rgba(0,0,0,0.6) + backdrop-filter blur 6px. With the
+	 * z-index trap on panel children removed and mix-blend-mode dropped from
+	 * the aurora, there's no longer a compositing barrier between the popover
+	 * and the underlying transactions list, so the filter actually fires. */
 	.wallet-panel-confirm {
 		position: absolute;
 		top: calc(100% + var(--space-2));
@@ -300,7 +292,9 @@
 		z-index: 10;
 		width: 172px;
 		padding: var(--space-3) var(--space-3) var(--space-2);
-		background-color: var(--color-surface-inset); /* #181A29 */
+		background-color: rgba(0, 0, 0, 0.6);
+		backdrop-filter: blur(6px);
+		-webkit-backdrop-filter: blur(6px);
 		border: 1px solid rgba(255, 255, 255, 0.08);
 		border-radius: var(--radius-md);
 		display: flex;
