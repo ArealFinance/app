@@ -162,7 +162,10 @@
 		position: relative;
 		width: 444px;
 		max-width: 100%;
-		min-height: 589px;
+		/* Fixed Figma height (589). Falls back to the viewport when the screen
+		 * is shorter than that. The internal list scrolls — the modal itself
+		 * doesn't grow when 'Load more' adds rows. */
+		height: 589px;
 		max-height: calc(100dvh - 2 * var(--space-4));
 		padding: 18px;
 		background-color: var(--color-surface); /* #080A0F */
@@ -200,6 +203,7 @@
 		align-items: center;
 		gap: 4px;
 		min-height: 32px;
+		flex-shrink: 0;
 	}
 
 	.wallet-panel-chip {
@@ -388,6 +392,7 @@
 		letter-spacing: var(--tracking-tight);
 		text-transform: uppercase;
 		color: var(--color-text);
+		flex-shrink: 0;
 	}
 
 	/* Date chip + tx rows. The date chip is intentionally rounded only on the
@@ -435,6 +440,7 @@
 		text-transform: uppercase;
 		color: var(--color-text);
 		cursor: pointer;
+		flex-shrink: 0;
 		transition: background-color var(--motion-base) var(--ease-out);
 	}
 	.wallet-panel-loadmore:hover {
