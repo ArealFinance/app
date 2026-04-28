@@ -176,9 +176,11 @@
 		gap: var(--space-4);
 	}
 
-	/* Figma-exported blur composite — the bright purple bloom is baked into the
-	 * top of the PNG and fades to transparent toward the bottom, so cover-sizing
-	 * places the bloom over the toolbar where the macet wants it. */
+	/* Figma-exported blur composite — bright purple bloom baked into the top
+	 * of the PNG, fading to transparent toward the bottom. Plain opacity
+	 * (no mix-blend-mode) on purpose: blend modes on a panel descendant
+	 * isolate the panel's stacking context, which breaks backdrop-filter
+	 * on the disconnect popover later. */
 	.wallet-panel-aurora {
 		position: absolute;
 		inset: 0;
@@ -187,8 +189,7 @@
 		background-size: cover;
 		background-position: top center;
 		background-repeat: no-repeat;
-		mix-blend-mode: screen;
-		opacity: 0.7;
+		opacity: 0.55;
 	}
 
 	.wallet-panel > :not(.wallet-panel-aurora) {
@@ -273,15 +274,10 @@
 		background-color: rgba(0, 0, 0, 0.5);
 	}
 
-	/* Inline confirm popover anchored under the logout button.
-	 *
-	 * Figma calls for `rgba(0,0,0,0.6) + backdrop-filter: blur(6px)`. The blur
-	 * doesn't fire here because .wallet-panel-aurora uses `mix-blend-mode: screen`,
-	 * which forces the panel into an isolation context that severs the chain
-	 * backdrop-filter walks for the underlying pixels. Bumping the alpha to
-	 * ~0.85 gives the same frosted-glass read on the dark surface and a 1px
-	 * inner border restores the rim the macet shows. `isolation: isolate` is
-	 * also set so any later child with blend-mode doesn't inherit through. */
+	/* Inline confirm popover anchored under the logout button. Frosted-glass
+	 * per Figma: rgba(0,0,0,0.6) + backdrop-filter blur 6px. Works because
+	 * the parent aurora dropped mix-blend-mode (which previously broke the
+	 * blur chain). 1px white-8% inner border lifts the popover off the panel. */
 	.wallet-panel-confirm {
 		position: absolute;
 		top: calc(100% + var(--space-2));
@@ -290,7 +286,7 @@
 		z-index: 10;
 		width: 172px;
 		padding: var(--space-3) var(--space-3) var(--space-2);
-		background-color: rgba(8, 10, 15, 0.85);
+		background-color: rgba(0, 0, 0, 0.6);
 		backdrop-filter: blur(6px);
 		-webkit-backdrop-filter: blur(6px);
 		border: 1px solid rgba(255, 255, 255, 0.08);
@@ -300,7 +296,6 @@
 		align-items: center;
 		gap: var(--space-2);
 		box-shadow: var(--shadow-overlay);
-		isolation: isolate;
 	}
 
 	.wallet-panel-confirm-icon {
