@@ -170,7 +170,11 @@
 		padding: 18px;
 		background-color: var(--color-surface); /* #080A0F */
 		border-radius: var(--radius-xl);
-		overflow: hidden;
+		/* clip-path instead of overflow: hidden so backdrop-filter on the
+		 * disconnect popover (a descendant) can still sample underlying pixels
+		 * in the same stacking context. overflow: hidden + border-radius forces
+		 * a separate compositing layer that breaks backdrop-filter. */
+		clip-path: inset(0 round var(--radius-xl));
 		display: flex;
 		flex-direction: column;
 		gap: var(--space-4);
@@ -275,14 +279,18 @@
 	}
 
 	/* Inline confirm popover anchored under the logout button. Frosted-glass
-	 * per Figma: rgba(0,0,0,0.6) + backdrop-filter blur 6px. Works because
-	 * the parent aurora dropped mix-blend-mode (which previously broke the
-	 * blur chain). 1px white-8% inner border lifts the popover off the panel. */
+	 * per Figma: rgba(0,0,0,0.6) + backdrop-filter blur 6px.
+	 *
+	 * Uses margin-left instead of transform: translateX(-50%) on purpose —
+	 * `transform` creates a stacking context that, combined with the panel's
+	 * clip-path, was suppressing the backdrop-filter sample. With raw left+
+	 * margin-left positioning, the filter has a clean compositing layer to
+	 * blur the transactions list pixels behind it. */
 	.wallet-panel-confirm {
 		position: absolute;
 		top: calc(100% + var(--space-2));
 		left: 50%;
-		transform: translateX(-50%);
+		margin-left: -86px; /* half of width 172 */
 		z-index: 10;
 		width: 172px;
 		padding: var(--space-3) var(--space-3) var(--space-2);
