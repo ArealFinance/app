@@ -273,7 +273,15 @@
 		background-color: rgba(0, 0, 0, 0.5);
 	}
 
-	/* Inline confirm popover anchored under the logout button. */
+	/* Inline confirm popover anchored under the logout button.
+	 *
+	 * Figma calls for `rgba(0,0,0,0.6) + backdrop-filter: blur(6px)`. The blur
+	 * doesn't fire here because .wallet-panel-aurora uses `mix-blend-mode: screen`,
+	 * which forces the panel into an isolation context that severs the chain
+	 * backdrop-filter walks for the underlying pixels. Bumping the alpha to
+	 * ~0.85 gives the same frosted-glass read on the dark surface and a 1px
+	 * inner border restores the rim the macet shows. `isolation: isolate` is
+	 * also set so any later child with blend-mode doesn't inherit through. */
 	.wallet-panel-confirm {
 		position: absolute;
 		top: calc(100% + var(--space-2));
@@ -282,15 +290,17 @@
 		z-index: 10;
 		width: 172px;
 		padding: var(--space-3) var(--space-3) var(--space-2);
-		background-color: rgba(0, 0, 0, 0.6);
+		background-color: rgba(8, 10, 15, 0.85);
 		backdrop-filter: blur(6px);
 		-webkit-backdrop-filter: blur(6px);
+		border: 1px solid rgba(255, 255, 255, 0.08);
 		border-radius: var(--radius-md);
 		display: flex;
 		flex-direction: column;
 		align-items: center;
 		gap: var(--space-2);
 		box-shadow: var(--shadow-overlay);
+		isolation: isolate;
 	}
 
 	.wallet-panel-confirm-icon {
