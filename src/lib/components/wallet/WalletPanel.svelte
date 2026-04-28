@@ -170,11 +170,7 @@
 		padding: 18px;
 		background-color: var(--color-surface); /* #080A0F */
 		border-radius: var(--radius-xl);
-		/* clip-path instead of overflow: hidden so backdrop-filter on the
-		 * disconnect popover (a descendant) can still sample underlying pixels
-		 * in the same stacking context. overflow: hidden + border-radius forces
-		 * a separate compositing layer that breaks backdrop-filter. */
-		clip-path: inset(0 round var(--radius-xl));
+		overflow: hidden;
 		display: flex;
 		flex-direction: column;
 		gap: var(--space-4);
@@ -278,25 +274,28 @@
 		background-color: rgba(0, 0, 0, 0.5);
 	}
 
-	/* Inline confirm popover anchored under the logout button. Frosted-glass
-	 * per Figma: rgba(0,0,0,0.6) + backdrop-filter blur 6px.
+	/* Inline confirm popover anchored under the logout button.
 	 *
-	 * Uses margin-left instead of transform: translateX(-50%) on purpose —
-	 * `transform` creates a stacking context that, combined with the panel's
-	 * clip-path, was suppressing the backdrop-filter sample. With raw left+
-	 * margin-left positioning, the filter has a clean compositing layer to
-	 * blur the transactions list pixels behind it. */
+	 * Figma calls for `rgba(0,0,0,0.6) + backdrop-filter: blur(6px)`. backdrop-
+	 * filter doesn't fire reliably here — the popover sits 4 layers deep
+	 * (modal-frame → wallet-panel with overflow:hidden+border-radius → bar →
+	 * logout-anchor) and the modal-backdrop already paints its own blur on
+	 * top of the page. Each ancestor introduces a compositing barrier that
+	 * tries to break the filter chain.
+	 *
+	 * Pragmatic fallback: opaque dark surface (surface-inset, slightly lighter
+	 * than the panel) with a 1px white-8% border + drop shadow. Reads as a
+	 * raised tile, hides the rows behind it cleanly, and works in every
+	 * browser regardless of context isolation. */
 	.wallet-panel-confirm {
 		position: absolute;
 		top: calc(100% + var(--space-2));
 		left: 50%;
-		margin-left: -86px; /* half of width 172 */
+		transform: translateX(-50%);
 		z-index: 10;
 		width: 172px;
 		padding: var(--space-3) var(--space-3) var(--space-2);
-		background-color: rgba(0, 0, 0, 0.6);
-		backdrop-filter: blur(6px);
-		-webkit-backdrop-filter: blur(6px);
+		background-color: var(--color-surface-inset); /* #181A29 */
 		border: 1px solid rgba(255, 255, 255, 0.08);
 		border-radius: var(--radius-md);
 		display: flex;

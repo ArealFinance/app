@@ -87,13 +87,11 @@
 	}
 
 	/* The frame is a transparent positioning anchor — the consumer's child
-	 * (WalletDialog / WalletPanel) brings its own background, radius, and
-	 * sizing (including its own internal scroll). No overflow / max-height
-	 * here on purpose: those create a scroll-clip context that interferes
-	 * with backdrop-filter on deeply nested descendants (e.g. the disconnect
-	 * popover inside WalletPanel). */
+	 * (WalletDialog / WalletPanel) brings its own background, radius, and size. */
 	.modal-frame {
 		position: relative;
 		z-index: 1;
+		max-height: calc(100dvh - 2 * var(--space-4));
+		overflow-y: auto;
 	}
 </style>
