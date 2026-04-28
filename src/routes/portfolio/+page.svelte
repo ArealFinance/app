@@ -565,24 +565,33 @@
 	}
 
 	/* ---------- Filled aside (claim + KPIs + chart + stats) ----------
-	 * Outer .portfolio-aside is the #181A29 card. .claim-shell stacks two
-	 * #080A0F inner sections separated by an 18px gap that reveals the
-	 * outer color — that's what makes the 'cut' across the card. The
-	 * crystal PNG floats absolutely on top of both sections and the gap. */
+	 * Two #080A0F sections stacked inside the #181A29 outer card; the gap
+	 * between them reveals the outer color and forms the horizontal 'cut'.
+	 *
+	 * The cut isn't a plain rectangular slot — its ends are rounded into
+	 * stadium half-caps. Achieved by giving the FACING corners (top section's
+	 * bottom + bottom section's top) a radius equal to half the gap height,
+	 * so the two semicircular curves meet across the gap and read as a single
+	 * pill-shaped channel. Outer corners keep the 20px radius the macet uses. */
 	.claim-shell {
 		position: relative;
 		margin: 4px;
 		display: flex;
 		flex-direction: column;
-		gap: 14px;
+		gap: 18px;
 	}
 	.claim-section {
 		background-color: var(--color-surface);
-		border-radius: var(--radius-lg);
 		padding: 24px;
 		display: flex;
 		flex-direction: column;
 		gap: var(--space-5);
+	}
+	.claim-top {
+		border-radius: var(--radius-lg) var(--radius-lg) 9px 9px;
+	}
+	.claim-bottom {
+		border-radius: 9px 9px var(--radius-lg) var(--radius-lg);
 	}
 	.claim-section .rewards-block {
 		flex: 1;
