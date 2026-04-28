@@ -72,8 +72,9 @@
 		position: relative;
 		width: 444px;
 		max-width: 100%;
-		min-height: 393px;
-		/* Figma: caption at (32, 26), Areal mark at (32, 69). Side gutter 32 = space-8. */
+		/* Figma: caption at (32, 26), Areal mark at (32, 69). Side gutter 32 = space-8.
+		 * No min-height — content drives height so the 'imbalance' below the CTA
+		 * disappears when the awaiting-signature pill is hidden. */
 		padding: 26px 32px 24px;
 		background-color: var(--color-surface); /* #080A0F */
 		border-radius: var(--radius-xl); /* 20 */
@@ -159,7 +160,8 @@
 	 * Phantom/Solflare line with brand glyphs. flex-column achieves that
 	 * without forcing inline spans into the same row. */
 	.wallet-dialog-help {
-		margin: 0 0 var(--space-5);
+		/* Per Figma: helper bottom at ~241, CTA top at 273 → 32px gap. */
+		margin: 0 0 32px;
 		font-family: var(--font-body);
 		font-size: var(--text-sm); /* 13 */
 		font-weight: var(--font-weight-medium);
@@ -184,11 +186,10 @@
 		object-fit: contain;
 	}
 
-	/* White CTA — Halvar Bold 14 dark, 20-radius. margin-top: auto pushes the
-	 * CTA + status-pill block to the bottom edge of the modal so the layout
-	 * matches the macet regardless of what's above. */
+	/* White CTA — Halvar Bold 14 dark, 20-radius. Flows right after the helper
+	 * text via that block's 32px margin-bottom; we don't push it to the bottom
+	 * edge anymore (caused the 'big empty gap' imbalance). */
 	.wallet-dialog-cta {
-		margin-top: auto;
 		display: inline-flex;
 		align-items: center;
 		justify-content: center;
