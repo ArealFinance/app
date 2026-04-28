@@ -120,98 +120,116 @@
 						</div>
 					</div>
 				{:else}
-					<!-- Filled: claim + KPI + asset distribution + stats -->
-					<div class="claim-inner">
-						<!-- Top: unclaimed rewards block -->
-						<div class="rewards-block">
-							<div class="kpi-label">Unclaimed Rewards</div>
-							<div class="rewards-row">
-								<img class="reward-icon" src="/images/tokens/rwt-mark.svg" alt="" aria-hidden="true" />
-								<span class="rewards-amount">46.096039</span>
-								<span class="rwt-pill">RWT</span>
-							</div>
-							<div class="rate-pill">
-								<svg
-									width="16"
-									height="16"
-									viewBox="0 0 24 24"
-									fill="none"
-									stroke="currentColor"
-									stroke-width="2"
-									stroke-linecap="round"
-									stroke-linejoin="round"
-									aria-hidden="true"
-								>
-									<path d="M12 14l4-4" />
-									<path d="M2 14a10 10 0 0 1 20 0" />
-									<circle cx="12" cy="14" r="1.5" fill="currentColor" />
-								</svg>
-								<span>+0.00000026 RWT/sec</span>
-							</div>
-						</div>
-
-						<!-- Successful Claim CTA -->
-						<button type="button" class="claim-btn">
-							<Check size={16} />
-							<span>Successful Claim</span>
-						</button>
-
-						<!-- Total value -->
-						<div class="rewards-block">
-							<div class="kpi-label">Total Value</div>
-							<div class="kpi-value">$200,995.85</div>
-						</div>
-
-						<!-- Assets distribution -->
-						<div class="dist-section">
-							<div class="dist-header">
-								<span class="dist-title">Assets distribution</span>
-								<span class="dist-count">
-									<span class="dist-count-dot" aria-hidden="true"></span>
-									<span>5 categories</span>
-								</span>
-							</div>
-
-							<div class="dist-chart" aria-hidden="true">
-								<div class="dist-bar dist-bar-purple"></div>
-								<div class="dist-bar dist-bar-pink"></div>
-								<span class="dist-marker"></span>
-							</div>
-
-							<div class="dist-legend">
-								<div class="legend-row">
-									<span class="legend-marker legend-purple"></span>
-									<span class="legend-label">Ownership tokens</span>
-									<span class="legend-value">$404.45</span>
-									<span class="legend-pill legend-pill-purple">40.61%</span>
+					<!-- Filled. The horizontal 'cut' between top & bottom is achieved by
+					     stacking two #080A0F sections inside the #181A29 outer card with
+					     a small gap — NOT a real subtraction or clip-path. -->
+					<div class="claim-shell">
+						<!-- TOP section: unclaimed rewards + claim CTA -->
+						<div class="claim-section claim-top">
+							<div class="rewards-block">
+								<div class="kpi-label">Unclaimed Rewards</div>
+								<div class="rewards-row">
+									<img
+										class="reward-icon"
+										src="/images/tokens/rwt-mark.svg"
+										alt=""
+										aria-hidden="true"
+									/>
+									<span class="rewards-amount">46.096039</span>
+									<span class="rwt-pill">RWT</span>
 								</div>
-								<div class="legend-row">
-									<span class="legend-marker legend-pink"></span>
-									<span class="legend-label">LP</span>
-									<span class="legend-value">$379.69</span>
-									<span class="legend-pill legend-pill-pink">21.26%</span>
+								<div class="rate-pill">
+									<svg
+										width="16"
+										height="16"
+										viewBox="0 0 24 24"
+										fill="none"
+										stroke="currentColor"
+										stroke-width="2"
+										stroke-linecap="round"
+										stroke-linejoin="round"
+										aria-hidden="true"
+									>
+										<path d="M12 14l4-4" />
+										<path d="M2 14a10 10 0 0 1 20 0" />
+										<circle cx="12" cy="14" r="1.5" fill="currentColor" />
+									</svg>
+									<span>+0.00000026 RWT/sec</span>
 								</div>
 							</div>
+
+							<button type="button" class="claim-btn">
+								<Check size={16} />
+								<span>Successful Claim</span>
+							</button>
 						</div>
 
-						<!-- Bottom stats -->
-						<div class="stats-row">
-							<div class="stat-cell">
-								<span class="stat-label">Portfolio APY</span>
-								<span class="stat-value stat-value-positive">1.55%</span>
+						<!-- BOTTOM section: total value, chart, legend, stats -->
+						<div class="claim-section claim-bottom">
+							<div class="rewards-block">
+								<div class="kpi-label">Total Value</div>
+								<div class="kpi-value">$200,995.85</div>
 							</div>
-							<div class="stat-cell">
-								<span class="stat-label">Daily Income</span>
-								<span class="stat-value stat-value-positive">$0.02</span>
+
+							<div class="dist-section">
+								<div class="dist-header">
+									<span class="dist-title">Assets distribution</span>
+									<span class="dist-count">
+										<span class="dist-count-dot" aria-hidden="true"></span>
+										<span>5 categories</span>
+									</span>
+								</div>
+
+								<div class="dist-chart" aria-hidden="true">
+									<div class="dist-bar dist-bar-purple"></div>
+									<div class="dist-bar dist-bar-pink"></div>
+									<span class="dist-marker"></span>
+								</div>
+
+								<div class="dist-legend">
+									<div class="legend-row">
+										<span class="legend-marker legend-purple"></span>
+										<span class="legend-label">Ownership tokens</span>
+										<span class="legend-value">$404.45</span>
+										<span class="legend-pill legend-pill-purple">40.61%</span>
+									</div>
+									<div class="legend-row">
+										<span class="legend-marker legend-pink"></span>
+										<span class="legend-label">LP</span>
+										<span class="legend-value">$379.69</span>
+										<span class="legend-pill legend-pill-pink">21.26%</span>
+									</div>
+								</div>
 							</div>
-							<div class="stat-cell">
-								<span class="stat-label">24h change</span>
-								<span class="stat-value stat-value-positive">
-									<ArrowUpSmall size={14} variant="filled" />
-									5.02%
-								</span>
+
+							<div class="stats-row">
+								<div class="stat-cell">
+									<span class="stat-label">Portfolio APY</span>
+									<span class="stat-value stat-value-positive">1.55%</span>
+								</div>
+								<div class="stat-cell">
+									<span class="stat-label">Daily Income</span>
+									<span class="stat-value stat-value-positive">$0.02</span>
+								</div>
+								<div class="stat-cell">
+									<span class="stat-label">24h change</span>
+									<span class="stat-value stat-value-positive">
+										<ArrowUpSmall size={14} variant="filled" />
+										5.02%
+									</span>
+								</div>
 							</div>
 						</div>
+
+						<!-- Decorative crystal — sits over both sections AND the gap. The PNG
+						     itself has transparency around the crystal silhouette so the cut
+						     between sections still reads through. -->
+						<img
+							class="claim-crystal"
+							src="/images/hero/crystal.png"
+							alt=""
+							aria-hidden="true"
+						/>
 					</div>
 				{/if}
 			</Card>
@@ -546,15 +564,39 @@
 		color: var(--color-text);
 	}
 
-	/* ---------- Filled aside (claim + KPIs + chart + stats) ---------- */
-	.claim-inner {
+	/* ---------- Filled aside (claim + KPIs + chart + stats) ----------
+	 * Outer .portfolio-aside is the #181A29 card. .claim-shell stacks two
+	 * #080A0F inner sections separated by an 18px gap that reveals the
+	 * outer color — that's what makes the 'cut' across the card. The
+	 * crystal PNG floats absolutely on top of both sections and the gap. */
+	.claim-shell {
+		position: relative;
 		margin: 4px;
-		padding: 24px;
-		background-color: var(--color-surface);
-		border-radius: var(--radius-lg);
 		display: flex;
 		flex-direction: column;
-		gap: var(--space-7);
+		gap: 14px;
+	}
+	.claim-section {
+		background-color: var(--color-surface);
+		border-radius: var(--radius-lg);
+		padding: 24px;
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-5);
+	}
+	.claim-section .rewards-block {
+		flex: 1;
+	}
+
+	.claim-crystal {
+		position: absolute;
+		top: -16px;
+		right: -24px;
+		width: 280px;
+		height: auto;
+		pointer-events: none;
+		transform: rotate(15deg);
+		filter: drop-shadow(0 12px 40px rgba(168, 132, 255, 0.4));
 	}
 
 	.rewards-block {
@@ -1223,9 +1265,14 @@
 			padding: var(--space-5);
 			gap: var(--space-5);
 		}
-		.claim-inner {
+		.claim-section {
 			padding: var(--space-5);
-			gap: var(--space-5);
+			gap: var(--space-4);
+		}
+		.claim-crystal {
+			top: -8px;
+			right: -16px;
+			width: 200px;
 		}
 		.section-head {
 			padding: var(--space-4) var(--space-4) var(--space-3);
