@@ -632,31 +632,34 @@
 		transform: translateX(-50%);
 		background-color: var(--color-surface);
 	}
+	/* Bite size 6 keeps a 6px straight edge in the centre of each connector
+	 * side (18 height - 2*6 = 6), so the bar reads as a clean rectangle with
+	 * softened corners rather than a sharply-pinched lens. */
 	.connector-bite {
 		position: absolute;
-		width: 9px;
-		height: 9px;
+		width: 6px;
+		height: 6px;
 		background-color: var(--color-surface-inset);
 	}
 	.connector-bite-tl {
 		top: 0;
 		left: 0;
-		border-bottom-right-radius: 9px;
+		border-bottom-right-radius: 6px;
 	}
 	.connector-bite-tr {
 		top: 0;
 		right: 0;
-		border-bottom-left-radius: 9px;
+		border-bottom-left-radius: 6px;
 	}
 	.connector-bite-bl {
 		bottom: 0;
 		left: 0;
-		border-top-right-radius: 9px;
+		border-top-right-radius: 6px;
 	}
 	.connector-bite-br {
 		bottom: 0;
 		right: 0;
-		border-top-left-radius: 9px;
+		border-top-left-radius: 6px;
 	}
 
 	.claim-crystal {
