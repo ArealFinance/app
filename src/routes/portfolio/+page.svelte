@@ -171,22 +171,17 @@
 
 						<!-- 18px gap-row that reveals the outer #181A29 — except the
 						     connector bar pinned to the centre keeps the two sections
-						     visually joined. The connector has concave (inverse) fillets
-						     on all four corners so it tapers smoothly into the section
-						     edges instead of meeting them at hard 90° angles. SVG path
-						     because CSS border-radius can only do convex corners. -->
+						     visually joined. Each of the 4 corner 'bites' paints the
+						     outer colour over the corner 9x9 area as a quarter-disc
+						     (border-radius on the INNER corner of the bite), which
+						     visually carves a concave fillet out of the connector. -->
 						<div class="claim-gap-row" aria-hidden="true">
-							<svg
-								class="claim-connector"
-								viewBox="0 0 74 18"
-								preserveAspectRatio="none"
-								aria-hidden="true"
-							>
-								<path
-									d="M 9 0 H 65 A 9 9 0 0 0 74 9 A 9 9 0 0 0 65 18 H 9 A 9 9 0 0 0 0 9 A 9 9 0 0 0 9 0 Z"
-									fill="currentColor"
-								/>
-							</svg>
+							<div class="claim-connector">
+								<span class="connector-bite connector-bite-tl"></span>
+								<span class="connector-bite connector-bite-tr"></span>
+								<span class="connector-bite connector-bite-bl"></span>
+								<span class="connector-bite connector-bite-br"></span>
+							</div>
 						</div>
 
 						<!-- BOTTOM section: total value, chart, legend, stats -->
@@ -625,8 +620,9 @@
 		position: relative;
 		height: 18px;
 	}
-	/* SVG element with concave fillets at each corner. currentColor drives
-	 * fill so the bar stays the same #080A0F as the sections. */
+	/* Connector bar: rectangle of #080A0F. The 4 bite spans paint the outer
+	 * #181A29 colour over each corner as a quarter-disc — border-radius on
+	 * the INNER corner of each bite carves a concave fillet into the bar. */
 	.claim-connector {
 		position: absolute;
 		left: 50%;
@@ -634,8 +630,33 @@
 		width: 74px;
 		height: 18px;
 		transform: translateX(-50%);
-		color: var(--color-surface);
-		display: block;
+		background-color: var(--color-surface);
+	}
+	.connector-bite {
+		position: absolute;
+		width: 9px;
+		height: 9px;
+		background-color: var(--color-surface-inset);
+	}
+	.connector-bite-tl {
+		top: 0;
+		left: 0;
+		border-bottom-right-radius: 9px;
+	}
+	.connector-bite-tr {
+		top: 0;
+		right: 0;
+		border-bottom-left-radius: 9px;
+	}
+	.connector-bite-bl {
+		bottom: 0;
+		left: 0;
+		border-top-right-radius: 9px;
+	}
+	.connector-bite-br {
+		bottom: 0;
+		right: 0;
+		border-top-left-radius: 9px;
 	}
 
 	.claim-crystal {
