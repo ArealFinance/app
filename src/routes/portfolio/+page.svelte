@@ -171,17 +171,22 @@
 
 						<!-- 18px gap-row that reveals the outer #181A29 — except the
 						     connector bar pinned to the centre keeps the two sections
-						     visually joined. Each of the 4 corner 'bites' paints the
-						     outer colour over the corner 9x9 area as a quarter-disc
-						     (border-radius on the INNER corner of the bite), which
-						     visually carves a concave fillet out of the connector. -->
+						     visually joined. Connector is a 74x18 rectangle with a
+						     concave semicircle carved into each side ('dogbone'): top
+						     and bottom edges stay flat full-width, left and right edges
+						     bow inward to the centre. -->
 						<div class="claim-gap-row" aria-hidden="true">
-							<div class="claim-connector">
-								<span class="connector-bite connector-bite-tl"></span>
-								<span class="connector-bite connector-bite-tr"></span>
-								<span class="connector-bite connector-bite-bl"></span>
-								<span class="connector-bite connector-bite-br"></span>
-							</div>
+							<svg
+								class="claim-connector"
+								viewBox="0 0 74 18"
+								preserveAspectRatio="none"
+								aria-hidden="true"
+							>
+								<path
+									d="M0,0 L74,0 A9,9 0 0,0 74,18 L0,18 A9,9 0 0,0 0,0 Z"
+									fill="currentColor"
+								/>
+							</svg>
 						</div>
 
 						<!-- BOTTOM section: total value, chart, legend, stats -->
@@ -620,9 +625,11 @@
 		position: relative;
 		height: 18px;
 	}
-	/* Connector bar: rectangle of #080A0F. The 4 bite spans paint the outer
-	 * #181A29 colour over each corner as a quarter-disc — border-radius on
-	 * the INNER corner of each bite carves a concave fillet into the bar. */
+	/* Inline SVG with one path — flat top + bottom edges, concave semicircle
+	 * on each side (dogbone). Two arc commands (one per side) is the simplest
+	 * unambiguous SVG path for this shape; chord = diameter = height, so the
+	 * arc has only one valid circle and renders crisp at every density.
+	 * currentColor keeps the fill in sync with the section surface token. */
 	.claim-connector {
 		position: absolute;
 		left: 50%;
@@ -630,36 +637,8 @@
 		width: 74px;
 		height: 18px;
 		transform: translateX(-50%);
-		background-color: var(--color-surface);
-	}
-	/* Bite size 6 keeps a 6px straight edge in the centre of each connector
-	 * side (18 height - 2*6 = 6), so the bar reads as a clean rectangle with
-	 * softened corners rather than a sharply-pinched lens. */
-	.connector-bite {
-		position: absolute;
-		width: 6px;
-		height: 6px;
-		background-color: var(--color-surface-inset);
-	}
-	.connector-bite-tl {
-		top: 0;
-		left: 0;
-		border-bottom-right-radius: 6px;
-	}
-	.connector-bite-tr {
-		top: 0;
-		right: 0;
-		border-bottom-left-radius: 6px;
-	}
-	.connector-bite-bl {
-		bottom: 0;
-		left: 0;
-		border-top-right-radius: 6px;
-	}
-	.connector-bite-br {
-		bottom: 0;
-		right: 0;
-		border-top-left-radius: 6px;
+		color: var(--color-surface);
+		display: block;
 	}
 
 	.claim-crystal {
