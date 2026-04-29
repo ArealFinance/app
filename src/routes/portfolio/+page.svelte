@@ -171,9 +171,22 @@
 
 						<!-- 18px gap-row that reveals the outer #181A29 — except the
 						     connector bar pinned to the centre keeps the two sections
-						     visually joined. -->
+						     visually joined. The connector has concave (inverse) fillets
+						     on all four corners so it tapers smoothly into the section
+						     edges instead of meeting them at hard 90° angles. SVG path
+						     because CSS border-radius can only do convex corners. -->
 						<div class="claim-gap-row" aria-hidden="true">
-							<span class="claim-connector"></span>
+							<svg
+								class="claim-connector"
+								viewBox="0 0 74 18"
+								preserveAspectRatio="none"
+								aria-hidden="true"
+							>
+								<path
+									d="M 9 0 H 65 A 9 9 0 0 0 74 9 A 9 9 0 0 0 65 18 H 9 A 9 9 0 0 0 0 9 A 9 9 0 0 0 9 0 Z"
+									fill="currentColor"
+								/>
+							</svg>
 						</div>
 
 						<!-- BOTTOM section: total value, chart, legend, stats -->
@@ -612,14 +625,17 @@
 		position: relative;
 		height: 18px;
 	}
+	/* SVG element with concave fillets at each corner. currentColor drives
+	 * fill so the bar stays the same #080A0F as the sections. */
 	.claim-connector {
 		position: absolute;
 		left: 50%;
 		top: 0;
-		bottom: 0;
 		width: 74px;
+		height: 18px;
 		transform: translateX(-50%);
-		background-color: var(--color-surface);
+		color: var(--color-surface);
+		display: block;
 	}
 
 	.claim-crystal {
