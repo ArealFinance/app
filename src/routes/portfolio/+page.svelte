@@ -120,9 +120,14 @@
 						</div>
 					</div>
 				{:else}
-					<!-- Filled. The horizontal 'cut' between top & bottom is achieved by
-					     stacking two #080A0F sections inside the #181A29 outer card with
-					     a small gap — NOT a real subtraction or clip-path. -->
+					<!-- Filled. The horizontal 'cut' is a Figma Subtract:
+					     base inner #080A0F (468x734, radius 20)
+					     MINUS two strips (199x18 left + 199x18 right at y=423)
+					     → result: two windows showing the outer #181A29, separated by
+					     a 74px-wide connector bar of #080A0F that bridges the top and
+					     bottom halves at their meeting line. We rebuild that with two
+					     stacked sections (flat facing edges) + an absolute connector bar
+					     in the gap. -->
 					<div class="claim-shell">
 						<!-- TOP section: unclaimed rewards + claim CTA -->
 						<div class="claim-section claim-top">
@@ -162,6 +167,13 @@
 								<Check size={16} />
 								<span>Successful Claim</span>
 							</button>
+						</div>
+
+						<!-- 18px gap-row that reveals the outer #181A29 — except the
+						     connector bar pinned to the centre keeps the two sections
+						     visually joined. -->
+						<div class="claim-gap-row" aria-hidden="true">
+							<span class="claim-connector"></span>
 						</div>
 
 						<!-- BOTTOM section: total value, chart, legend, stats -->
@@ -565,20 +577,19 @@
 	}
 
 	/* ---------- Filled aside (claim + KPIs + chart + stats) ----------
-	 * Two #080A0F sections stacked inside the #181A29 outer card; the gap
-	 * between them reveals the outer color and forms the horizontal 'cut'.
-	 *
-	 * The cut isn't a plain rectangular slot — its ends are rounded into
-	 * stadium half-caps. Achieved by giving the FACING corners (top section's
-	 * bottom + bottom section's top) a radius equal to half the gap height,
-	 * so the two semicircular curves meet across the gap and read as a single
-	 * pill-shaped channel. Outer corners keep the 20px radius the macet uses. */
+	 * Re-creates the Figma Subtract: full inner #080A0F minus two 199x18
+	 * strips, leaving a 74px connector bar in the centre. Built with:
+	 *   - claim-top      → top section, flat bottom edge
+	 *   - claim-gap-row  → 18px height, no bg (outer #181A29 shows through)
+	 *   - claim-connector→ 74px bar absolute-pinned to centre of gap, #080A0F
+	 *   - claim-bottom   → bottom section, flat top edge
+	 * Result: two visible windows of outer colour on either side of the bar,
+	 * exactly matching the boolean op in the source file. */
 	.claim-shell {
 		position: relative;
 		margin: 4px;
 		display: flex;
 		flex-direction: column;
-		gap: 18px;
 	}
 	.claim-section {
 		background-color: var(--color-surface);
@@ -588,13 +599,27 @@
 		gap: var(--space-5);
 	}
 	.claim-top {
-		border-radius: var(--radius-lg) var(--radius-lg) 9px 9px;
+		border-radius: var(--radius-lg) var(--radius-lg) 0 0;
 	}
 	.claim-bottom {
-		border-radius: 9px 9px var(--radius-lg) var(--radius-lg);
+		border-radius: 0 0 var(--radius-lg) var(--radius-lg);
 	}
 	.claim-section .rewards-block {
 		flex: 1;
+	}
+
+	.claim-gap-row {
+		position: relative;
+		height: 18px;
+	}
+	.claim-connector {
+		position: absolute;
+		left: 50%;
+		top: 0;
+		bottom: 0;
+		width: 74px;
+		transform: translateX(-50%);
+		background-color: var(--color-surface);
 	}
 
 	.claim-crystal {
