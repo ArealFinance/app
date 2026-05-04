@@ -76,9 +76,9 @@
 	.modal-backdrop {
 		position: absolute;
 		inset: 0;
-		background-color: rgba(0, 0, 0, 0.5);
-		backdrop-filter: blur(8px);
-		-webkit-backdrop-filter: blur(8px);
+		background-color: rgba(8, 10, 15, 0.55);
+		backdrop-filter: blur(24px) saturate(1.2);
+		-webkit-backdrop-filter: blur(24px) saturate(1.2);
 		border: 0;
 		padding: 0;
 		cursor: pointer;
