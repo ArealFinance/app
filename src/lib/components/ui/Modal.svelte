@@ -76,9 +76,11 @@
 	.modal-backdrop {
 		position: absolute;
 		inset: 0;
-		background-color: rgba(8, 10, 15, 0.55);
-		backdrop-filter: blur(24px) saturate(1.2);
-		-webkit-backdrop-filter: blur(24px) saturate(1.2);
+		/* Figma: Background blur, Uniform, 6px. Tint is intentionally faint —
+		 * the blur does the visual work. */
+		background-color: rgba(8, 10, 15, 0.4);
+		backdrop-filter: blur(6px);
+		-webkit-backdrop-filter: blur(6px);
 		border: 0;
 		padding: 0;
 		cursor: pointer;
