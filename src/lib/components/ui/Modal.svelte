@@ -78,7 +78,7 @@
 		inset: 0;
 		/* Figma: Background blur, Uniform, 6px. Tint is intentionally faint —
 		 * the blur does the visual work. */
-		background-color: rgba(8, 10, 15, 0.4);
+		background-color: rgba(0, 0, 0, 0.5);
 		backdrop-filter: blur(6px);
 		-webkit-backdrop-filter: blur(6px);
 		border: 0;
