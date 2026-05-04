@@ -35,9 +35,7 @@
 			iconSrc: '/images/tokens/rwt-mark.svg'
 		},
 		{ id: 'usdt', symbol: 'USDt', bg: '#009393', iconSrc: '/images/tokens/usdt-t.svg' },
-		{ id: 'trx', symbol: 'TRX', bg: '#d84347', iconLetter: 'T' },
-		{ id: 'ton', symbol: 'TON', bg: '#0098ea', iconLetter: 'T' },
-		{ id: 'sprk', symbol: 'SPRK', bg: '#4265ff', iconLetter: 'S' }
+		{ id: 'sprk', symbol: 'SPRK', bg: '#4265ff', iconSrc: '/images/tokens/sparkles.svg' }
 	];
 
 	let {

@@ -57,30 +57,6 @@
 			price: '$3.57',
 			value: '$829.39'
 		},
-		{
-			symbol: 'TRX',
-			logoBg: '#FF060A',
-			logoLetter: 'T',
-			qty: '2,050.89',
-			apy: '5.89%',
-			apyTone: 'success',
-			price24h: '27.7%',
-			price24hTone: 'success',
-			price: '$2.96',
-			value: '$1,142.92'
-		},
-		{
-			symbol: 'TON',
-			logoBg: '#0098EA',
-			logoLetter: 'T',
-			qty: '768.27',
-			apy: '12.5%',
-			apyTone: 'success',
-			price24h: '5.5%',
-			price24hTone: 'success',
-			price: '$1.08',
-			value: '$200,249.98'
-		}
 	];
 
 	const positions: LpPosition[] = [

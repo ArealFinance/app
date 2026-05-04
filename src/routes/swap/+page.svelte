@@ -30,9 +30,7 @@
 			iconSrc: '/images/tokens/rwt-mark.svg'
 		},
 		{ id: 'usdt', symbol: 'USDt', bg: '#009393', iconSrc: '/images/tokens/usdt-t.svg' },
-		{ id: 'trx', symbol: 'TRX', bg: '#d84347', iconLetter: 'T' },
-		{ id: 'ton', symbol: 'TON', bg: '#0098ea', iconLetter: 'T' },
-		{ id: 'sprk', symbol: 'SPRK', bg: '#4265ff', iconLetter: 'S' }
+		{ id: 'sprk', symbol: 'SPRK', bg: '#4265ff', iconSrc: '/images/tokens/sparkles.svg' }
 	];
 
 	type Side = 'from' | 'to';
@@ -83,7 +81,7 @@
 </svelte:head>
 
 {#snippet tokenLogo(token: Token, size: 'sm' | 'lg')}
-	<span class="swap-token-logo swap-token-logo-{size}" style:background={token.bg}>
+	<span class="swap-token-logo swap-token-logo-{size}" style:background={token.iconSrc ? 'transparent' : token.bg}>
 		{#if token.iconSrc}
 			<img src={token.iconSrc} alt="" aria-hidden="true" />
 		{:else}
@@ -333,9 +331,9 @@
 		border-radius: 14px;
 	}
 	.swap-token-logo img {
-		width: 60%;
-		height: 60%;
-		object-fit: contain;
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
 	}
 	.swap-token-mark {
 		font-family: var(--font-sans);

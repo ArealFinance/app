@@ -43,6 +43,7 @@
 			symbol: 'SPRK',
 			name: 'Sparkles',
 			logoBg: '#4265FF',
+			logoSrc: '/images/tokens/sparkles.svg',
 			category: 'OWNERSHIP',
 			price: '$0.9984',
 			priceChange: '0.57%',
@@ -242,8 +243,7 @@
 		{ id: 'usdc', symbol: 'USDC', tokens: '90 000,00 tokens', usd: '$101.4k', yieldPct: '1590%', color: '#447AD8', bubbleSize: 169 },
 		{ id: 'sol', symbol: 'SOL', tokens: '50 000,00 tokens', usd: '$90k', yieldPct: '1590%', color: '#44D8BA', bubbleSize: 97 },
 		{ id: 'dot', symbol: 'DOT', tokens: '50 000,00 tokens', usd: '$85.5k', yieldPct: '1590%', color: '#D844C6', bubbleSize: 90 },
-		{ id: 'btc', symbol: 'BTC', tokens: '50 000,00 tokens', usd: '$12.5k', yieldPct: '1590%', color: '#D89D44', bubbleSize: 80 },
-		{ id: 'trx', symbol: 'TRX', tokens: '12 480,00 tokens', usd: '$5.4k', yieldPct: '159%', color: '#D84446', bubbleSize: 57 }
+		{ id: 'btc', symbol: 'BTC', tokens: '50 000,00 tokens', usd: '$12.5k', yieldPct: '1590%', color: '#D89D44', bubbleSize: 80 }
 	];
 
 	type RwaBreakdownRow = { label: string; qty: string; usd: string; pct: string; pctTone: 'purple' | 'teal' | 'pink' };
