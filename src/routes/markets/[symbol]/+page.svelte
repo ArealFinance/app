@@ -168,7 +168,7 @@
 			{
 				id: 'rwt-usdc',
 				pairA: { symbol: 'RWT', bg: '#A56EFF', iconSrc: '/images/tokens/rwt-mark.svg' },
-				pairB: { symbol: 'USDC', bg: '#2775CA', iconLetter: 'C' },
+				pairB: { symbol: 'USDC', bg: '#2775CA', iconSrc: '/images/tokens/usdc.svg' },
 				tvl: '$20.15k',
 				kind: 'Concentrated'
 			}
@@ -177,7 +177,7 @@
 			{
 				id: 'sprk-usdc',
 				pairA: { symbol: 'SPRK', bg: '#4265FF', iconSrc: '/images/tokens/sparkles.svg' },
-				pairB: { symbol: 'USDC', bg: '#2775CA', iconLetter: 'C' },
+				pairB: { symbol: 'USDC', bg: '#2775CA', iconSrc: '/images/tokens/usdc.svg' },
 				tvl: '$8.42k',
 				kind: 'Standard'
 			}
@@ -190,7 +190,7 @@
 		'rwt-usdc': {
 			id: 'rwt-usdc',
 			pairA: { symbol: 'RWT', bg: '#A56EFF', iconSrc: '/images/tokens/rwt-mark.svg' },
-			pairB: { symbol: 'USDC', bg: '#2775CA', iconLetter: 'C' },
+			pairB: { symbol: 'USDC', bg: '#2775CA', iconSrc: '/images/tokens/usdc.svg' },
 			tvlPill: '$20.15k',
 			kind: 'Concentrated',
 			totalUsd: '$21,893.59',
@@ -209,7 +209,7 @@
 		'sprk-usdc': {
 			id: 'sprk-usdc',
 			pairA: { symbol: 'SPRK', bg: '#4265FF', iconSrc: '/images/tokens/sparkles.svg' },
-			pairB: { symbol: 'USDC', bg: '#2775CA', iconLetter: 'C' },
+			pairB: { symbol: 'USDC', bg: '#2775CA', iconSrc: '/images/tokens/usdc.svg' },
 			tvlPill: '$8.42k',
 			kind: 'Standard',
 			totalUsd: '$8,418.20',
@@ -1078,9 +1078,9 @@
 		overflow: hidden;
 	}
 	.pool-logo img {
-		width: 60%;
-		height: 60%;
-		object-fit: contain;
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
 	}
 	.pool-logo-overlap {
 		margin-left: -10px;

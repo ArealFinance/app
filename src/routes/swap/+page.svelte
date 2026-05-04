@@ -30,6 +30,7 @@
 			iconSrc: '/images/tokens/rwt-mark.svg'
 		},
 		{ id: 'usdt', symbol: 'USDt', bg: '#009393', iconSrc: '/images/tokens/usdt-t.svg' },
+		{ id: 'usdc', symbol: 'USDC', bg: '#2775ca', iconSrc: '/images/tokens/usdc.svg' },
 		{ id: 'sprk', symbol: 'SPRK', bg: '#4265ff', iconSrc: '/images/tokens/sparkles.svg' }
 	];
 
