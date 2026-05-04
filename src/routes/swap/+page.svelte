@@ -536,14 +536,15 @@
 
 	.dex-item {
 		display: flex;
-		flex-direction: column;
-		gap: var(--space-2);
+		align-items: center;
+		gap: var(--space-3);
 	}
 
 	.dex-item-icon {
 		display: inline-flex;
 		align-items: center;
 		justify-content: center;
+		flex-shrink: 0;
 		width: 24px;
 		height: 24px;
 		color: var(--color-text);
