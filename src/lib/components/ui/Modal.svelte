@@ -93,5 +93,13 @@
 		z-index: 1;
 		max-height: calc(100dvh - 2 * var(--space-4));
 		overflow-y: auto;
+		/* Hide native scrollbar — modal stays scrollable but the bar is
+		 * visually suppressed so it doesn't intrude on the panel chrome. */
+		scrollbar-width: none;
+	}
+	.modal-frame::-webkit-scrollbar {
+		width: 0;
+		height: 0;
+		display: none;
 	}
 </style>

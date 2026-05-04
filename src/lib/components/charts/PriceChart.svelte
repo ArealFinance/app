@@ -1,0 +1,103 @@
+<script lang="ts" module>
+	export type PricePoint = { x: number; y: number };
+</script>
+
+<script lang="ts">
+	import { LayerCake, Svg } from 'layercake';
+	import PriceChartAreas from './PriceChartAreas.svelte';
+
+	type Props = {
+		data?: PricePoint[];
+		/** Optional pill anchored to the last data point (e.g. "0.9984"). */
+		currentPrice?: string;
+		/** Optional row of equally-spaced labels rendered under the chart (e.g. dates). */
+		xLabels?: string[];
+	};
+
+	let { data = generateMockData(), currentPrice, xLabels }: Props = $props();
+
+	function generateMockData(): PricePoint[] {
+		// Smooth-ish growth + dip + recovery. Range ~7-15.
+		const N = 60;
+		return Array.from({ length: N }, (_, i) => {
+			const t = i / (N - 1);
+			const trend = 7 + 8 * t;
+			const wave = Math.sin(i / 6) * 0.6 + Math.sin(i / 13) * 0.9;
+			return { x: i, y: trend + wave };
+		});
+	}
+
+	const xDomain = $derived<[number, number]>([
+		data[0]?.x ?? 0,
+		data[data.length - 1]?.x ?? 1
+	]);
+</script>
+
+<div class="chart">
+	<div class="chart-canvas">
+		<div class="chart-canvas-inner">
+			<LayerCake padding={{ top: 0, right: 0, bottom: 0, left: 0 }} x="x" y="y" {data} {xDomain}>
+				<Svg pointerEvents={false}>
+					<PriceChartAreas badgeLabel={currentPrice} />
+				</Svg>
+			</LayerCake>
+		</div>
+	</div>
+
+	{#if xLabels && xLabels.length > 0}
+		<div class="chart-x-labels" aria-hidden="true">
+			{#each xLabels as label}
+				<span class="chart-x-label">{label}</span>
+			{/each}
+		</div>
+	{/if}
+</div>
+
+<style>
+	.chart {
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+		width: 100%;
+		height: 100%;
+		min-height: 0;
+		min-width: 0;
+	}
+	/* The flex:1 + min-height:0 chain can collapse on the first tick before
+	 * LayerCake reads `clientHeight`. Wrap LayerCake in an absolute-positioned
+	 * inner so it fills its parent's bounding box once the layout settles —
+	 * works equally well for full-height (price chart) and fixed-height (NAV
+	 * Growth, 160px) consumers. */
+	.chart-canvas {
+		position: relative;
+		flex: 1 1 auto;
+		min-height: 0;
+		width: 100%;
+	}
+	.chart-canvas-inner {
+		position: absolute;
+		inset: 0;
+	}
+	.chart-x-labels {
+		display: grid;
+		grid-auto-flow: column;
+		grid-auto-columns: 1fr;
+		align-items: center;
+		padding: 0 4px;
+	}
+	.chart-x-label {
+		font-family: var(--font-body);
+		font-size: 12px;
+		font-weight: 600;
+		line-height: 1;
+		letter-spacing: -0.02em;
+		text-align: center;
+		color: var(--color-chart-axis);
+	}
+	.chart-x-label:first-child {
+		text-align: left;
+	}
+	.chart-x-label:last-child {
+		text-align: right;
+	}
+</style>

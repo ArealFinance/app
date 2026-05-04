@@ -36,12 +36,20 @@
 	}: Props = $props();
 
 	const isComingSoon = $derived(state === 'coming-soon');
-	const showLink = $derived(external && href !== undefined);
+	// External cards get the corner arrow indicator; internal links don't,
+	// but the whole card is still clickable via the stretched-link overlay.
+	const hasLink = $derived(href !== undefined && !isComingSoon);
+	const showCornerArrow = $derived(external && hasLink);
 </script>
 
-<article class="card" class:coming-soon={isComingSoon}>
-	{#if showLink}
-		<a class="card-go" {href} aria-label="Open {name}">
+<article class="card" class:coming-soon={isComingSoon} class:card-linkable={hasLink}>
+	{#if hasLink}
+		<!-- Stretched-link overlay: covers the whole card so any click on
+		     the card navigates. Visually invisible. -->
+		<a class="card-link-overlay" {href} aria-label="Open {name}"></a>
+	{/if}
+	{#if showCornerArrow}
+		<a class="card-go" {href} aria-label="Open {name}" target="_blank" rel="noopener">
 			<img src="/images/cards/arrow-up-right.svg" alt="" />
 		</a>
 	{/if}
@@ -115,6 +123,28 @@
 		isolation: isolate;
 	}
 
+	.card-linkable {
+		cursor: pointer;
+		transition: background-color var(--motion-base) var(--ease-out);
+	}
+	.card-linkable:hover {
+		background-color: var(--color-surface-inset);
+	}
+
+	/* Stretched-link overlay — invisible <a> covering the whole card so any
+	 * click on the surface navigates. Sits above .card-price (z=1) and
+	 * .card-spark (z=0); only the corner arrow (z=3) overlays it. */
+	.card-link-overlay {
+		position: absolute;
+		inset: 0;
+		z-index: 2;
+		border-radius: inherit;
+	}
+	.card-link-overlay:focus-visible {
+		outline: 2px solid var(--color-primary, #a56eff);
+		outline-offset: -2px;
+	}
+
 	/* External-link disk */
 	.card-go {
 		position: absolute;
@@ -129,7 +159,7 @@
 		border-radius: var(--radius-full);
 		color: var(--color-text);
 		text-decoration: none;
-		z-index: 2;
+		z-index: 3;
 		transition: background-color var(--motion-base) var(--ease-out);
 	}
 	.card-go:hover {
@@ -328,7 +358,10 @@
 		z-index: 0;
 		overflow: hidden;
 		border-radius: 0 0 calc(var(--radius-lg) - 4px) calc(var(--radius-lg) - 4px);
-		background: linear-gradient(to bottom, var(--color-surface), var(--color-dark-600));
+		/* Top stop is transparent so the card's own background-color shows
+		 * through — this lets hover-state colour changes carry into the
+		 * sparkline area instead of leaving it stuck at the default surface. */
+		background: linear-gradient(to bottom, transparent, var(--color-dark-600));
 	}
 	.card-spark.dim {
 		opacity: 0.4;

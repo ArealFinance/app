@@ -18,6 +18,7 @@ export { default as ChartPieSimple } from './ChartPieSimple.svelte';
 export { default as Check } from './Check.svelte';
 export { default as Clipboard } from './Clipboard.svelte';
 export { default as Clock } from './Clock.svelte';
+export { default as FileText } from './FileText.svelte';
 export { default as Gear } from './Gear.svelte';
 export { default as House } from './House.svelte';
 export { default as Minus } from './Minus.svelte';

@@ -173,6 +173,11 @@
 	--color-danger-tint: rgba(216, 67, 71, 0.16);
 	--color-info-tint: rgba(158, 96, 246, 0.16);
 
+	/* Chart-specific (PriceChart axis labels, on-success badge text). */
+	--color-chart-axis: rgba(131, 164, 148, 0.4); /* X-axis date labels — muted green-gray */
+	--color-chart-line: var(--color-green-900); /* Area chart line + glow */
+	--color-on-success: #0d0a17; /* Dark text on solid green badge */
+
 	/* Aurora — decorative purple gradient mesh (page-wide bg).
 	 * Approximates Figma's multi-blend SVG-mask ellipse stack via overlapping radials.
 	 * Strong top-centre bloom around the hero/crystal, softer wash across the rest. */

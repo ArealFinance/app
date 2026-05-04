@@ -108,7 +108,7 @@
 </svelte:head>
 
 <AppShell
-	currentPath="/"
+	currentPath="/markets"
 	onSubscribe={(email) => toast.success(`Subscribed: ${email}`)}
 >
 	<section class="hero">

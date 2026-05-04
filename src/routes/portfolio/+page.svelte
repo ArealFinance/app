@@ -1,5 +1,7 @@
 <script lang="ts">
 	import AppShell from '$lib/components/sections/AppShell.svelte';
+	import AssetsDistributionChart from '$lib/components/charts/AssetsDistributionChart.svelte';
+	import TickWheel from '$lib/components/charts/TickWheel.svelte';
 	import { Card } from '$lib/components/ui';
 	import { ArrowUpSmall, Check } from '$lib/icons';
 	import { wallet } from '$lib/stores/wallet.svelte';
@@ -169,24 +171,19 @@
 							</button>
 						</div>
 
-						<!-- 18px gap-row that reveals the outer #181A29 — except the
-						     connector bar pinned to the centre keeps the two sections
-						     visually joined. Connector is a 74x18 rectangle with a
-						     concave semicircle carved into each side ('dogbone'): top
-						     and bottom edges stay flat full-width, left and right edges
-						     bow inward to the centre. -->
+						<!-- 18px gap-row recreating the Figma boolean Subtract.
+						     Background is section colour (continuous with top + bottom
+						     sections). Two pill-shaped overlays of outer-mat colour
+						     punch the cut windows out: full pill (radius 9 = height/2)
+						     means BOTH ends of each cut are rounded — outer end (toward
+						     section's vertical edge) and inner end (toward connector).
+						     Section material naturally wraps around all four pill ends
+						     via the geometry, producing the four concave fillets seen
+						     in the Figma source. The 74px space between the two cuts
+						     is the visual 'connector' — no separate element needed. -->
 						<div class="claim-gap-row" aria-hidden="true">
-							<svg
-								class="claim-connector"
-								viewBox="0 0 74 18"
-								preserveAspectRatio="none"
-								aria-hidden="true"
-							>
-								<path
-									d="M0,0 L74,0 A9,9 0 0,0 74,18 L0,18 A9,9 0 0,0 0,0 Z"
-									fill="currentColor"
-								/>
-							</svg>
+							<span class="claim-cut claim-cut-left"></span>
+							<span class="claim-cut claim-cut-right"></span>
 						</div>
 
 						<!-- BOTTOM section: total value, chart, legend, stats -->
@@ -205,11 +202,7 @@
 									</span>
 								</div>
 
-								<div class="dist-chart" aria-hidden="true">
-									<div class="dist-bar dist-bar-purple"></div>
-									<div class="dist-bar dist-bar-pink"></div>
-									<span class="dist-marker"></span>
-								</div>
+								<AssetsDistributionChart />
 
 								<div class="dist-legend">
 									<div class="legend-row">
@@ -246,12 +239,15 @@
 							</div>
 						</div>
 
-						<!-- Decorative crystal — sits over both sections AND the gap. The PNG
-						     itself has transparency around the crystal silhouette so the cut
-						     between sections still reads through. -->
+						<!-- Decorative crystal with baked-in aurora glow — TOPMOST layer
+						     per Figma (claim card z-order: bg → cut → blur → button →
+						     text → chart → CRYSTAL). The asset is 936x943 with the
+						     crystal silhouette in the upper portion and a soft purple
+						     aurora taking the lower half — no extra drop-shadow needed.
+						     Sits over the upper-right corner of the card. -->
 						<img
 							class="claim-crystal"
-							src="/images/hero/crystal.png"
+							src="/images/hero/crystal-glow.png"
 							alt=""
 							aria-hidden="true"
 						/>
@@ -426,70 +422,46 @@
 									<header class="lp-detail-head">
 										<h3>USDt / RWT</h3>
 									</header>
+									<hr class="lp-detail-divider" aria-hidden="true" />
 
 									<div class="lp-donut" aria-hidden="true">
-										<svg viewBox="0 0 134 134" width="134" height="134">
-											<defs>
-												<linearGradient id="donut-purple" x1="0" y1="0" x2="0" y2="1">
-													<stop offset="0" stop-color="#A56EFF" />
-													<stop offset="1" stop-color="#602FDC" />
-												</linearGradient>
-											</defs>
-											<!-- 47% USDt teal arc -->
-											<circle
-												cx="67"
-												cy="67"
-												r="56"
-												fill="none"
-												stroke="#009393"
-												stroke-width="8"
-												stroke-dasharray="165 351"
-												stroke-dashoffset="0"
-												transform="rotate(-90 67 67)"
-											/>
-											<!-- 53% RWT purple arc -->
-											<circle
-												cx="67"
-												cy="67"
-												r="56"
-												fill="none"
-												stroke="url(#donut-purple)"
-												stroke-width="8"
-												stroke-dasharray="186 351"
-												stroke-dashoffset="-165"
-												transform="rotate(-90 67 67)"
-											/>
-										</svg>
+										<!-- 53% RWT (purple) starts at 12 o'clock going CW; the
+										     remaining 47% USDt (teal) wraps the left half. -->
+										<TickWheel
+											value={0.53}
+											colorA="#A56EFF"
+											colorB="#1FB7B7"
+											size={130}
+											tickCount={50}
+											tickLength={10}
+											tickWidth={3}
+										/>
 										<div class="lp-donut-center">
 											<span class="lp-donut-label">Your Position</span>
 											<span class="lp-donut-value">$211.71</span>
 										</div>
 									</div>
 
+									<hr class="lp-detail-divider" aria-hidden="true" />
+
 									<div class="lp-detail-rows">
 										<div class="lp-detail-row">
 											<span class="lp-detail-marker lp-marker-purple"></span>
 											<span class="lp-detail-symbol">RWT</span>
-											<span class="lp-detail-qty">10.00K</span>
+											<span class="lp-detail-amount">
+												<span class="lp-detail-qty">10.00K</span>
+												<span class="lp-detail-usd">$11.4k</span>
+											</span>
 											<span class="lp-detail-pill lp-pill-purple">53%</span>
-										</div>
-										<div class="lp-detail-sub">
-											<span></span>
-											<span></span>
-											<span class="lp-detail-usd">$11.4k</span>
-											<span></span>
 										</div>
 										<div class="lp-detail-row">
 											<span class="lp-detail-marker lp-marker-teal"></span>
 											<span class="lp-detail-symbol">USDt</span>
-											<span class="lp-detail-qty">10.00K</span>
+											<span class="lp-detail-amount">
+												<span class="lp-detail-qty">10.00K</span>
+												<span class="lp-detail-usd">$11.4k</span>
+											</span>
 											<span class="lp-detail-pill lp-pill-teal">47%</span>
-										</div>
-										<div class="lp-detail-sub">
-											<span></span>
-											<span></span>
-											<span class="lp-detail-usd">$11.4k</span>
-											<span></span>
 										</div>
 									</div>
 
@@ -613,9 +585,19 @@
 	}
 	.claim-top {
 		border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+		/* Extend section bg 12px past content (padding 24 → 36), then pull
+		 * the next sibling 18px back up (negative margin). Net: section bg
+		 * covers the full gap-row band from above, while flow stays compact.
+		 * Combined with claim-bottom's mirror trick the gap-row is fully
+		 * blanketed by section material — cut overlays carve outer mat
+		 * cleanly, no separate background needed on gap-row. */
+		padding-bottom: 36px;
+		margin-bottom: -18px;
 	}
 	.claim-bottom {
 		border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+		padding-top: 36px;
+		margin-top: -18px;
 	}
 	.claim-section .rewards-block {
 		flex: 1;
@@ -624,32 +606,50 @@
 	.claim-gap-row {
 		position: relative;
 		height: 18px;
+		/* No background — top + bottom sections (with padding/margin tricks)
+		 * cover the gap-row band with section bg from both sides. z-index
+		 * keeps the cut overlays above section bg. */
+		z-index: 9;
 	}
-	/* Inline SVG with one path — flat top + bottom edges, concave semicircle
-	 * on each side (dogbone). Two arc commands (one per side) is the simplest
-	 * unambiguous SVG path for this shape; chord = diameter = height, so the
-	 * arc has only one valid circle and renders crisp at every density.
-	 * currentColor keeps the fill in sync with the section surface token. */
-	.claim-connector {
+	.claim-cut {
 		position: absolute;
-		left: 50%;
 		top: 0;
-		width: 74px;
 		height: 18px;
-		transform: translateX(-50%);
-		color: var(--color-surface);
-		display: block;
+		/* Outer mat colour (the Card variant="inset" surface) shows through
+		 * each cut. Each cut is rounded ONLY on the centre-facing end (toward
+		 * the connector); the outer end stays flush with the section's outer
+		 * vertical edge. radius=9px = height/2 → full semicircle on the
+		 * inner end. Concave fillets in the section material show only at
+		 * the inner cut ends (around the connector). */
+		background-color: var(--color-surface-inset);
+	}
+	.claim-cut-left {
+		left: 0;
+		/* 37px = half of 74px connector core. Together both cuts leave a
+		 * 74px section-coloured strip in the centre — the visible connector. */
+		right: calc(50% + 37px);
+		border-radius: 0 9px 9px 0;
+	}
+	.claim-cut-right {
+		left: calc(50% + 37px);
+		right: 0;
+		border-radius: 9px 0 0 9px;
 	}
 
+	/* Crystal — fills claim-shell full width with baked-in aurora glow.
+	 * Asset is 936x943: crystal silhouette in upper portion + soft glow
+	 * filling the rest. Anchored top-right at 0,0 so the silhouette lines
+	 * up with the upper-right of the card and the glow bleeds down across
+	 * the cut into the upper part of the bottom section. No CSS drop-shadow
+	 * — the asset carries it. Last DOM child of .claim-shell → paints on
+	 * top of every section and the cut overlays. */
 	.claim-crystal {
 		position: absolute;
-		top: -16px;
-		right: -24px;
-		width: 280px;
+		top: 0;
+		right: 0;
+		width: 100%;
 		height: auto;
 		pointer-events: none;
-		transform: rotate(15deg);
-		filter: drop-shadow(0 12px 40px rgba(168, 132, 255, 0.4));
 	}
 
 	.rewards-block {
@@ -764,38 +764,6 @@
 		width: 8px;
 		height: 8px;
 		border-radius: 3px;
-		background-color: var(--color-text);
-	}
-
-	/* Stacked bars chart */
-	.dist-chart {
-		position: relative;
-		height: 200px;
-		display: flex;
-		flex-direction: column;
-		gap: 0;
-		padding-right: 6px;
-	}
-	.dist-bar {
-		width: 13px;
-		border-radius: 3px;
-	}
-	.dist-bar-purple {
-		height: 88px;
-		background-color: #a56eff;
-	}
-	.dist-bar-pink {
-		height: 88px;
-		background-color: #d844c6;
-		margin-top: 4px;
-	}
-	.dist-marker {
-		position: absolute;
-		right: 0;
-		top: 0;
-		width: 2px;
-		height: 100%;
-		border-radius: 2px;
 		background-color: var(--color-text);
 	}
 
@@ -956,19 +924,26 @@
 		min-height: 269px;
 	}
 	.section-body-table {
-		padding: 12px;
+		/* Inner panel #080A0F shows only a 4px ring around the table
+		 * substrate (.tt #181A29) per Figma. Override the default 24px
+		 * body padding. */
+		padding: 4px;
 		min-height: auto;
 		align-items: stretch;
 		justify-content: flex-start;
 	}
 	.section-body-split {
-		padding: 12px;
+		/* Override .section-body's bg + padding + radius — for split layout
+		 * the inner panes are themselves cards, no wrapper bg/padding needed. */
+		background-color: transparent;
+		padding: 0;
+		border-radius: 0;
 		min-height: auto;
 		align-items: stretch;
 		justify-content: flex-start;
 		display: grid;
 		grid-template-columns: 1fr 1fr;
-		gap: 12px;
+		gap: 4px;
 	}
 
 	.empty-illu {
@@ -996,11 +971,25 @@
 		text-align: center;
 	}
 
-	/* ---------- Token table ---------- */
+	/* ---------- Token table ----------
+	 * Figma layering for the table block:
+	 *   1. .tt           — substrate #181A29 (Rectangle 39625 in dump)
+	 *   2. .tt-head      — flat header strip on top of the substrate
+	 *   3. .tt-row × N   — #080A0F cards (Rectangle 39626 × 4) sitting on
+	 *                       the substrate with small gaps revealing it.
+	 * Outer card variant="inset" stays as the OUTERMOST #181A29 frame;
+	 * .section-body is the #080A0F panel that wraps everything below the
+	 * section header. */
 	.tt {
 		display: flex;
 		flex-direction: column;
 		gap: 4px;
+		background-color: var(--color-surface-inset);
+		border-radius: 16px;
+		/* Per Figma: table substrate inset ~4px from the inner panel,
+		 * rows inset ~4px from the substrate (= padding here), 4px gap
+		 * between rows (= column gap above). */
+		padding: 4px;
 	}
 	.tt-head,
 	.tt-row {
@@ -1014,8 +1003,8 @@
 		padding: 8px 16px;
 	}
 	.tt-row {
-		background-color: var(--color-surface-inset);
-		border-radius: 14px;
+		background-color: var(--color-surface);
+		border-radius: 12px;
 	}
 	.tt-cell {
 		font-family: var(--font-body);
@@ -1111,29 +1100,62 @@
 		gap: 8px;
 		max-height: 460px;
 		overflow-y: auto;
-		padding-right: 4px;
+		padding: 16px;
+		background-color: var(--color-surface);
+		border-radius: 16px;
+		/* Subtle hairline + ambient shadow lift the pane off the substrate. */
+		border: 1px solid rgba(255, 255, 255, 0.04);
+		box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
 	}
 	.lp-item {
+		position: relative;
 		display: grid;
 		grid-template-columns: auto 1fr auto;
 		align-items: center;
 		gap: var(--space-3);
 		padding: 14px 16px;
-		background-color: var(--color-surface-inset);
+		/* Non-selected rows are transparent over the pane #080A0F per
+		 * Figma — only text + logos are visible. Border 1px transparent
+		 * holds box dimensions identical to the selected state so layout
+		 * doesn't jump on selection. */
+		background-color: transparent;
 		border: 1px solid transparent;
 		border-radius: 16px;
 		cursor: pointer;
 		text-align: left;
 		font: inherit;
 		color: var(--color-text);
-		transition: background-color var(--motion-base) var(--ease-out);
+		transition:
+			background-color var(--motion-base) var(--ease-out),
+			border-color var(--motion-base) var(--ease-out),
+			box-shadow var(--motion-base) var(--ease-out);
 	}
-	.lp-item:hover {
-		background-color: rgba(255, 255, 255, 0.04);
+	.lp-item:hover:not(.lp-item-selected) {
+		background-color: rgba(255, 255, 255, 0.03);
 	}
 	.lp-item-selected {
+		background-color: var(--color-surface-inset);
 		border-color: #6e97ff;
-		box-shadow: 0 0 8px rgba(110, 151, 255, 0.6);
+		box-shadow: 0 0 8px rgba(110, 151, 255, 0.8);
+	}
+	/* Hairline separator between adjacent rows — a 1px strip ABOVE the
+	 * non-first rows, inset from horizontal edges so it reads as a
+	 * subtle divider rather than a full-width line. Hidden when either
+	 * the row above OR the row itself is selected (selected row's
+	 * border + glow already act as visual separator). */
+	.lp-item + .lp-item::before {
+		content: '';
+		position: absolute;
+		top: -1px;
+		left: 16px;
+		right: 16px;
+		height: 1px;
+		background-color: var(--color-surface-inset);
+		pointer-events: none;
+	}
+	.lp-item-selected::before,
+	.lp-item-selected + .lp-item::before {
+		display: none;
 	}
 	.lp-logos {
 		display: inline-flex;
@@ -1185,6 +1207,10 @@
 		padding: 16px;
 		background-color: var(--color-surface);
 		border-radius: 16px;
+		/* Match .lp-list elevation so both panes read as the same layer
+		 * floating above the substrate. */
+		border: 1px solid rgba(255, 255, 255, 0.04);
+		box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
 	}
 	.lp-detail-head h3 {
 		margin: 0;
@@ -1194,6 +1220,12 @@
 		text-transform: uppercase;
 		letter-spacing: var(--tracking-tight);
 		color: var(--color-text);
+	}
+	.lp-detail-divider {
+		margin: 0;
+		border: 0;
+		height: 1px;
+		background-color: var(--color-border);
 	}
 
 	.lp-donut {
@@ -1227,9 +1259,13 @@
 	}
 
 	.lp-detail-rows {
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-3);
+	}
+	.lp-detail-row {
 		display: grid;
 		grid-template-columns: 12px auto 1fr auto;
-		row-gap: 4px;
 		column-gap: var(--space-3);
 		align-items: center;
 	}
@@ -1244,7 +1280,19 @@
 	.lp-marker-teal {
 		background-color: #009393;
 	}
-	.lp-detail-symbol,
+	.lp-detail-symbol {
+		font-family: var(--font-body);
+		font-size: var(--text-base);
+		font-weight: var(--font-weight-semibold);
+		letter-spacing: var(--tracking-tight);
+		color: var(--color-text);
+	}
+	.lp-detail-amount {
+		display: flex;
+		flex-direction: column;
+		align-items: flex-end;
+		gap: 2px;
+	}
 	.lp-detail-qty {
 		font-family: var(--font-body);
 		font-size: var(--text-base);
@@ -1252,8 +1300,11 @@
 		letter-spacing: var(--tracking-tight);
 		color: var(--color-text);
 	}
-	.lp-detail-qty {
-		text-align: right;
+	.lp-detail-usd {
+		font-family: var(--font-body);
+		font-size: 12px;
+		font-weight: var(--font-weight-semibold);
+		color: var(--color-text-muted);
 	}
 	.lp-detail-pill {
 		display: inline-flex;
@@ -1274,17 +1325,6 @@
 	.lp-pill-teal {
 		background-color: rgba(0, 147, 147, 0.25);
 		color: #009393;
-	}
-	.lp-detail-sub {
-		display: contents;
-	}
-	.lp-detail-usd {
-		grid-column: 3;
-		font-family: var(--font-body);
-		font-size: 12px;
-		font-weight: var(--font-weight-semibold);
-		text-align: right;
-		color: var(--color-text-muted);
 	}
 
 	.lp-manage-btn {
@@ -1323,9 +1363,11 @@
 			gap: var(--space-4);
 		}
 		.claim-crystal {
-			top: -8px;
-			right: -16px;
-			width: 200px;
+			/* Mobile uses the same full-width anchoring — asset has glow
+			 * baked in, scales naturally. */
+			top: 0;
+			right: 0;
+			width: 100%;
 		}
 		.section-head {
 			padding: var(--space-4) var(--space-4) var(--space-3);
