@@ -40,13 +40,19 @@
 			.curve(curveMonotoneX)
 	);
 
-	// Vertical grid (21 columns) + horizontal grid (9 rows). Light hairlines
-	// per Figma (rgba(255,255,255,0.05)).
-	const verticalGrid = $derived(
-		Array.from({ length: 21 }, (_, i) => ($width * i) / 20)
-	);
+	// Square grid: derive step from the canvas height so cells stay 1:1
+	// regardless of how wide the chart container is. The horizontal-line
+	// count is fixed (8 rows) which sets the step, and vertical lines
+	// fill the canvas at the same stride.
+	const HORIZONTAL_DIVISIONS = 8;
+	const gridStep = $derived($height / HORIZONTAL_DIVISIONS);
 	const horizontalGrid = $derived(
-		Array.from({ length: 9 }, (_, i) => ($height * i) / 8)
+		Array.from({ length: HORIZONTAL_DIVISIONS + 1 }, (_, i) => i * gridStep)
+	);
+	const verticalGrid = $derived(
+		gridStep > 0
+			? Array.from({ length: Math.floor($width / gridStep) + 1 }, (_, i) => i * gridStep)
+			: []
 	);
 
 	const lastPoint = $derived($data[$data.length - 1]);

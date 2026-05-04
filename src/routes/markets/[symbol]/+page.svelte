@@ -3,6 +3,7 @@
 	import AppShell from '$lib/components/sections/AppShell.svelte';
 	import PriceChart from '$lib/components/charts/PriceChart.svelte';
 	import TickWheel from '$lib/components/charts/TickWheel.svelte';
+	import VaultBubbleChart from '$lib/components/charts/VaultBubbleChart.svelte';
 	import QuickSwap from '$lib/components/sections/QuickSwap.svelte';
 	import type { SwapToken } from '$lib/components/sections/QuickSwap.svelte';
 	import PoolDetailPanel from '$lib/components/sections/PoolDetailPanel.svelte';
@@ -499,14 +500,14 @@
 							<li>
 								<button type="button" class="pool-row" onclick={() => openPool(p.id)}>
 									<span class="pool-logos">
-										<span class="pool-logo" style:background-color={p.pairA.bg}>
+										<span class="pool-logo" style:background-color={p.pairA.iconSrc ? 'transparent' : p.pairA.bg}>
 											{#if p.pairA.iconSrc}
 												<img src={p.pairA.iconSrc} alt="" aria-hidden="true" />
 											{:else}
 												<span>{p.pairA.iconLetter ?? p.pairA.symbol[0]}</span>
 											{/if}
 										</span>
-										<span class="pool-logo pool-logo-overlap" style:background-color={p.pairB.bg}>
+										<span class="pool-logo pool-logo-overlap" style:background-color={p.pairB.iconSrc ? 'transparent' : p.pairB.bg}>
 											{#if p.pairB.iconSrc}
 												<img src={p.pairB.iconSrc} alt="" aria-hidden="true" />
 											{:else}
@@ -541,18 +542,7 @@
 						<span class="vault-total">~ $879.5k</span>
 					</header>
 
-					<div class="vault-bubbles" aria-hidden="true">
-						{#each vaultPositions as p, i}
-							<div
-								class="vault-bubble vault-bubble-{i}"
-								style:width="{p.bubbleSize}px"
-								style:height="{p.bubbleSize}px"
-								style:--bubble-glow={p.color}
-							>
-								<span class="vault-bubble-amount">{p.usd}</span>
-							</div>
-						{/each}
-					</div>
+					<VaultBubbleChart bubbles={vaultPositions} height={360} />
 
 					<ul class="vault-list">
 						{#each vaultPositions as p (p.id)}
@@ -1199,76 +1189,8 @@
 	/* Bubble chart — fixed pseudo-cluster layout per Figma. Each bubble is
 	 * an absolutely-positioned circle whose colour is set via custom prop
 	 * `--bubble-glow`; the gradient + inset shadow give the orb effect. */
-	.vault-bubbles {
-		position: relative;
-		width: 100%;
-		height: 280px;
-		padding: 0 8px;
-	}
-	.vault-bubble {
-		position: absolute;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		border-radius: 50%;
-		background: radial-gradient(circle at 50% 30%, color-mix(in srgb, var(--bubble-glow) 65%, #18094d) 0%, #080a0f 100%);
-		box-shadow: inset 0 0 24px var(--bubble-glow);
-		color: #fff;
-	}
-	.vault-bubble-amount {
-		font-family: var(--font-body);
-		font-weight: 600;
-		font-size: 14px;
-		letter-spacing: -0.01em;
-		color: #fff;
-	}
-	/* Position each bubble by index — coordinates approximated from Figma. */
-	.vault-bubble-0 { /* SAND $565.9k */
-		left: 0;
-		top: 47px;
-		font-size: 32px;
-		line-height: 1.25;
-	}
-	.vault-bubble-0 .vault-bubble-amount {
-		font-size: 32px;
-		letter-spacing: -0.01em;
-	}
-	.vault-bubble-1 { /* USDC $101.4k */
-		right: 100px;
-		top: 76px;
-		font-size: 24px;
-	}
-	.vault-bubble-1 .vault-bubble-amount {
-		font-size: 24px;
-	}
-	.vault-bubble-2 { /* SOL $90.0k */
-		left: 211px;
-		top: 47px;
-	}
-	.vault-bubble-2 .vault-bubble-amount {
-		font-size: 18px;
-	}
-	.vault-bubble-3 { /* DOT $85.5k */
-		left: 309px;
-		top: 0;
-	}
-	.vault-bubble-3 .vault-bubble-amount {
-		font-size: 17px;
-	}
-	.vault-bubble-4 { /* BTC $12.5k */
-		left: 383px;
-		top: 75px;
-	}
-	.vault-bubble-4 .vault-bubble-amount {
-		font-size: 17px;
-	}
-	.vault-bubble-5 { /* TRX $5.4k */
-		left: 314px;
-		top: 101px;
-	}
-	.vault-bubble-5 .vault-bubble-amount {
-		font-size: 11px;
-	}
+	/* Bubble chart is now its own component — see
+	 * lib/components/charts/VaultBubbleChart.svelte. */
 
 	.vault-list {
 		display: flex;

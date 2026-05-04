@@ -114,7 +114,7 @@
 				aria-haspopup={side !== 'pinned' ? 'listbox' : undefined}
 				aria-expanded={side !== 'pinned' ? isOtherOpen : undefined}
 			>
-				<span class="qs-token-logo" style:background={token.bg}>
+				<span class="qs-token-logo" style:background={token.iconSrc ? 'transparent' : token.bg}>
 					{#if token.iconSrc}
 						<img src={token.iconSrc} alt="" aria-hidden="true" />
 					{:else}
@@ -148,7 +148,7 @@
 					{#each otherCandidates as t (t.id)}
 						<li>
 							<button type="button" class="qs-option" role="option" aria-selected={t.id === other.id} onclick={() => pickOther(t)}>
-								<span class="qs-token-logo qs-token-logo-sm" style:background={t.bg}>
+								<span class="qs-token-logo qs-token-logo-sm" style:background={t.iconSrc ? 'transparent' : t.bg}>
 									{#if t.iconSrc}
 										<img src={t.iconSrc} alt="" aria-hidden="true" />
 									{:else}

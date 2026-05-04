@@ -1,13 +1,14 @@
 <script lang="ts">
 	import { AppShell, TokenStatCard } from '$lib/components/sections';
 	import { WalletAddressChip, toast } from '$lib/components/ui';
-	import { DEMO_WALLET_ADDRESS } from '$lib/constants';
-
-	const demoAddress = DEMO_WALLET_ADDRESS;
+	import { wallet } from '$lib/stores/wallet.svelte';
+	import { walletDialog } from '$lib/stores/walletDialog.svelte';
 
 	type AvatarSpec = {
 		src: string;
-		bg: string;
+		/** Optional fallback colour. Most token SVGs ship with their own bg
+		 * (gradient border + brand fill), so leave this empty for those. */
+		bg?: string;
 	};
 
 	type Token = {
@@ -22,9 +23,9 @@
 		avatar: AvatarSpec;
 	};
 
-	const avatarRwt: AvatarSpec = { src: '/images/tokens/rwt-mark.svg', bg: '#9e60f6' };
-	const avatarSparkles: AvatarSpec = { src: '/images/tokens/sparkles.svg', bg: '#4265ff' };
-	const avatarUsdt: AvatarSpec = { src: '/images/tokens/usdt-t.svg', bg: '#009393' };
+	const avatarRwt: AvatarSpec = { src: '/images/tokens/rwt-mark.svg' };
+	const avatarSparkles: AvatarSpec = { src: '/images/tokens/sparkles.svg' };
+	const avatarUsdt: AvatarSpec = { src: '/images/tokens/usdt-t.svg' };
 	const avatarComing: AvatarSpec = { src: '/images/tokens/coming-soon.svg', bg: '#9e60f6' };
 
 	const protocolTokens: Token[] = [
@@ -139,7 +140,13 @@
 				Build your wealth engine via ownership tokens backed by real-world assets
 			</p>
 			<div class="hero-cta">
-				<WalletAddressChip address={demoAddress} size="md" class="hero-chip" />
+				{#if wallet.isConnected && wallet.address}
+					<WalletAddressChip address={wallet.address} size="md" class="hero-chip" />
+				{:else}
+					<button type="button" class="hero-connect" onclick={() => walletDialog.open('connect')}>
+						Connect Wallet
+					</button>
+				{/if}
 			</div>
 		</div>
 
@@ -172,7 +179,7 @@
 					external={t.external}
 				>
 					{#snippet icon()}
-						<span class="token-disk" style:background-color={t.avatar.bg}>
+						<span class="token-disk" style:background-color={t.avatar.bg ?? 'transparent'}>
 							<img src={t.avatar.src} alt="" />
 						</span>
 					{/snippet}
@@ -202,7 +209,7 @@
 					external={t.external}
 				>
 					{#snippet icon()}
-						<span class="token-disk" style:background-color={t.avatar.bg}>
+						<span class="token-disk" style:background-color={t.avatar.bg ?? 'transparent'}>
 							<img src={t.avatar.src} alt="" />
 						</span>
 					{/snippet}
@@ -368,6 +375,31 @@
 	.hero-cta :global(.hero-chip) {
 		width: 245px;
 		justify-content: center;
+	}
+
+	/* Connect-wallet variant — same width as the chip so layout doesn't jump
+	 * when the user disconnects/reconnects. */
+	.hero-connect {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 245px;
+		height: 48px;
+		padding: 0 24px;
+		background-color: var(--color-text);
+		color: var(--color-surface);
+		border: 0;
+		border-radius: var(--radius-button);
+		font-family: 'Halvar Breit', var(--font-sans);
+		font-weight: 700;
+		font-size: 14px;
+		letter-spacing: -0.6px;
+		text-transform: uppercase;
+		cursor: pointer;
+		transition: opacity var(--motion-base) var(--ease-out);
+	}
+	.hero-connect:hover {
+		opacity: 0.9;
 	}
 
 	.hero-art {

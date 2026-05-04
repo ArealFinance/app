@@ -29,6 +29,8 @@
 
 <script lang="ts">
 	import { Bolt, Plus, Minus } from '$lib/icons';
+	import { wallet } from '$lib/stores/wallet.svelte';
+	import { walletDialog } from '$lib/stores/walletDialog.svelte';
 
 	type Props = {
 		pool: PoolInfo;
@@ -81,7 +83,7 @@
 		<h1 id="pool-modal-title" class="pool-title">LIQUIDITY</h1>
 
 		<div class="pool-tokens">
-			<span class="pool-logo" style:background={pool.pairA.bg}>
+			<span class="pool-logo" style:background={pool.pairA.iconSrc ? 'transparent' : pool.pairA.bg}>
 				{#if pool.pairA.iconSrc}
 					<img src={pool.pairA.iconSrc} alt="" />
 				{:else}
@@ -89,7 +91,7 @@
 				{/if}
 			</span>
 			<span class="pool-sym">{pool.pairA.symbol}</span>
-			<span class="pool-logo" style:background={pool.pairB.bg}>
+			<span class="pool-logo" style:background={pool.pairB.iconSrc ? 'transparent' : pool.pairB.bg}>
 				{#if pool.pairB.iconSrc}
 					<img src={pool.pairB.iconSrc} alt="" />
 				{:else}
@@ -401,7 +403,7 @@
 							class:currency-card-active={depositSide === 'B'}
 							onclick={() => (depositSide = 'B')}
 						>
-							<span class="currency-logo" style:background={pool.pairB.bg}>
+							<span class="currency-logo" style:background={pool.pairB.iconSrc ? 'transparent' : pool.pairB.bg}>
 								{#if pool.pairB.iconSrc}
 									<img src={pool.pairB.iconSrc} alt="" />
 								{:else}
@@ -418,7 +420,7 @@
 							class:currency-card-active={depositSide === 'A'}
 							onclick={() => (depositSide = 'A')}
 						>
-							<span class="currency-logo" style:background={pool.pairA.bg}>
+							<span class="currency-logo" style:background={pool.pairA.iconSrc ? 'transparent' : pool.pairA.bg}>
 								{#if pool.pairA.iconSrc}
 									<img src={pool.pairA.iconSrc} alt="" />
 								{:else}
@@ -454,9 +456,15 @@
 						</div>
 					</div>
 
-					<button type="button" class="cta">
-						{depositMode === 'Zap' ? 'Zap & Add Liquidity' : 'Add Liquidity'}
-					</button>
+					{#if wallet.isConnected}
+						<button type="button" class="cta">
+							{depositMode === 'Zap' ? 'Zap & Add Liquidity' : 'Add Liquidity'}
+						</button>
+					{:else}
+						<button type="button" class="cta" onclick={() => walletDialog.open('connect')}>
+							Connect Wallet
+						</button>
+					{/if}
 				{:else}
 					<!-- ─── Withdraw ───────────────────────────────────────── -->
 					<div class="withdraw">
@@ -509,7 +517,7 @@
 						<p class="wd-receive-label">You will receive</p>
 						<div class="wd-receive-rows">
 							<div class="wd-receive-row">
-								<span class="wd-receive-logo" style:background={pool.pairB.bg}>
+								<span class="wd-receive-logo" style:background={pool.pairB.iconSrc ? 'transparent' : pool.pairB.bg}>
 									{#if pool.pairB.iconSrc}
 										<img src={pool.pairB.iconSrc} alt="" />
 									{:else}
@@ -524,7 +532,7 @@
 								</span>
 							</div>
 							<div class="wd-receive-row">
-								<span class="wd-receive-logo" style:background={pool.pairA.bg}>
+								<span class="wd-receive-logo" style:background={pool.pairA.iconSrc ? 'transparent' : pool.pairA.bg}>
 									{#if pool.pairA.iconSrc}
 										<img src={pool.pairA.iconSrc} alt="" />
 									{:else}
@@ -541,9 +549,15 @@
 						</div>
 					</div>
 
-					<button type="button" class="cta" disabled={withdrawPct === 0}>
-						Remove Liquidity
-					</button>
+					{#if wallet.isConnected}
+						<button type="button" class="cta" disabled={withdrawPct === 0}>
+							Remove Liquidity
+						</button>
+					{:else}
+						<button type="button" class="cta" onclick={() => walletDialog.open('connect')}>
+							Connect Wallet
+						</button>
+					{/if}
 				{/if}
 			</article>
 		</div>
