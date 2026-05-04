@@ -4,7 +4,21 @@
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
 		<meta name="text-scale" content="scale" />
-		<link rel="icon" type="image/svg+xml" href="%sveltekit.assets%/favicon-dark.svg" />
+		<!-- Theme-aware favicon: dark variant (white crystal) shows on dark UI,
+		     light variant (dark crystal) on light UI. Without the media split,
+		     #F9F7EF on a white tab is invisible. -->
+		<link
+			rel="icon"
+			type="image/svg+xml"
+			href="%sveltekit.assets%/favicon-light.svg"
+			media="(prefers-color-scheme: light)"
+		/>
+		<link
+			rel="icon"
+			type="image/svg+xml"
+			href="%sveltekit.assets%/favicon-dark.svg"
+			media="(prefers-color-scheme: dark)"
+		/>
 		%sveltekit.head%
 	</head>
 	<body data-sveltekit-preload-data="hover">
