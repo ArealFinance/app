@@ -24,6 +24,14 @@
 		binStep: string;
 		priceLabels: string[];
 		userBalance: string;
+		/** Demo: user's current position, shown in "My Position" when wallet is connected. */
+		userPosition?: {
+			totalUsd: string;
+			tokenA: { qty: string; usd: string; pct: string };
+			tokenB: { qty: string; usd: string; pct: string };
+			/** Fraction (0..1) of pairA in the position — drives the donut split. */
+			aFraction: number;
+		};
 	};
 </script>
 
@@ -31,6 +39,7 @@
 	import { Bolt, Plus, Minus } from '$lib/icons';
 	import { wallet } from '$lib/stores/wallet.svelte';
 	import { walletDialog } from '$lib/stores/walletDialog.svelte';
+	import TickWheel from '$lib/components/charts/TickWheel.svelte';
 
 	type Props = {
 		pool: PoolInfo;
@@ -40,6 +49,7 @@
 	let { pool, onclose }: Props = $props();
 
 	const isConcentrated = $derived(pool.kind === 'Concentrated');
+	const hasActivePosition = $derived(wallet.isConnected && pool.userPosition !== undefined);
 
 	type ModeTab = 'Add Liquidity' | 'Withdraw';
 	let modeTab = $state<ModeTab>('Add Liquidity');
@@ -280,65 +290,109 @@
 		</div>
 
 		<div class="pool-col">
-			<!-- ─── My Position (empty) ──────────────────────────────── -->
+			<!-- ─── My Position ─────────────────────────────────────── -->
 			<article class="card position-card">
 				<p class="dist-title position-title">MY POSITION</p>
-				<div class="empty">
-					<svg
-						class="empty-illustration"
-						width="82"
-						height="60"
-						viewBox="0 0 82 60"
-						fill="none"
-						aria-hidden="true"
-					>
-						<rect x="1" y="1" width="80" height="28" rx="14" fill="url(#pool-empty-g1)" />
-						<rect x="20" y="9" width="52" height="2.4" rx="1.2" fill="#717390" />
-						<rect x="20" y="17" width="30" height="2.4" rx="1.2" fill="#717390" />
-						<circle cx="11" cy="15" r="6" fill="rgba(113,115,144,0.5)" />
-						<path
-							d="M8.5 15.5l1.8 1.8 3.5-3.6"
-							stroke="#73FF83"
-							stroke-width="1.5"
-							stroke-linecap="round"
-							stroke-linejoin="round"
+
+				{#if hasActivePosition && pool.userPosition}
+					<div class="my-position">
+						<ul class="my-position-rows">
+							<li class="alloc-row">
+								<span class="alloc-row-dot alloc-row-dot-a"></span>
+								<span class="alloc-row-sym">{pool.pairA.symbol}</span>
+								<span class="alloc-row-spacer"></span>
+								<span class="alloc-row-qty">
+									<span class="alloc-row-qty-main">{pool.userPosition.tokenA.qty}</span>
+									<span class="alloc-row-qty-sub">{pool.userPosition.tokenA.usd}</span>
+								</span>
+								<span class="alloc-row-pct alloc-row-pct-a">{pool.userPosition.tokenA.pct}</span>
+							</li>
+							<li class="alloc-row">
+								<span class="alloc-row-dot alloc-row-dot-b"></span>
+								<span class="alloc-row-sym">{pool.pairB.symbol}</span>
+								<span class="alloc-row-spacer"></span>
+								<span class="alloc-row-qty">
+									<span class="alloc-row-qty-main">{pool.userPosition.tokenB.qty}</span>
+									<span class="alloc-row-qty-sub">{pool.userPosition.tokenB.usd}</span>
+								</span>
+								<span class="alloc-row-pct alloc-row-pct-b">{pool.userPosition.tokenB.pct}</span>
+							</li>
+						</ul>
+
+						<div class="my-position-donut">
+							<TickWheel
+								value={pool.userPosition.aFraction}
+								colorA="#A56EFF"
+								colorB="#009393"
+								size={134}
+								tickCount={48}
+								tickLength={10}
+								tickWidth={3}
+							/>
+							<div class="my-position-donut-center">
+								<p class="my-position-donut-label">Total value</p>
+								<p class="my-position-donut-value">{pool.userPosition.totalUsd}</p>
+							</div>
+						</div>
+					</div>
+				{:else}
+					<div class="empty">
+						<svg
+							class="empty-illustration"
+							width="82"
+							height="60"
+							viewBox="0 0 82 60"
 							fill="none"
-						/>
-						<rect
-							x="6"
-							y="32"
-							width="74"
-							height="26"
-							rx="13"
-							fill="url(#pool-empty-g2)"
-							opacity="0.5"
-						/>
-						<rect x="26" y="40" width="48" height="2.2" rx="1.1" fill="rgba(113,115,144,0.5)" />
-						<rect x="26" y="48" width="27" height="2.2" rx="1.1" fill="rgba(113,115,144,0.5)" />
-						<rect
-							x="11"
-							y="38"
-							width="12"
-							height="12"
-							rx="2"
-							stroke="rgba(113,115,144,0.5)"
-							stroke-width="1.2"
-							fill="none"
-						/>
-						<defs>
-							<linearGradient id="pool-empty-g1" x1="0" y1="0" x2="0" y2="1">
-								<stop offset="0%" stop-color="#3C415F" />
-								<stop offset="100%" stop-color="#111322" />
-							</linearGradient>
-							<linearGradient id="pool-empty-g2" x1="0" y1="0" x2="0" y2="1">
-								<stop offset="0%" stop-color="#3C415F" />
-								<stop offset="100%" stop-color="#111322" />
-							</linearGradient>
-						</defs>
-					</svg>
-					<p class="empty-title">No Active Position</p>
-					<p class="empty-sub">Add liquidity below to start earning</p>
-				</div>
+							aria-hidden="true"
+						>
+							<rect x="1" y="1" width="80" height="28" rx="14" fill="url(#pool-empty-g1)" />
+							<rect x="20" y="9" width="52" height="2.4" rx="1.2" fill="#717390" />
+							<rect x="20" y="17" width="30" height="2.4" rx="1.2" fill="#717390" />
+							<circle cx="11" cy="15" r="6" fill="rgba(113,115,144,0.5)" />
+							<path
+								d="M8.5 15.5l1.8 1.8 3.5-3.6"
+								stroke="#73FF83"
+								stroke-width="1.5"
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								fill="none"
+							/>
+							<rect
+								x="6"
+								y="32"
+								width="74"
+								height="26"
+								rx="13"
+								fill="url(#pool-empty-g2)"
+								opacity="0.5"
+							/>
+							<rect x="26" y="40" width="48" height="2.2" rx="1.1" fill="rgba(113,115,144,0.5)" />
+							<rect x="26" y="48" width="27" height="2.2" rx="1.1" fill="rgba(113,115,144,0.5)" />
+							<rect
+								x="11"
+								y="38"
+								width="12"
+								height="12"
+								rx="2"
+								stroke="rgba(113,115,144,0.5)"
+								stroke-width="1.2"
+								fill="none"
+							/>
+							<defs>
+								<linearGradient id="pool-empty-g1" x1="0" y1="0" x2="0" y2="1">
+									<stop offset="0%" stop-color="#3C415F" />
+									<stop offset="100%" stop-color="#111322" />
+								</linearGradient>
+								<linearGradient id="pool-empty-g2" x1="0" y1="0" x2="0" y2="1">
+									<stop offset="0%" stop-color="#3C415F" />
+									<stop offset="100%" stop-color="#111322" />
+								</linearGradient>
+							</defs>
+						</svg>
+						<p class="empty-title">No Active Position</p>
+						<p class="empty-sub">Add liquidity below to start earning</p>
+					</div>
+				{/if}
 			</article>
 
 			<!-- ─── Add Liquidity ────────────────────────────────────── -->
@@ -1103,6 +1157,55 @@
 		font-size: 13px;
 		letter-spacing: -0.4px;
 		color: var(--color-text-muted);
+	}
+
+	/* Active "My Position" — token rows on the left, donut on the right. */
+	.my-position {
+		display: grid;
+		grid-template-columns: 1fr auto;
+		gap: 24px;
+		align-items: center;
+	}
+	.my-position-rows {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 12px;
+		min-width: 0;
+	}
+	.my-position-donut {
+		position: relative;
+		flex-shrink: 0;
+		width: 134px;
+		height: 134px;
+	}
+	.my-position-donut-center {
+		position: absolute;
+		inset: 0;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		gap: 2px;
+		text-align: center;
+	}
+	.my-position-donut-label {
+		margin: 0;
+		font-family: var(--font-body);
+		font-weight: 500;
+		font-size: 13px;
+		letter-spacing: -0.4px;
+		color: var(--color-text-muted);
+	}
+	.my-position-donut-value {
+		margin: 0;
+		font-family: var(--font-numeric);
+		font-weight: 600;
+		font-size: 20px;
+		letter-spacing: -0.6px;
+		color: var(--color-text);
 	}
 
 	/* ─── Add Liquidity card ─────────────────────────────────────── */

@@ -204,7 +204,13 @@
 			fees24h: '$0.0000',
 			binStep: '20 bps (0.2%)',
 			priceLabels: ['0.840', '0.863', '0.885', '0.825', '0.972', '0.982', '0.993', '0.997'],
-			userBalance: '950'
+			userBalance: '950',
+			userPosition: {
+				totalUsd: '$9,598',
+				tokenA: { qty: '10.00K', usd: '$11.4k', pct: '53%' },
+				tokenB: { qty: '10.00K', usd: '$11.4k', pct: '47%' },
+				aFraction: 0.53
+			}
 		},
 		'sprk-usdc': {
 			id: 'sprk-usdc',
@@ -307,7 +313,7 @@
 			<aside class="token-aside">
 				<header class="token-head">
 					<div class="token-id">
-						<div class="token-logo" style:background-color={token.logoBg}>
+						<div class="token-logo" style:background-color={token.logoSrc ? 'transparent' : token.logoBg}>
 							{#if token.logoSrc}
 								<img src={token.logoSrc} alt="" aria-hidden="true" />
 							{:else}
@@ -680,9 +686,9 @@
 		overflow: hidden;
 	}
 	.token-logo img {
-		width: 60%;
-		height: 60%;
-		object-fit: contain;
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
 	}
 	.token-name-block {
 		display: flex;
