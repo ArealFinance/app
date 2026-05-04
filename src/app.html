@@ -4,17 +4,15 @@
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
 		<meta name="text-scale" content="scale" />
-		<!-- Same favicon as areal.finance: bare crystal, theme-aware. -->
+		<!-- Same favicon as areal.finance: bare crystal, theme-aware.
+		     The first link has no media query so browsers that don't honour
+		     media on rel=icon (Chrome treats it inconsistently) still get a
+		     real icon instead of the SvelteKit fallback. -->
+		<link rel="icon" type="image/svg+xml" href="%sveltekit.assets%/favicon-light.svg?v=4" />
 		<link
 			rel="icon"
 			type="image/svg+xml"
-			href="%sveltekit.assets%/favicon-light.svg?v=3"
-			media="(prefers-color-scheme: light)"
-		/>
-		<link
-			rel="icon"
-			type="image/svg+xml"
-			href="%sveltekit.assets%/favicon-dark.svg?v=3"
+			href="%sveltekit.assets%/favicon-dark.svg?v=4"
 			media="(prefers-color-scheme: dark)"
 		/>
 		%sveltekit.head%
