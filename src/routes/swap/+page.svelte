@@ -10,7 +10,6 @@
 		Gear,
 		Check,
 		ThumbsUp,
-		Clock,
 		Bolt
 	} from '$lib/icons';
 
@@ -71,8 +70,7 @@
 	const features = [
 		{ icon: Check, label: 'Best rates across all liquidity pools' },
 		{ icon: ThumbsUp, label: 'Low 0.5% trading fee' },
-		{ icon: Bolt, label: 'Instant swaps on Solana blockchain' },
-		{ icon: Clock, label: 'No registration or KYC required' }
+		{ icon: Bolt, label: 'Instant swaps on Solana blockchain' }
 	];
 </script>
 
