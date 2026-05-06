@@ -4,7 +4,24 @@
  * Persisted to localStorage so the choice survives reloads. Default is
  * `devnet` (safest for public dev — localnet is invisible from outside the
  * dev's machine, mainnet is too production-y to default to).
+ *
+ * Connections live here (not on the wallet store): a Connection is bound to
+ * an RPC URL, which is a network-scoped concept. Reads need to work even
+ * when the wallet is disconnected (e.g. landing page TVL, public market
+ * data), so coupling the read path to wallet state was wrong.
+ *
+ * Two flavors:
+ *   - `connection`   → ws disabled. Use for one-shot reads.
+ *   - `wsConnection` → ws enabled. Use for `onAccountChange` / `onLogs` /
+ *                       `onSlotChange` (Phase 6+ portfolio reactivity).
+ *
+ * Both are recreated whenever `current` changes (network switch). web3.js
+ * `Connection` objects are cheap to construct, so the getter pattern is
+ * fine — no need for explicit caching.
  */
+import type { Connection } from '@solana/web3.js';
+
+import { createConnection, createWsConnection } from '$lib/sdk/connection';
 import { ENDPOINTS, NETWORK_IDS, type NetworkEndpoint, type NetworkId } from './endpoints';
 
 const STORAGE_KEY = 'app:network:v1';
@@ -37,6 +54,14 @@ export const network = {
 	},
 	get label(): string {
 		return ENDPOINTS[current].label;
+	},
+	/** Read-only Connection (websocket disabled). Use for one-shot reads. */
+	get connection(): Connection {
+		return createConnection(ENDPOINTS[current].rpcUrl);
+	},
+	/** Subscription-capable Connection. Use for onAccountChange / onLogs. */
+	get wsConnection(): Connection {
+		return createWsConnection(ENDPOINTS[current].rpcUrl);
 	},
 	setNetwork(id: NetworkId) {
 		if (current === id) return;

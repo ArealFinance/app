@@ -4,11 +4,13 @@
  * Public surface (kept stable for existing components):
  *   wallet.{status, address, provider, displayAddress,
  *           transactions, hasMore, isConnected,
+ *           publicKey,
  *           connect(), disconnect(), copyAddress(), loadMore()}
  *
- * Added in Phase 5:
- *   wallet.publicKey   → @solana/web3.js PublicKey | null (for SDK calls)
- *   wallet.connection  → cached `Connection` for the active network
+ * Note: `Connection` lives on the network store (`network.connection` /
+ * `network.wsConnection`). It's a network-scoped concept and reads need to
+ * work even when the wallet is disconnected — coupling it to wallet state
+ * was wrong. See `src/lib/network/network.svelte.ts`.
  *
  * Transactions are intentionally empty here: the mock fixtures lived inside
  * this file in Phase 4. Phase 6+ will wire them to the backend; until then
@@ -17,9 +19,7 @@
 import type { PublicKey } from '@solana/web3.js';
 
 import { connectPhantom, disconnectPhantom, getPhantomProvider } from '$lib/wallet';
-import { network } from '$lib/network';
 import { showError } from '$lib/errors';
-import { createConnection } from '$lib/sdk';
 import { truncateAddress } from '$lib/utils/address';
 
 export type WalletStatus = 'disconnected' | 'awaiting-signature' | 'connected' | 'error';
@@ -48,10 +48,6 @@ let publicKey: PublicKey | null = $state(null);
 let provider: WalletProvider | null = $state(null);
 let transactions: Transaction[] = $state([]);
 let hasMore: boolean = $state(false);
-
-// Connection follows the active network — recreated when `network.current`
-// changes. `$derived.by` keeps it lazy and re-runs on dependency change.
-const connection = $derived.by(() => createConnection(network.endpoint.rpcUrl));
 
 let errorRevertTimeout: ReturnType<typeof setTimeout> | null = null;
 
@@ -149,9 +145,6 @@ export const wallet = {
 	},
 	get isConnected() {
 		return status === 'connected';
-	},
-	get connection() {
-		return connection;
 	},
 
 	connect,

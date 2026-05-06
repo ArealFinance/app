@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { Connection } from '@solana/web3.js';
 import { ENDPOINTS, NETWORK_IDS, type NetworkId } from './endpoints';
 
 // Import the network singleton after mocking localStorage
@@ -255,6 +256,52 @@ describe('network (svelte.ts store)', () => {
 			const { network: net } = await import('./network.svelte');
 
 			expect(net.current).toBe('devnet');
+		});
+	});
+
+	describe('connection property', () => {
+		it('should return a Connection instance', async () => {
+			const { network: net } = await import('./network.svelte');
+			expect(net.connection).toBeInstanceOf(Connection);
+		});
+
+		it('should reflect rpcUrl of current network', async () => {
+			const { network: net } = await import('./network.svelte');
+			net.setNetwork('devnet');
+			expect(net.connection.rpcEndpoint).toBe(ENDPOINTS.devnet.rpcUrl);
+		});
+
+		it('should track rpcUrl after network switch', async () => {
+			const { network: net } = await import('./network.svelte');
+
+			net.setNetwork('devnet');
+			expect(net.connection.rpcEndpoint).toBe(ENDPOINTS.devnet.rpcUrl);
+
+			net.setNetwork('mainnet');
+			expect(net.connection.rpcEndpoint).toBe(ENDPOINTS.mainnet.rpcUrl);
+		});
+	});
+
+	describe('wsConnection property', () => {
+		it('should return a Connection instance', async () => {
+			const { network: net } = await import('./network.svelte');
+			expect(net.wsConnection).toBeInstanceOf(Connection);
+		});
+
+		it('should reflect rpcUrl of current network', async () => {
+			const { network: net } = await import('./network.svelte');
+			net.setNetwork('devnet');
+			expect(net.wsConnection.rpcEndpoint).toBe(ENDPOINTS.devnet.rpcUrl);
+		});
+
+		it('should track rpcUrl after network switch', async () => {
+			const { network: net } = await import('./network.svelte');
+
+			net.setNetwork('devnet');
+			expect(net.wsConnection.rpcEndpoint).toBe(ENDPOINTS.devnet.rpcUrl);
+
+			net.setNetwork('mainnet');
+			expect(net.wsConnection.rpcEndpoint).toBe(ENDPOINTS.mainnet.rpcUrl);
 		});
 	});
 
