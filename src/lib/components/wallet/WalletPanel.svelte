@@ -3,6 +3,7 @@
 	import { Xmark, Clipboard, ArrowUpRightSmall, ArrowRightSmall, Plus } from '$lib/icons';
 	import { wallet, type Transaction } from '$lib/stores/wallet.svelte';
 	import { walletDialog } from '$lib/stores/walletDialog.svelte';
+	import NetworkSwitcher from '$lib/components/debug/NetworkSwitcher.svelte';
 	import TransactionRow from './TransactionRow.svelte';
 
 	const open = $derived(walletDialog.mode === 'panel' && wallet.isConnected);
@@ -135,6 +136,12 @@
 				<Xmark size={20} />
 			</button>
 		</header>
+
+		<!-- Mobile-only: the desktop network switcher lives in the page header,
+		     mobile gets it here so it's still reachable at 375px. -->
+		<div class="wallet-panel-network">
+			<NetworkSwitcher variant="row" />
+		</div>
 
 		<h2 id="wallet-panel-title" class="wallet-panel-title">Transactions</h2>
 
@@ -395,6 +402,12 @@
 		background-color: rgba(255, 255, 255, 0.08);
 	}
 
+	/* Mobile-only — hidden on desktop where the header carries the switcher. */
+	.wallet-panel-network {
+		display: none;
+		flex-shrink: 0;
+	}
+
 	.wallet-panel-title {
 		margin: var(--space-4) 0 0;
 		font-family: var(--font-sans);
@@ -473,6 +486,9 @@
 		}
 		.wallet-panel-status {
 			justify-self: start;
+		}
+		.wallet-panel-network {
+			display: block;
 		}
 	}
 </style>
