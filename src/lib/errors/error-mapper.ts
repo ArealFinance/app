@@ -62,8 +62,22 @@ export function mapError(err: unknown, programId?: PublicKey): ErrorDescriptor {
 			}
 		}
 
-		return { tone: 'error', title: 'Error', body: msg };
+		// Generic fallback for unrecognized errors. We deliberately do NOT
+		// surface `err.message` to the user — RPC responses can leak URLs,
+		// internal node IDs, or stack-trace fragments. Log the original
+		// message for developers and show a neutral string instead.
+		console.warn('[mapError] Unrecognized error:', msg);
+		return {
+			tone: 'error',
+			title: 'Error',
+			body: 'Something went wrong. Please try again.'
+		};
 	}
 
-	return { tone: 'error', title: 'Error', body: String(err) };
+	console.warn('[mapError] Unrecognized non-Error thrown value:', err);
+	return {
+		tone: 'error',
+		title: 'Error',
+		body: 'Something went wrong. Please try again.'
+	};
 }

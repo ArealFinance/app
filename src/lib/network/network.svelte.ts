@@ -64,6 +64,10 @@ export const network = {
 		return createWsConnection(ENDPOINTS[current].rpcUrl);
 	},
 	setNetwork(id: NetworkId) {
+		// Defensive guard: reject ids outside the known set. Callers cast at
+		// the boundary (e.g. URL params, user input) so a bogus value can
+		// reach this method despite the static type.
+		if (!(NETWORK_IDS as readonly string[]).includes(id)) return;
 		if (current === id) return;
 		current = id;
 		persist(id);

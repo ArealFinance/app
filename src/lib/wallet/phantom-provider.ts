@@ -11,6 +11,22 @@
  */
 import type { PublicKey, Transaction, VersionedTransaction } from '@solana/web3.js';
 
+/*
+ * Phantom emits three events. Typing them per-name (overload signatures)
+ * lets call sites get the right handler shape without casting.
+ *
+ *   - `connect`        → fired after a successful connect; receives the
+ *                        resolved public key.
+ *   - `disconnect`     → fired when the user disconnects (no payload).
+ *   - `accountChanged` → fired when the user switches the active account in
+ *                        the Phantom UI. The new public key is passed, or
+ *                        `null` if the user disconnected the previously
+ *                        trusted account.
+ */
+export type PhantomConnectHandler = (publicKey: PublicKey) => void;
+export type PhantomDisconnectHandler = () => void;
+export type PhantomAccountChangedHandler = (publicKey: PublicKey | null) => void;
+
 export interface PhantomProvider {
 	publicKey: PublicKey | null;
 	isPhantom?: boolean;
@@ -21,8 +37,12 @@ export interface PhantomProvider {
 	signAndSendTransaction<T extends Transaction | VersionedTransaction>(
 		tx: T
 	): Promise<{ signature: string }>;
-	on(event: string, handler: (...args: unknown[]) => void): void;
-	off(event: string, handler: (...args: unknown[]) => void): void;
+	on(event: 'connect', handler: PhantomConnectHandler): void;
+	on(event: 'disconnect', handler: PhantomDisconnectHandler): void;
+	on(event: 'accountChanged', handler: PhantomAccountChangedHandler): void;
+	off(event: 'connect', handler: PhantomConnectHandler): void;
+	off(event: 'disconnect', handler: PhantomDisconnectHandler): void;
+	off(event: 'accountChanged', handler: PhantomAccountChangedHandler): void;
 }
 
 interface PhantomGlobals {

@@ -1,10 +1,23 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { PublicKey } from '@solana/web3.js';
 import { mapError } from './error-mapper';
 import * as sdkErrorModule from '@areal/sdk/errors';
 
 // Mock @areal/sdk/errors
 vi.mock('@areal/sdk/errors');
+
+// W1 — generic fallback should NOT leak internal error messages to users,
+// and SHOULD log them for developers via console.warn. The fallback body is
+// the same neutral string regardless of input.
+const GENERIC_FALLBACK_BODY = 'Something went wrong. Please try again.';
+
+beforeEach(() => {
+	vi.spyOn(console, 'warn').mockImplementation(() => {});
+});
+
+afterEach(() => {
+	vi.restoreAllMocks();
+});
 
 describe('error-mapper', () => {
 	describe('mapError: user rejection errors', () => {
@@ -101,8 +114,14 @@ describe('error-mapper', () => {
 
 			expect(result.tone).toBe('error');
 			expect(result.title).toBe('Error');
-			expect(result.body).toBe('generic error message');
+			// W1: generic fallback hides the original message from the user.
+			expect(result.body).toBe(GENERIC_FALLBACK_BODY);
 			expect(result.code).toBeUndefined();
+			// Original message still logged for developers.
+			expect(console.warn).toHaveBeenCalledWith(
+				'[mapError] Unrecognized error:',
+				'generic error message'
+			);
 		});
 
 		it('should not call mapAnchorError when programId is undefined', () => {
@@ -117,64 +136,73 @@ describe('error-mapper', () => {
 	});
 
 	describe('mapError: generic Error fallback', () => {
-		it('should return error tone with message for unrecognized Error', () => {
+		it('should return generic fallback body for unrecognized Error (W1)', () => {
 			const err = new Error('Database connection failed');
 			const result = mapError(err);
 
 			expect(result.tone).toBe('error');
 			expect(result.title).toBe('Error');
-			expect(result.body).toBe('Database connection failed');
+			// W1: never surface the raw message — could leak RPC URLs, internal paths.
+			expect(result.body).toBe(GENERIC_FALLBACK_BODY);
+			expect(console.warn).toHaveBeenCalledWith(
+				'[mapError] Unrecognized error:',
+				'Database connection failed'
+			);
 		});
 
-		it('should handle empty error message', () => {
+		it('should use generic fallback for empty error message (W1)', () => {
 			const err = new Error('');
 			const result = mapError(err);
 
 			expect(result.tone).toBe('error');
 			expect(result.title).toBe('Error');
-			expect(result.body).toBe('');
+			expect(result.body).toBe(GENERIC_FALLBACK_BODY);
 		});
 	});
 
 	describe('mapError: non-Error thrown values', () => {
-		it('should convert string to error descriptor', () => {
-			const result = mapError('Something went wrong');
+		it('should map string thrown values to generic fallback (W1)', () => {
+			const result = mapError('Something internal');
 
 			expect(result.tone).toBe('error');
 			expect(result.title).toBe('Error');
-			expect(result.body).toBe('Something went wrong');
+			expect(result.body).toBe(GENERIC_FALLBACK_BODY);
+			expect(console.warn).toHaveBeenCalledWith(
+				'[mapError] Unrecognized non-Error thrown value:',
+				'Something internal'
+			);
 		});
 
-		it('should convert number to error descriptor', () => {
+		it('should map numbers to generic fallback (W1)', () => {
 			const result = mapError(42);
 
 			expect(result.tone).toBe('error');
-			expect(result.body).toBe('42');
+			expect(result.body).toBe(GENERIC_FALLBACK_BODY);
 		});
 
-		it('should convert undefined to error descriptor', () => {
+		it('should map undefined to generic fallback (W1)', () => {
 			const result = mapError(undefined);
 
 			expect(result.tone).toBe('error');
-			expect(result.body).toBe('undefined');
+			expect(result.body).toBe(GENERIC_FALLBACK_BODY);
 		});
 
-		it('should convert null to error descriptor', () => {
+		it('should map null to generic fallback (W1)', () => {
 			const result = mapError(null);
 
 			expect(result.tone).toBe('error');
-			expect(result.body).toBe('null');
+			expect(result.body).toBe(GENERIC_FALLBACK_BODY);
 		});
 
-		it('should convert object to string representation', () => {
+		it('should map plain objects to generic fallback (W1)', () => {
 			const obj = { code: 500, message: 'Internal error' };
 			const result = mapError(obj);
 
 			expect(result.tone).toBe('error');
-			expect(result.body).toBe('[object Object]');
+			expect(result.body).toBe(GENERIC_FALLBACK_BODY);
 		});
 
-		it('should convert custom Error subclass', () => {
+		it('should map custom Error subclasses through generic fallback (W1)', () => {
 			class NetworkError extends Error {
 				constructor(msg: string) {
 					super(msg);
@@ -186,7 +214,7 @@ describe('error-mapper', () => {
 			const result = mapError(err);
 
 			expect(result.tone).toBe('error');
-			expect(result.body).toBe('Connection timeout');
+			expect(result.body).toBe(GENERIC_FALLBACK_BODY);
 		});
 	});
 
@@ -226,13 +254,13 @@ describe('error-mapper', () => {
 			expect(result.code).toBe(0);
 		});
 
-		it('should handle very long error messages', () => {
+		it('should map very long error messages to generic fallback (W1)', () => {
 			const longMsg = 'Error: '.repeat(100);
 			const err = new Error(longMsg);
 			const result = mapError(err);
 
 			expect(result.tone).toBe('error');
-			expect(result.body).toBe(longMsg);
+			expect(result.body).toBe(GENERIC_FALLBACK_BODY);
 		});
 	});
 });

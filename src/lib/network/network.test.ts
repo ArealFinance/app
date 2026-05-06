@@ -185,6 +185,23 @@ describe('network (svelte.ts store)', () => {
 				expect(net.endpoint.id).toBe(to);
 			}
 		});
+
+		// W2: defensive guard against unknown ids (callers cast at the boundary).
+		it('should ignore invalid network ids', async () => {
+			const { network: net } = await import('./network.svelte');
+			net.setNetwork('mainnet');
+			expect(net.current).toBe('mainnet');
+
+			net.setNetwork('bogus' as NetworkId);
+			expect(net.current).toBe('mainnet');
+			expect(localStorage.getItem('app:network:v1')).toBe('mainnet');
+
+			net.setNetwork('' as NetworkId);
+			expect(net.current).toBe('mainnet');
+
+			net.setNetwork(null as unknown as NetworkId);
+			expect(net.current).toBe('mainnet');
+		});
 	});
 
 	describe('network switching', () => {
