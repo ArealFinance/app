@@ -23,6 +23,7 @@
 <script lang="ts">
 	import { ChartPie, ArrowUpDownSimple, Chart } from '$lib/icons';
 	import { WalletAddressChip } from '$lib/components/ui';
+	import NetworkSwitcher from '$lib/components/debug/NetworkSwitcher.svelte';
 	import DemoBanner from './DemoBanner.svelte';
 	import Logo from './Logo.svelte';
 
@@ -96,6 +97,9 @@
 		{/if}
 
 		<div class="header-right">
+			<div class="header-network-desktop">
+				<NetworkSwitcher variant="chip" />
+			</div>
 			{#if walletAddress}
 				<WalletAddressChip
 					address={walletAddress}
@@ -189,6 +193,13 @@
 		display: flex;
 		align-items: center;
 		justify-content: flex-end;
+		gap: var(--space-2);
+	}
+
+	/* Network switcher is desktop-only in the header. Mobile gets it inside
+	 * the wallet panel instead — saves horizontal space at 375px. */
+	.header-network-desktop {
+		display: inline-flex;
 	}
 
 	.connect-btn {
@@ -237,6 +248,9 @@
 		}
 		.header-right {
 			justify-content: flex-end;
+		}
+		.header-network-desktop {
+			display: none;
 		}
 	}
 </style>

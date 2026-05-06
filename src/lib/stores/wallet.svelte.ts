@@ -1,124 +1,161 @@
 /*
- * Wallet store — mock-first.
+ * Wallet store — runes-based singleton wired to the real Phantom provider.
  *
- * Real Phantom/Solflare adapter integration lives off this same API later.
- * Transactions come from our backend (which talks to Solana RPC); for now
- * they're a static fixture.
+ * Public surface (kept stable for existing components):
+ *   wallet.{status, address, provider, displayAddress,
+ *           transactions, hasMore, isConnected,
+ *           connect(), disconnect(), copyAddress(), loadMore()}
+ *
+ * Added in Phase 5:
+ *   wallet.publicKey   → @solana/web3.js PublicKey | null (for SDK calls)
+ *   wallet.connection  → cached `Connection` for the active network
+ *
+ * Transactions are intentionally empty here: the mock fixtures lived inside
+ * this file in Phase 4. Phase 6+ will wire them to the backend; until then
+ * we don't lie to the user with stale fixture data.
  */
+import type { PublicKey } from '@solana/web3.js';
 
+import { connectPhantom, disconnectPhantom, getPhantomProvider } from '$lib/wallet';
+import { network } from '$lib/network';
+import { showError } from '$lib/errors';
+import { createConnection } from '$lib/sdk';
 import { truncateAddress } from '$lib/utils/address';
 
-export type WalletStatus = 'disconnected' | 'awaiting-signature' | 'connected';
+export type WalletStatus = 'disconnected' | 'awaiting-signature' | 'connected' | 'error';
 export type WalletProvider = 'phantom' | 'solflare';
 
 export type TxType = 'add-lp' | 'swap' | 'withdraw-lp';
 
+/**
+ * Transaction shape from the (future) backend pagination endpoint. Kept here
+ * because UI components reference it. Will move to a service module when the
+ * backend integration lands.
+ */
 export type Transaction = {
 	id: string;
 	type: TxType;
-	pair: [string, string]; // ['USDT', 'RWT']
-	/** Pre-formatted amount string with sign + token (e.g. "+ 1,000.00 shares"). */
+	pair: [string, string];
 	amount: string;
-	/** "11:26 AM" — pre-formatted in the bot/backend. */
 	time: string;
-	/** Group key for the date chip (e.g. "Apr 09, 2026"). */
 	date: string;
-	/** Pre-formatted USD value (e.g. "$954.54"). */
 	usd: string;
 };
 
-const MOCK_ADDRESS = '41LU8sM5z2K3eXg4y7VqRb6NzTcG9HpYwJfdAaMnPp5K';
+let status: WalletStatus = $state('disconnected');
+let address: string | null = $state(null);
+let publicKey: PublicKey | null = $state(null);
+let provider: WalletProvider | null = $state(null);
+let transactions: Transaction[] = $state([]);
+let hasMore: boolean = $state(false);
 
-const MOCK_TRANSACTIONS: Transaction[] = [
-	{ id: 't1', type: 'add-lp',     pair: ['USDT', 'RWT'], amount: '+ 1,000.00 shares', time: '11:26 AM', date: 'Apr 09, 2026', usd: '$954.54' },
-	{ id: 't2', type: 'swap',       pair: ['USDT', 'RWT'], amount: '- 500.00 RWT',     time: '11:26 AM', date: 'Apr 09, 2026', usd: '$487.38' },
-	{ id: 't3', type: 'withdraw-lp', pair: ['USDT', 'RWT'], amount: '- 500.00 RWT',     time: '11:26 AM', date: 'Apr 09, 2026', usd: '$487.38' },
-	{ id: 't4', type: 'add-lp',     pair: ['USDT', 'RWT'], amount: '+ 1,000.00 shares', time: '11:26 AM', date: 'Apr 09, 2026', usd: '$954.54' },
-	{ id: 't5', type: 'swap',       pair: ['USDT', 'RWT'], amount: '- 500.00 RWT',     time: '11:26 AM', date: 'Apr 09, 2026', usd: '$487.38' },
-	{ id: 't6', type: 'withdraw-lp', pair: ['USDT', 'RWT'], amount: '- 500.00 RWT',     time: '11:26 AM', date: 'Apr 09, 2026', usd: '$487.38' }
-];
+// Connection follows the active network — recreated when `network.current`
+// changes. `$derived.by` keeps it lazy and re-runs on dependency change.
+const connection = $derived.by(() => createConnection(network.endpoint.rpcUrl));
 
-type WalletState = {
-	status: WalletStatus;
-	address: string | null;
-	provider: WalletProvider | null;
-	transactions: Transaction[];
-	hasMore: boolean;
-};
+let errorRevertTimeout: ReturnType<typeof setTimeout> | null = null;
 
-let state = $state<WalletState>({
-	status: 'disconnected',
-	address: null,
-	provider: null,
-	transactions: [],
-	hasMore: false
-});
+function clearErrorRevert() {
+	if (errorRevertTimeout) {
+		clearTimeout(errorRevertTimeout);
+		errorRevertTimeout = null;
+	}
+}
 
-let signatureTimeout: ReturnType<typeof setTimeout> | null = null;
+async function connect(providerName: WalletProvider = 'phantom'): Promise<void> {
+	clearErrorRevert();
+
+	// Solflare not wired yet — surface explicitly, don't quietly fall through.
+	if (providerName !== 'phantom') {
+		showError(new Error(`Provider "${providerName}" not yet supported`));
+		return;
+	}
+
+	if (!getPhantomProvider()) {
+		showError(new Error('Phantom not found'));
+		return;
+	}
+
+	status = 'awaiting-signature';
+	provider = 'phantom';
+	try {
+		const pk = await connectPhantom();
+		publicKey = pk;
+		address = pk.toBase58();
+		status = 'connected';
+		// Don't fabricate transactions — Phase 6+ will populate from the backend.
+		transactions = [];
+		hasMore = false;
+	} catch (err) {
+		status = 'error';
+		showError(err);
+		// Auto-revert to disconnected so the UI doesn't get stuck on an error
+		// state with no path back to "Connect wallet".
+		errorRevertTimeout = setTimeout(() => {
+			status = 'disconnected';
+			provider = null;
+			errorRevertTimeout = null;
+		}, 1500);
+	}
+}
+
+async function disconnect(): Promise<void> {
+	clearErrorRevert();
+	await disconnectPhantom();
+	publicKey = null;
+	address = null;
+	provider = null;
+	transactions = [];
+	hasMore = false;
+	status = 'disconnected';
+}
+
+async function copyAddress(): Promise<boolean> {
+	if (!address || typeof navigator === 'undefined' || !navigator.clipboard) return false;
+	try {
+		await navigator.clipboard.writeText(address);
+		return true;
+	} catch {
+		return false;
+	}
+}
+
+/** Stub for backend pagination — Phase 6+. */
+function loadMore(): void {
+	// no-op until the backend transaction history endpoint is wired
+}
 
 export const wallet = {
 	get status() {
-		return state.status;
+		return status;
 	},
 	get address() {
-		return state.address;
+		return address;
+	},
+	get publicKey() {
+		return publicKey;
 	},
 	get provider() {
-		return state.provider;
+		return provider;
 	},
 	get displayAddress() {
-		return state.address ? truncateAddress(state.address, 4) : null;
+		return address ? truncateAddress(address, 4) : null;
 	},
 	get transactions() {
-		return state.transactions;
+		return transactions;
 	},
 	get hasMore() {
-		return state.hasMore;
+		return hasMore;
 	},
 	get isConnected() {
-		return state.status === 'connected';
+		return status === 'connected';
+	},
+	get connection() {
+		return connection;
 	},
 
-	/** Mock connect — flips through awaiting-signature into connected after a short delay. */
-	connect(provider: WalletProvider = 'phantom') {
-		state.status = 'awaiting-signature';
-		state.provider = provider;
-		if (signatureTimeout) clearTimeout(signatureTimeout);
-		signatureTimeout = setTimeout(() => {
-			state.address = MOCK_ADDRESS;
-			state.status = 'connected';
-			state.transactions = MOCK_TRANSACTIONS;
-			state.hasMore = true;
-			signatureTimeout = null;
-		}, 1500);
-	},
-
-	disconnect() {
-		if (signatureTimeout) {
-			clearTimeout(signatureTimeout);
-			signatureTimeout = null;
-		}
-		state.status = 'disconnected';
-		state.address = null;
-		state.provider = null;
-		state.transactions = [];
-		state.hasMore = false;
-	},
-
-	async copyAddress(): Promise<boolean> {
-		if (!state.address || typeof navigator === 'undefined' || !navigator.clipboard) return false;
-		try {
-			await navigator.clipboard.writeText(state.address);
-			return true;
-		} catch {
-			return false;
-		}
-	},
-
-	/** Stub for backend pagination — appends another mock page. */
-	loadMore() {
-		// Future: fetch from /api/wallet/:address/transactions?cursor=...
-		state.transactions = [...state.transactions, ...MOCK_TRANSACTIONS];
-		state.hasMore = state.transactions.length < 24;
-	}
+	connect,
+	disconnect,
+	copyAddress,
+	loadMore
 };
