@@ -1,5 +1,6 @@
 import { defineConfig } from 'vitest/config';
 import { svelte } from '@sveltejs/vite-plugin-svelte';
+import { nodePolyfills } from 'vite-plugin-node-polyfills';
 import path from 'node:path';
 
 /*
@@ -13,12 +14,27 @@ const dirname = typeof __dirname !== 'undefined' ? __dirname : path.dirname(file
 
 // More info at: https://storybook.js.org/docs/next/writing-tests/integrations/vitest-addon
 export default defineConfig({
-  plugins: [svelte()],
+  plugins: [
+    svelte(),
+    // Polyfills required for @solana/web3.js / @areal/sdk inside jsdom tests.
+    nodePolyfills({
+      include: ['buffer', 'crypto', 'stream', 'util', 'process'],
+      globals: { Buffer: 'build', global: true, process: true },
+      overrides: { fs: 'empty' }
+    })
+  ],
+  optimizeDeps: {
+    include: ['@solana/web3.js', 'bs58', 'buffer']
+  },
   resolve: {
     alias: {
       $lib: path.resolve('./src/lib')
     },
-    conditions: ['browser']
+    conditions: ['browser'],
+    // Dedupe @solana/web3.js so spies on PublicKey statics intercept calls
+    // made inside the SDK. Dedupe `buffer` so the polyfill's Buffer class
+    // matches the one Buffer.from(...) reaches for.
+    dedupe: ['@solana/web3.js', 'buffer']
   },
   test: {
     projects: [{
