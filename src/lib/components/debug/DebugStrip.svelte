@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { network } from '$lib/network';
-	import { wallet } from '$lib/stores/wallet.svelte';
 	import { readNavBookValue, type NavBookValueSnapshot } from '$lib/sdk';
 
 	/*
@@ -35,7 +34,7 @@
 		loading = true;
 		error = null;
 		try {
-			snapshot = await readNavBookValue(wallet.connection, network.endpoint.programIds);
+			snapshot = await readNavBookValue(network.connection, network.endpoint.programIds);
 		} catch (err) {
 			snapshot = null;
 			error = err instanceof Error ? err.message : String(err);
