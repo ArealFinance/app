@@ -2,6 +2,7 @@
 	import '$lib/styles/global.css';
 	import favicon from '$lib/assets/favicon.svg';
 	import { Toaster } from '$lib/components/ui';
+	import DebugStrip from '$lib/components/debug/DebugStrip.svelte';
 
 	let { children } = $props();
 </script>
@@ -13,3 +14,4 @@
 {@render children()}
 
 <Toaster />
+<DebugStrip />
