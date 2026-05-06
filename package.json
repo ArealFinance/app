@@ -56,7 +56,7 @@
 	},
 	"dependencies": {
 		"@areal/sdk": "file:../sdk",
-		"@arlex/client": "file:../vendor/arlex-client-0.2.1.tgz",
+		"@arlex/client": "file:../vendor/arlex-client-0.2.2.tgz",
 		"@solana/web3.js": "^1.98.4",
 		"@types/d3-force": "^3.0.10",
 		"bs58": "^6.0.0",
