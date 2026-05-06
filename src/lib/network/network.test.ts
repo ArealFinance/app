@@ -192,17 +192,14 @@ describe('network (svelte.ts store)', () => {
 			net.setNetwork('mainnet');
 			expect(net.current).toBe('mainnet');
 
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any
-			net.setNetwork('bogus' as any);
+			net.setNetwork('bogus' as NetworkId);
 			expect(net.current).toBe('mainnet');
 			expect(localStorage.getItem('app:network:v1')).toBe('mainnet');
 
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any
-			net.setNetwork('' as any);
+			net.setNetwork('' as NetworkId);
 			expect(net.current).toBe('mainnet');
 
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any
-			net.setNetwork(null as any);
+			net.setNetwork(null as unknown as NetworkId);
 			expect(net.current).toBe('mainnet');
 		});
 	});
