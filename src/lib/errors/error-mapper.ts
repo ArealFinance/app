@@ -58,6 +58,28 @@ const FRIENDLY_BY_NAME: Record<string, { title: string; body: string }> = {
 		body: 'Not enough liquidity for this size.'
 	},
 
+	// native-dex LP-path errors that surface to a user during
+	// add_liquidity / zap_liquidity / remove_liquidity / claim_lp_fees.
+	InsufficientShares: {
+		title: 'Insufficient shares',
+		body: 'You do not have enough LP shares for this withdrawal.'
+	},
+	InvalidPoolType: {
+		title: 'Pool type not supported',
+		body: 'Concentrated pools are not yet supported for this action.'
+	},
+	MissingOtTreasuryAccount: {
+		title: 'Missing fee account',
+		body: 'OT treasury fee account is missing for this pool.'
+	},
+	// Defensive: the contract may add an explicit master-pool block in a
+	// future revision. Keep a friendly translation ready so we don't fall
+	// through to the raw IDL `msg`.
+	MasterPoolUserLpDisabled: {
+		title: 'Liquidity managed by Areal Nexus',
+		body: 'User liquidity is managed by Areal Nexus on this pool.'
+	},
+
 	// rwt-engine errors that surface to a user during mint_rwt.
 	// Note: `SlippageExceeded` is a name collision with the dex error above;
 	// the friendly copy fits both paths (price moved during the action) so we
