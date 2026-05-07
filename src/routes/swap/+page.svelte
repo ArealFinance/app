@@ -1,8 +1,48 @@
 <script lang="ts">
+	/*
+	 * Swap page — second user write-path (after Phase 7 claim).
+	 *
+	 * Wires the visual swap card to the real on-chain flow:
+	 *   1. Pool dropdown filtered against KNOWN_POOLS_BY_CLUSTER[network.current].
+	 *   2. From-amount input → quote.setInput → cached quote re-renders the
+	 *      To-amount field (read-only, computed from quote.result).
+	 *   3. Slippage gear opens SwapSettings popover wired into quote.setSlippage.
+	 *   4. Flip toggles aToB; the To/From labels and chips swap.
+	 *   5. Swap button → opens SwapConfirmModal with a frozen SwapIntent.
+	 *      Confirm in modal → swap.start(intent) → modal walks 7 phases.
+	 *
+	 * Lifecycle:
+	 *   - onMount: activate the first available pool for the active cluster.
+	 *   - $effect: re-activate when network.current changes (drops the old
+	 *     subscription cycle and starts a new one).
+	 *   - onDestroy: tear down WS subscriptions.
+	 *
+	 * Decisions:
+	 *   - Exact-in only. "Specify To amount" mode is out of Phase 8 scope —
+	 *     would require a quote inverter that's not in the SDK yet.
+	 *   - Single-pool only. Multi-hop is also out of scope.
+	 *   - Phase 8 ships USDC↔RWT only. Mainnet shows an empty-state message
+	 *     until R20 lands and KNOWN_POOLS_BY_CLUSTER.mainnet is populated.
+	 */
+	import { onDestroy, onMount } from 'svelte';
+	import { PublicKey } from '@solana/web3.js';
+
 	import AppShell from '$lib/components/sections/AppShell.svelte';
 	import { Button } from '$lib/components/ui';
+	import { SwapConfirmModal, SwapSettings } from '$lib/components/swap';
 	import { wallet } from '$lib/stores/wallet.svelte';
 	import { walletDialog } from '$lib/stores/walletDialog.svelte';
+	import { network } from '$lib/network/network.svelte';
+	import {
+		KNOWN_POOLS_BY_CLUSTER,
+		quote,
+		swap,
+		userBalances,
+		type PoolEntry,
+		type SwapIntent
+	} from '$lib/swap';
+	import { applySlippage } from '@areal/sdk/native-dex';
+	import { formatTokenAmount } from '$lib/portfolio/format';
 	import {
 		AngleDownSmall,
 		AngleUpSmall,
@@ -13,55 +53,259 @@
 		Bolt
 	} from '$lib/icons';
 
-	type Token = {
-		id: string;
-		symbol: string;
-		bg: string;
-		iconSrc?: string;
-		iconLetter?: string;
-	};
+	// ──────────────────── pool & direction state ──────────────────────────
 
-	const TOKENS: Token[] = [
-		{
-			id: 'rwt',
-			symbol: 'RWT',
-			bg: 'linear-gradient(135deg, #a56eff 0%, #602fdc 100%)',
-			iconSrc: '/images/tokens/rwt-mark.svg'
-		},
-		{ id: 'usdt', symbol: 'USDt', bg: '#009393', iconSrc: '/images/tokens/usdt-t.svg' },
-		{ id: 'usdc', symbol: 'USDC', bg: '#2775ca', iconSrc: '/images/tokens/usdc.svg' },
-		{ id: 'sprk', symbol: 'SPRK', bg: '#4265ff', iconSrc: '/images/tokens/sparkles.svg' }
-	];
+	const poolsForCluster = $derived(KNOWN_POOLS_BY_CLUSTER[network.current]);
+	let activePool = $state<PoolEntry | null>(null);
+	let aToB = $state(true);
+	let poolsOpen = $state(false);
 
-	type Side = 'from' | 'to';
+	const fromMint = $derived<PublicKey | null>(
+		activePool ? (aToB ? activePool.mintA : activePool.mintB) : null
+	);
+	const toMint = $derived<PublicKey | null>(
+		activePool ? (aToB ? activePool.mintB : activePool.mintA) : null
+	);
+	const fromSymbol = $derived(
+		activePool ? (aToB ? activePool.symbolA : activePool.symbolB) : ''
+	);
+	const toSymbol = $derived(activePool ? (aToB ? activePool.symbolB : activePool.symbolA) : '');
+	const fromDecimals = $derived(
+		activePool ? (aToB ? activePool.decimalsA : activePool.decimalsB) : 6
+	);
+	const toDecimals = $derived(
+		activePool ? (aToB ? activePool.decimalsB : activePool.decimalsA) : 6
+	);
 
-	let fromToken = $state<Token>(TOKENS[0]);
-	let toToken = $state<Token>(TOKENS[1]);
-	let fromAmount = $state('');
-	let toAmount = $state('');
-	let openSide = $state<Side | null>(null);
+	// ──────────────────── amount input state ──────────────────────────────
 
-	function pickToken(side: Side, token: Token) {
-		if (side === 'from') fromToken = token;
-		else toToken = token;
-		openSide = null;
+	let fromAmountStr = $state('');
+	let settingsOpen = $state(false);
+	let modalOpen = $state(false);
+	let pendingIntent = $state<SwapIntent | null>(null);
+
+	/**
+	 * Parse a human-readable decimal string into base-units bigint, or
+	 * `null` for malformed / negative / zero inputs. We do this manually
+	 * (instead of `BigInt(parseFloat(...) * 10**decimals)`) to keep the math
+	 * exact — float coercion drops precision past ~15 significant digits.
+	 */
+	function parseAmount(raw: string, decimals: number): bigint | null {
+		const trimmed = raw.trim();
+		if (!trimmed) return null;
+		// Reject anything that isn't a positive decimal.
+		if (!/^\d+(\.\d*)?$/.test(trimmed) && !/^\.\d+$/.test(trimmed)) return null;
+		const [whole, frac = ''] = trimmed.split('.');
+		const wholePart = whole || '0';
+		// Right-pad and clip the fractional part to `decimals` digits.
+		const fracPadded = (frac + '0'.repeat(decimals)).slice(0, decimals);
+		try {
+			const big = BigInt(wholePart) * 10n ** BigInt(decimals) + BigInt(fracPadded || '0');
+			if (big <= 0n) return null;
+			return big;
+		} catch {
+			return null;
+		}
 	}
 
-	function toggleDropdown(side: Side, e: MouseEvent) {
-		e.stopPropagation();
-		openSide = openSide === side ? null : side;
-	}
+	const amountInBigint = $derived(parseAmount(fromAmountStr, fromDecimals));
 
-	function flipSides() {
-		[fromToken, toToken] = [toToken, fromToken];
-		[fromAmount, toAmount] = [toAmount, fromAmount];
-	}
-
-	// Click anywhere outside the open dropdown closes it.
+	// Pipe the parsed amount into the quote store. Slot the effect inside
+	// $effect so we don't re-fire on unrelated re-renders.
 	$effect(() => {
-		if (!openSide) return;
+		const amount = amountInBigint;
+		const from = fromMint;
+		const to = toMint;
+		if (!from || !to) return;
+		if (amount === null) {
+			quote.setInput(0n, from, to);
+		} else {
+			quote.setInput(amount, from, to);
+		}
+	});
+
+	// ──────────────────── derived display ─────────────────────────────────
+
+	const quoteResult = $derived(quote.result);
+	const expectedOut = $derived(
+		quoteResult && quoteResult.ok ? quoteResult.quote.amountOut : null
+	);
+	const toAmountDisplay = $derived(
+		expectedOut !== null ? formatTokenAmount(expectedOut, toDecimals, toDecimals) : ''
+	);
+	const quoteError = $derived(
+		quoteResult && !quoteResult.ok ? quoteResult.error : null
+	);
+
+	const slippageBps = $derived(quote.slippageBps);
+	const minAmountOut = $derived(
+		expectedOut !== null ? applySlippage(expectedOut, slippageBps) : null
+	);
+
+	const usdcBalance = $derived(userBalances.usdc);
+	const rwtBalance = $derived(userBalances.rwt);
+
+	const fromBalance = $derived.by<bigint | null>(() => {
+		if (!activePool) return null;
+		// Decide which symbol corresponds to the From side.
+		return fromSymbol === 'USDC' ? usdcBalance : rwtBalance;
+	});
+	const toBalance = $derived.by<bigint | null>(() => {
+		if (!activePool) return null;
+		return toSymbol === 'USDC' ? usdcBalance : rwtBalance;
+	});
+
+	const fromBalanceDisplay = $derived(
+		fromBalance !== null
+			? `Balance: ${formatTokenAmount(fromBalance, fromDecimals, 4)}`
+			: ''
+	);
+	const toBalanceDisplay = $derived(
+		toBalance !== null ? `Balance: ${formatTokenAmount(toBalance, toDecimals, 4)}` : ''
+	);
+
+	// ──────────────────── lifecycle ───────────────────────────────────────
+
+	onMount(() => {
+		const first = poolsForCluster[0];
+		if (first) {
+			activePool = first;
+			void quote.activatePool(first);
+		}
+		if (wallet.publicKey) {
+			void userBalances.refreshAll();
+		}
+	});
+
+	// React to network and wallet changes. We DO NOT recreate the activePool
+	// reference if the user switches network and the same pool exists with
+	// different addresses — instead we reset to the first available pool.
+	$effect(() => {
+		const cluster = network.current;
+		const pools = KNOWN_POOLS_BY_CLUSTER[cluster];
+		if (pools.length === 0) {
+			activePool = null;
+			quote.deactivate();
+			return;
+		}
+		const next = pools[0];
+		if (!activePool || !activePool.poolPda.equals(next.poolPda)) {
+			activePool = next;
+			void quote.activatePool(next);
+		}
+	});
+
+	$effect(() => {
+		// Keep balances in sync with wallet connect/disconnect & network.
+		void network.current;
+		if (wallet.publicKey) {
+			void userBalances.refreshAll();
+		} else {
+			userBalances.reset();
+		}
+	});
+
+	onDestroy(() => {
+		quote.deactivate();
+	});
+
+	// ──────────────────── actions ─────────────────────────────────────────
+
+	function flipDirection() {
+		aToB = !aToB;
+		// Wipe the input so the user doesn't accidentally send the wrong-
+		// decimal amount the other way (USDC and RWT have the same decimals
+		// today, but when more pairs land this guard becomes load-bearing).
+		fromAmountStr = '';
+	}
+
+	function selectPool(entry: PoolEntry) {
+		poolsOpen = false;
+		if (activePool && activePool.poolPda.equals(entry.poolPda)) return;
+		activePool = entry;
+		fromAmountStr = '';
+		void quote.activatePool(entry);
+	}
+
+	function openConfirm() {
+		if (!wallet.isConnected) {
+			walletDialog.open('connect');
+			return;
+		}
+		if (!activePool || !fromMint || !toMint) return;
+		if (amountInBigint === null) return;
+		if (expectedOut === null || minAmountOut === null) return;
+		if (!quoteResult || !quoteResult.ok) return;
+
+		// Freeze a fresh intent — the FSM re-validates these against fresh
+		// reserves before signature, so this snapshot is allowed to be a
+		// few hundred milliseconds stale.
+		pendingIntent = {
+			poolEntry: activePool,
+			fromMint,
+			toMint,
+			aToB,
+			amountIn: amountInBigint,
+			minAmountOut,
+			expectedOut,
+			fees: quoteResult.quote.fees,
+			priceImpactBps: quoteResult.quote.priceImpactBps,
+			slippageBps
+		};
+		modalOpen = true;
+	}
+
+	function closeModal() {
+		modalOpen = false;
+		// Keep `pendingIntent` until the modal animation finishes — the FSM
+		// drops its attempt at the same time, so the modal would render
+		// stale data otherwise. Drop after a short delay.
+		setTimeout(() => {
+			pendingIntent = null;
+		}, 200);
+	}
+
+	function confirmSwap() {
+		if (!pendingIntent) return;
+		void swap.start(pendingIntent);
+	}
+
+	const currentAttempt = $derived(
+		activePool ? swap.attempts.get(activePool.poolPda.toBase58()) ?? null : null
+	);
+	const isInFlight = $derived(currentAttempt !== null && (
+		currentAttempt.phase === 'preparing' ||
+		currentAttempt.phase === 'awaiting-signature' ||
+		currentAttempt.phase === 'broadcasting' ||
+		currentAttempt.phase === 'confirming'
+	));
+
+	const swapDisabled = $derived(
+		wallet.isConnected &&
+			(amountInBigint === null ||
+				expectedOut === null ||
+				quoteError !== null ||
+				isInFlight)
+	);
+
+	const swapButtonLabel = $derived.by(() => {
+		if (!wallet.isConnected) return 'Connect Wallet';
+		if (isInFlight) return 'Swap in progress…';
+		if (amountInBigint === null) return 'Enter an amount';
+		if (quoteError === 'EmptyReserves' || quoteError === 'PoolNotActive') return 'Pool unavailable';
+		if (quoteError === 'PoolPaused') return 'Trading paused';
+		if (quoteError === 'ZeroOutput') return 'Amount too small';
+		if (quoteError) return 'Cannot price swap';
+		if (expectedOut === null) return 'Loading quote…';
+		return 'Swap';
+	});
+
+	// Click outside the dropdowns to close them.
+	$effect(() => {
+		if (!poolsOpen && !settingsOpen) return;
 		const close = () => {
-			openSide = null;
+			poolsOpen = false;
+			settingsOpen = false;
 		};
 		document.addEventListener('click', close);
 		return () => document.removeEventListener('click', close);
@@ -79,16 +323,6 @@
 	<meta name="description" content="Exchange tokens at the best rates on Solana." />
 </svelte:head>
 
-{#snippet tokenLogo(token: Token, size: 'sm' | 'lg')}
-	<span class="swap-token-logo swap-token-logo-{size}" style:background={token.iconSrc ? 'transparent' : token.bg}>
-		{#if token.iconSrc}
-			<img src={token.iconSrc} alt="" aria-hidden="true" />
-		{:else}
-			<span class="swap-token-mark">{token.iconLetter ?? token.symbol[0]}</span>
-		{/if}
-	</span>
-{/snippet}
-
 <AppShell currentPath="/swap">
 	<div class="swap-page">
 		<h1 class="swap-headline">Exchange tokens at the best rates</h1>
@@ -96,99 +330,172 @@
 		<section class="swap-card" aria-labelledby="swap-card-title">
 			<header class="swap-card-head">
 				<h2 id="swap-card-title" class="swap-card-title">Swap tokens</h2>
-				<button class="swap-settings" type="button" aria-label="Swap settings">
-					<Gear size={16} variant="duotone" />
-				</button>
+				<div class="settings-anchor">
+					<button
+						class="swap-settings-btn"
+						type="button"
+						aria-label="Swap settings"
+						aria-expanded={settingsOpen}
+						onclick={(e) => {
+							e.stopPropagation();
+							settingsOpen = !settingsOpen;
+						}}
+					>
+						<Gear size={16} variant="duotone" />
+					</button>
+					{#if settingsOpen}
+						<div
+							class="settings-popover"
+							role="dialog"
+							aria-label="Slippage settings"
+							onclick={(e) => e.stopPropagation()}
+							onkeydown={(e) => {
+								if (e.key === 'Escape') settingsOpen = false;
+							}}
+							tabindex="-1"
+						>
+							<SwapSettings
+								slippageBps={slippageBps}
+								onslippagechange={(bps) => quote.setSlippage(bps)}
+							/>
+						</div>
+					{/if}
+				</div>
 			</header>
 
-			<div class="swap-stack">
-				{#each [{ side: 'from', label: 'From', token: fromToken, amount: fromAmount }, { side: 'to', label: 'To', token: toToken, amount: toAmount }] as row (row.side)}
-					{@const isOpen = openSide === row.side}
-					<div class="swap-row" class:is-open={isOpen}>
+			{#if !activePool}
+				<div class="empty-state">
+					<p class="empty-title">No pools on {network.label}</p>
+					<p class="empty-sub">
+						Switch to devnet or localnet to swap. Mainnet pools will be enabled
+						once the production RWT mint deploys.
+					</p>
+				</div>
+			{:else}
+				<div class="swap-stack">
+					<!-- ─────── From row ─────── -->
+					<div class="swap-row" class:is-open={poolsOpen}>
+						<div class="row-head">
+							<span class="row-label">From</span>
+							{#if fromBalanceDisplay}
+								<span class="row-balance">{fromBalanceDisplay} {fromSymbol}</span>
+							{/if}
+						</div>
 						<button
 							type="button"
 							class="swap-token-chip"
-							class:is-open={isOpen}
-							onclick={(e) => toggleDropdown(row.side as Side, e)}
+							class:is-open={poolsOpen}
+							onclick={(e) => {
+								e.stopPropagation();
+								poolsOpen = !poolsOpen;
+							}}
 							aria-haspopup="listbox"
-							aria-expanded={isOpen}
+							aria-expanded={poolsOpen}
 						>
-							{@render tokenLogo(row.token, 'sm')}
-							<span class="swap-token-meta">
-								<span class="swap-token-side">{row.label}</span>
-								<span class="swap-token-symbol">{row.token.symbol}</span>
-							</span>
-							{#if isOpen}
+							<span class="swap-token-symbol">{fromSymbol}</span>
+							{#if poolsOpen}
 								<AngleUpSmall size={16} />
 							{:else}
 								<AngleDownSmall size={16} />
 							{/if}
 						</button>
+						<input
+							class="swap-amount"
+							type="text"
+							inputmode="decimal"
+							placeholder="0.00"
+							bind:value={fromAmountStr}
+							aria-label="Amount to swap from"
+						/>
 
-						{#if row.side === 'from'}
-							<input
-								class="swap-amount"
-								type="text"
-								inputmode="decimal"
-								placeholder="0.00"
-								bind:value={fromAmount}
-								aria-label="Amount to swap from"
-							/>
-						{:else}
-							<input
-								class="swap-amount"
-								type="text"
-								inputmode="decimal"
-								placeholder="0.00"
-								bind:value={toAmount}
-								aria-label="Amount to receive"
-							/>
-						{/if}
-
-						{#if isOpen}
+						{#if poolsOpen}
 							<div
 								class="swap-dropdown"
 								role="listbox"
 								tabindex="-1"
 								onclick={(e) => e.stopPropagation()}
 								onkeydown={(e) => {
-									if (e.key === 'Escape') openSide = null;
+									if (e.key === 'Escape') poolsOpen = false;
 								}}
 							>
-								{#each TOKENS as token (token.id)}
-									{@const isSelected = row.token.id === token.id}
+								{#each poolsForCluster as entry (entry.poolPda.toBase58())}
+									{@const isSelected =
+										activePool !== null && activePool.poolPda.equals(entry.poolPda)}
 									<button
 										type="button"
 										class="swap-option"
 										class:is-selected={isSelected}
 										role="option"
 										aria-selected={isSelected}
-										onclick={() => pickToken(row.side as Side, token)}
+										onclick={() => selectPool(entry)}
 									>
-										{@render tokenLogo(token, 'lg')}
-										<span class="swap-option-symbol">{token.symbol}</span>
+										<span class="swap-option-symbol">{entry.label}</span>
 									</button>
 								{/each}
 							</div>
 						{/if}
 					</div>
-				{/each}
 
-				<button class="swap-toggle" type="button" aria-label="Swap from and to" onclick={flipSides}>
-					<span class="swap-toggle-outer" aria-hidden="true"></span>
-					<span class="swap-toggle-inner" aria-hidden="true"></span>
-					<span class="swap-toggle-icon">
-						<ArrowUpDownSimple size={16} />
-					</span>
-				</button>
-			</div>
+					<!-- ─────── To row (read-only) ─────── -->
+					<div class="swap-row">
+						<div class="row-head">
+							<span class="row-label">To</span>
+							{#if toBalanceDisplay}
+								<span class="row-balance">{toBalanceDisplay} {toSymbol}</span>
+							{/if}
+						</div>
+						<div class="swap-token-chip swap-token-chip-static">
+							<span class="swap-token-symbol">{toSymbol}</span>
+						</div>
+						<input
+							class="swap-amount swap-amount-readonly"
+							type="text"
+							readonly
+							placeholder="0.00"
+							value={toAmountDisplay}
+							aria-label="Amount to receive (computed)"
+						/>
+					</div>
 
-			<Button
-				variant="inverse"
-				full
-				onclick={() => (wallet.isConnected ? walletDialog.open('panel') : walletDialog.open('connect'))}
-			>
-				{wallet.isConnected ? 'Swap' : 'Connect Wallet'}
+					<!-- Flip button. Sits between the two rows. -->
+					<button
+						class="swap-toggle"
+						type="button"
+						aria-label="Swap from and to"
+						onclick={flipDirection}
+					>
+						<span class="swap-toggle-outer" aria-hidden="true"></span>
+						<span class="swap-toggle-inner" aria-hidden="true"></span>
+						<span class="swap-toggle-icon">
+							<ArrowUpDownSimple size={16} />
+						</span>
+					</button>
+				</div>
+
+				{#if quoteError}
+					<p class="quote-error" role="status">
+						{#if quoteError === 'EmptyReserves' || quoteError === 'PoolNotActive'}
+							Pool is unavailable.
+						{:else if quoteError === 'PoolPaused'}
+							Trading is paused.
+						{:else if quoteError === 'ZeroOutput'}
+							Amount is too small to swap.
+						{:else if quoteError === 'ZeroAmount'}
+							Enter an amount to swap.
+						{:else}
+							Cannot price swap.
+						{/if}
+					</p>
+				{:else if expectedOut !== null && minAmountOut !== null}
+					<p class="quote-summary">
+						<span>Min received: {formatTokenAmount(minAmountOut, toDecimals, 4)} {toSymbol}</span>
+						<span>· Slippage {(slippageBps / 100).toFixed(2)}%</span>
+					</p>
+				{/if}
+			{/if}
+
+			<Button variant="inverse" full disabled={swapDisabled} onclick={openConfirm}>
+				{swapButtonLabel}
 			</Button>
 		</section>
 
@@ -210,6 +517,14 @@
 	</div>
 </AppShell>
 
+<SwapConfirmModal
+	open={modalOpen}
+	intent={pendingIntent}
+	attempt={currentAttempt}
+	onclose={closeModal}
+	onconfirm={confirmSwap}
+/>
+
 <style>
 	.swap-page {
 		display: flex;
@@ -219,22 +534,20 @@
 		padding: var(--space-8) var(--space-4);
 	}
 
-	/* Hero headline. Halvar Bold 24, uppercase, max width keeps the line break
-	 * Figma intends ("Exchange tokens at the / best rates"). */
 	.swap-headline {
 		margin: 0 0 var(--space-2);
 		max-width: 371px;
 		font-family: var(--font-sans);
-		font-size: var(--text-xl); /* 24 */
+		font-size: var(--text-xl);
 		font-weight: var(--font-weight-bold);
-		line-height: var(--leading-snug); /* 1.2 */
+		line-height: var(--leading-snug);
 		letter-spacing: var(--tracking-tight);
 		text-transform: uppercase;
 		color: var(--color-text);
 		text-align: center;
 	}
 
-	/* ---------- Swap card ---------- */
+	/* ─── Swap card ─── */
 	.swap-card {
 		position: relative;
 		width: 100%;
@@ -264,7 +577,11 @@
 		color: var(--color-text);
 	}
 
-	.swap-settings {
+	.settings-anchor {
+		position: relative;
+	}
+
+	.swap-settings-btn {
 		display: inline-flex;
 		align-items: center;
 		justify-content: center;
@@ -272,21 +589,55 @@
 		height: 32px;
 		background-color: var(--color-bg);
 		color: var(--color-text);
+		border: 0;
 		border-radius: var(--radius-md);
 		cursor: pointer;
 		transition: background-color var(--motion-base) var(--ease-out);
 	}
-	.swap-settings:hover {
+	.swap-settings-btn:hover {
 		background-color: var(--color-dark-700);
 	}
 
-	/* From / To row container — bg one shade darker than the card so it nests. */
+	.settings-popover {
+		position: absolute;
+		top: calc(100% + var(--space-2));
+		right: 0;
+		z-index: 30;
+	}
+
+	/* ─── Empty state for clusters with no pools ─── */
+	.empty-state {
+		padding: var(--space-6) var(--space-4);
+		text-align: center;
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-2);
+	}
+	.empty-title {
+		margin: 0;
+		font-family: var(--font-sans);
+		font-size: var(--text-md);
+		font-weight: var(--font-weight-bold);
+		color: var(--color-text);
+	}
+	.empty-sub {
+		margin: 0;
+		font-family: var(--font-body);
+		font-size: var(--text-sm);
+		color: var(--color-text-muted);
+	}
+
+	/* ─── From / To rows ─── */
 	.swap-row {
 		position: relative;
 		display: grid;
 		grid-template-columns: auto 1fr;
+		grid-template-rows: auto 1fr;
+		grid-template-areas:
+			'head head'
+			'chip amount';
 		align-items: center;
-		gap: var(--space-3);
+		gap: var(--space-2) var(--space-3);
 		padding: var(--space-3);
 		background-color: var(--color-bg);
 		border-radius: var(--radius-lg);
@@ -295,12 +646,34 @@
 		z-index: 10;
 	}
 
+	.row-head {
+		grid-area: head;
+		display: flex;
+		justify-content: space-between;
+		align-items: baseline;
+		gap: var(--space-3);
+	}
+	.row-label {
+		font-family: 'Onest', var(--font-body);
+		font-size: 11px;
+		font-weight: var(--font-weight-medium);
+		color: var(--color-text-muted);
+	}
+	.row-balance {
+		font-family: 'Onest', var(--font-body);
+		font-size: 11px;
+		font-weight: var(--font-weight-medium);
+		color: var(--color-text-muted);
+	}
+
 	.swap-token-chip {
+		grid-area: chip;
 		display: inline-flex;
 		align-items: center;
 		gap: var(--space-2);
 		padding: var(--space-2) var(--space-3);
 		background-color: var(--color-surface-inset);
+		border: 0;
 		border-radius: var(--radius-md);
 		color: var(--color-text);
 		cursor: pointer;
@@ -311,52 +684,10 @@
 		background-color: var(--color-dark-700);
 		filter: brightness(1.1);
 	}
-
-	.swap-token-logo {
-		display: inline-flex;
-		align-items: center;
-		justify-content: center;
-		flex-shrink: 0;
-		overflow: hidden;
-	}
-	.swap-token-logo-sm {
-		width: 32px;
-		height: 32px;
-		border-radius: 12px;
-	}
-	.swap-token-logo-lg {
-		width: 40px;
-		height: 40px;
-		border-radius: 14px;
-	}
-	.swap-token-logo img {
-		width: 100%;
-		height: 100%;
-		object-fit: cover;
-	}
-	.swap-token-mark {
-		font-family: var(--font-sans);
-		font-size: 16px;
-		font-weight: var(--font-weight-bold);
-		color: var(--color-white-900);
-		line-height: 1;
-	}
-	.swap-token-logo-lg .swap-token-mark {
-		font-size: 20px;
+	.swap-token-chip-static {
+		cursor: default;
 	}
 
-	.swap-token-meta {
-		display: inline-flex;
-		flex-direction: column;
-		align-items: flex-start;
-		line-height: 1.2;
-	}
-	.swap-token-side {
-		font-family: 'Onest', var(--font-body);
-		font-size: 11px;
-		font-weight: var(--font-weight-medium);
-		color: var(--color-text-muted);
-	}
 	.swap-token-symbol {
 		font-family: 'Onest', var(--font-body);
 		font-size: var(--text-base);
@@ -366,6 +697,7 @@
 	}
 
 	.swap-amount {
+		grid-area: amount;
 		width: 100%;
 		min-width: 0;
 		background: transparent;
@@ -382,9 +714,10 @@
 	.swap-amount::placeholder {
 		color: var(--color-text-muted);
 	}
+	.swap-amount-readonly {
+		color: var(--color-text-muted);
+	}
 
-	/* Token picker dropdown — opens from the From/To row, lists all available
-	 * tokens. Each option pads its row and shows a purple glow when selected. */
 	.swap-dropdown {
 		position: absolute;
 		top: calc(100% + var(--space-2));
@@ -416,29 +749,23 @@
 		text-align: left;
 		transition:
 			background-color var(--motion-base) var(--ease-out),
-			border-color var(--motion-base) var(--ease-out),
-			box-shadow var(--motion-base) var(--ease-out);
+			border-color var(--motion-base) var(--ease-out);
 	}
 	.swap-option:hover {
 		background-color: var(--color-dark-700);
 	}
 	.swap-option.is-selected {
 		border-color: var(--color-purple-300);
-		box-shadow:
-			0 0 0 4px rgba(165, 110, 255, 0.2),
-			0 0 16px rgba(165, 110, 255, 0.5);
 	}
 
 	.swap-option-symbol {
 		font-family: var(--font-sans);
-		font-size: var(--text-lg); /* 18 */
+		font-size: var(--text-lg);
 		font-weight: var(--font-weight-bold);
 		letter-spacing: var(--tracking-tight);
 		color: var(--color-text);
 	}
 
-	/* Wraps the From row + To row so the swap toggle can absolutely-position
-	 * itself at the centre of the stack regardless of row content height. */
 	.swap-stack {
 		position: relative;
 		display: flex;
@@ -459,7 +786,6 @@
 		cursor: pointer;
 		z-index: 1;
 	}
-
 	.swap-toggle-outer {
 		position: absolute;
 		inset: 0;
@@ -483,7 +809,24 @@
 		color: var(--color-text);
 	}
 
-	/* ---------- Why use our DEX? card ---------- */
+	.quote-error {
+		margin: 0;
+		font-family: var(--font-body);
+		font-size: var(--text-sm);
+		color: var(--color-danger);
+		text-align: center;
+	}
+	.quote-summary {
+		margin: 0;
+		display: flex;
+		justify-content: center;
+		gap: var(--space-2);
+		font-family: 'Onest', var(--font-body);
+		font-size: var(--text-xs);
+		color: var(--color-text-muted);
+	}
+
+	/* ─── Why use our DEX? card ─── */
 	.dex-card {
 		position: relative;
 		width: 100%;
