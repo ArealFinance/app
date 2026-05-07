@@ -4,10 +4,13 @@
 	import AssetsDistributionChart from '$lib/components/charts/AssetsDistributionChart.svelte';
 	import TickWheel from '$lib/components/charts/TickWheel.svelte';
 	import { Card } from '$lib/components/ui';
-	import { ArrowUpSmall, Check } from '$lib/icons';
+	import { ArrowUpSmall, Check, Xmark } from '$lib/icons';
 	import { wallet } from '$lib/stores/wallet.svelte';
 	import { portfolio, RWT_DECIMALS } from '$lib/portfolio/store.svelte';
 	import { formatTokenAmount } from '$lib/portfolio/format';
+	import { claims, type ClaimAttempt } from '$lib/portfolio/claim.svelte';
+	import { ClaimConfirmModal } from '$lib/components/portfolio';
+	import type { PortfolioRow } from '@areal/sdk/portfolio';
 
 	const isConnected = $derived(wallet.isConnected);
 
@@ -24,6 +27,8 @@
 		price24hTone: Tone;
 		price: string;
 		value: string;
+		row: PortfolioRow;
+		canClaim: boolean;
 	};
 
 	type LpPosition = {
@@ -47,7 +52,9 @@
 			price24h: '—',
 			price24hTone: 'success' as const,
 			price: '—',
-			value: '—'
+			value: '—',
+			row,
+			canClaim: row.distributor !== null && (row.claimableNow ?? 0n) > 0n
 		}))
 	);
 
@@ -81,6 +88,69 @@
 	];
 
 	let selectedLp = $state(positions[0]?.id);
+
+	// ── Phase 7: Claim wiring ────────────────────────────────────────────
+	//
+	// Aggregate "Claim" CTA selects the row with the highest `claimableNow`
+	// (single-OT per tx in Phase 7; multi-OT batching is a Phase 7.x
+	// follow-up). Ties broken by stable sort on `otMint.toBase58()` so
+	// the choice is deterministic across renders.
+	const claimableRows = $derived(
+		portfolio.rows
+			.filter((r) => r.distributor !== null && (r.claimableNow ?? 0n) > 0n)
+			.slice()
+			.sort((a, b) => {
+				const da = b.claimableNow! - a.claimableNow!;
+				if (da > 0n) return 1;
+				if (da < 0n) return -1;
+				return a.otMint.toBase58().localeCompare(b.otMint.toBase58());
+			})
+	);
+	const aggregateRow = $derived<PortfolioRow | null>(claimableRows[0] ?? null);
+
+	// Modal state — `modalRow` is the row we're confirming for; `modalAttempt`
+	// is the live FSM attempt for that row (or null pre-confirm).
+	let modalOpen = $state(false);
+	let modalRow = $state<PortfolioRow | null>(null);
+
+	const modalAttempt = $derived<ClaimAttempt | null>(
+		modalRow ? (claims.attempts.get(modalRow.otMint.toBase58()) ?? null) : null
+	);
+
+	// Aggregate button state derives from the highest-claimable row's
+	// in-flight attempt, OR from a generic "nothing to claim" empty state.
+	const aggregateAttempt = $derived<ClaimAttempt | null>(
+		aggregateRow ? (claims.attempts.get(aggregateRow.otMint.toBase58()) ?? null) : null
+	);
+	const aggregatePhase = $derived<ClaimAttempt['phase'] | 'idle-empty' | 'idle-claimable'>(
+		aggregateAttempt
+			? aggregateAttempt.phase
+			: aggregateRow
+				? 'idle-claimable'
+				: 'idle-empty'
+	);
+	const aggregateLabel = $derived(
+		aggregateRow
+			? `Claim ${formatTokenAmount(aggregateRow.claimableNow ?? 0n, RWT_DECIMALS, RWT_DECIMALS)} RWT`
+			: 'Nothing to claim'
+	);
+
+	function openClaimModal(row: PortfolioRow) {
+		modalRow = row;
+		modalOpen = true;
+	}
+	function closeClaimModal() {
+		modalOpen = false;
+		// Defer clearing modalRow — the closing animation needs it briefly.
+		// Setting it null on next tick prevents a flash of "no row" copy.
+		setTimeout(() => {
+			modalRow = null;
+		}, 200);
+	}
+	function confirmClaim() {
+		if (!modalRow) return;
+		void claims.start(modalRow);
+	}
 
 	// Lifecycle — store handles wallet/network re-fires on its own.
 	onMount(() => portfolio.start());
@@ -160,9 +230,40 @@
 								</div>
 							</div>
 
-							<button type="button" class="claim-btn">
-								<Check size={16} />
-								<span>Successful Claim</span>
+							<!--
+								Aggregate Claim CTA — 8 visible states keyed off `aggregatePhase`.
+								Disabled while in-flight or when nothing to claim.
+							-->
+							<button
+								type="button"
+								class="claim-btn claim-btn-{aggregatePhase}"
+								disabled={aggregatePhase !== 'idle-claimable'}
+								onclick={() => aggregateRow && openClaimModal(aggregateRow)}
+							>
+								{#if aggregatePhase === 'idle-empty'}
+									<span>Nothing to claim</span>
+								{:else if aggregatePhase === 'idle-claimable'}
+									<Check size={16} />
+									<span>{aggregateLabel}</span>
+								{:else if aggregatePhase === 'preparing'}
+									<span class="btn-spinner" aria-hidden="true"></span>
+									<span>Preparing…</span>
+								{:else if aggregatePhase === 'awaiting-signature'}
+									<span class="btn-spinner" aria-hidden="true"></span>
+									<span>Sign in wallet…</span>
+								{:else if aggregatePhase === 'broadcasting'}
+									<span class="btn-spinner" aria-hidden="true"></span>
+									<span>Broadcasting…</span>
+								{:else if aggregatePhase === 'confirming'}
+									<span class="btn-spinner" aria-hidden="true"></span>
+									<span>Confirming…</span>
+								{:else if aggregatePhase === 'success'}
+									<Check size={16} />
+									<span>Claimed!</span>
+								{:else if aggregatePhase === 'error'}
+									<Xmark size={16} />
+									<span>Failed</span>
+								{/if}
 							</button>
 						</div>
 
@@ -331,8 +432,10 @@
 										<div class="tt-cell tt-cell-24h">Price 24h</div>
 										<div class="tt-cell tt-cell-price">&nbsp;</div>
 										<div class="tt-cell tt-cell-value">Value</div>
+										<div class="tt-cell tt-cell-claim">&nbsp;</div>
 									</div>
 									{#each tokens as t (t.symbol)}
+										{@const rowAttempt = claims.attempts.get(t.row.otMint.toBase58()) ?? null}
 										<div class="tt-row">
 											<div class="tt-cell tt-cell-asset">
 												<span class="token-logo">
@@ -360,6 +463,32 @@
 												<span class="price-pill">{t.price}</span>
 											</div>
 											<div class="tt-cell tt-cell-value">{t.value}</div>
+											<div class="tt-cell tt-cell-claim">
+												{#if t.canClaim}
+													<button
+														type="button"
+														class="row-claim-btn row-claim-btn-{rowAttempt?.phase ?? 'idle'}"
+														disabled={rowAttempt !== null &&
+															rowAttempt.phase !== 'success' &&
+															rowAttempt.phase !== 'error'}
+														onclick={() => openClaimModal(t.row)}
+													>
+														{#if rowAttempt === null}
+															Claim
+														{:else if rowAttempt.phase === 'preparing'}
+															<span class="btn-spinner" aria-hidden="true"></span>
+														{:else if rowAttempt.phase === 'awaiting-signature'}
+															Sign…
+														{:else if rowAttempt.phase === 'broadcasting' || rowAttempt.phase === 'confirming'}
+															<span class="btn-spinner" aria-hidden="true"></span>
+														{:else if rowAttempt.phase === 'success'}
+															<Check size={14} />
+														{:else if rowAttempt.phase === 'error'}
+															<Xmark size={14} />
+														{/if}
+													</button>
+												{/if}
+											</div>
 										</div>
 									{/each}
 								</div>
@@ -506,6 +635,17 @@
 			</div>
 		</div>
 	</div>
+
+	<!-- Phase 7 — claim confirmation modal. Stays open across the entire
+	     attempt lifecycle (preparing → success / error) so the user has a
+	     persistent status surface; auto-dismisses on success after 3s. -->
+	<ClaimConfirmModal
+		open={modalOpen}
+		onclose={closeClaimModal}
+		onconfirm={confirmClaim}
+		row={modalRow}
+		attempt={modalAttempt}
+	/>
 </AppShell>
 
 <style>
@@ -757,11 +897,46 @@
 		cursor: pointer;
 		transition: background-color var(--motion-base) var(--ease-out);
 	}
-	.claim-btn:hover {
+	.claim-btn:hover:not(:disabled) {
 		background-color: rgba(115, 255, 131, 0.08);
+	}
+	.claim-btn:disabled {
+		cursor: not-allowed;
+		opacity: 0.7;
 	}
 	.claim-btn :global(svg) {
 		color: var(--color-green-900);
+	}
+	/* Phase-specific accents — keep the green outline as the resting state,
+	 * but recolour for terminal states so the user can read the result at a
+	 * glance without parsing the label. */
+	.claim-btn-idle-empty {
+		border-color: var(--color-border);
+	}
+	.claim-btn-error {
+		border-color: var(--color-danger);
+	}
+	.claim-btn-error :global(svg) {
+		color: var(--color-danger);
+	}
+	.claim-btn-success {
+		background-color: rgba(115, 255, 131, 0.12);
+	}
+
+	/* Inline button spinner — shared by aggregate CTA and per-row buttons. */
+	.btn-spinner {
+		width: 14px;
+		height: 14px;
+		border: 2px solid currentColor;
+		border-top-color: transparent;
+		border-radius: 50%;
+		animation: btn-spin 0.7s linear infinite;
+		display: inline-block;
+	}
+	@keyframes btn-spin {
+		to {
+			transform: rotate(360deg);
+		}
 	}
 
 	/* Assets distribution */
@@ -1057,7 +1232,7 @@
 	.tt-head,
 	.tt-row {
 		display: grid;
-		grid-template-columns: minmax(120px, 1.4fr) minmax(60px, 0.8fr) minmax(60px, 0.8fr) minmax(80px, 1fr) minmax(60px, 0.8fr) minmax(80px, 1fr);
+		grid-template-columns: minmax(120px, 1.4fr) minmax(60px, 0.8fr) minmax(60px, 0.8fr) minmax(80px, 1fr) minmax(60px, 0.8fr) minmax(80px, 1fr) minmax(72px, 0.8fr);
 		align-items: center;
 		gap: var(--space-2);
 		padding: 12px 16px;
@@ -1090,6 +1265,45 @@
 	}
 	.tt-cell-value {
 		text-align: right;
+	}
+	.tt-cell-claim {
+		display: flex;
+		justify-content: flex-end;
+	}
+	/* Per-row claim button. Compact pill shape, defaults to ghost with green
+	 * accent, swaps colour on terminal states to mirror the aggregate CTA. */
+	.row-claim-btn {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		gap: 6px;
+		min-width: 56px;
+		height: 28px;
+		padding: 0 10px;
+		background: transparent;
+		border: 1px solid var(--color-green-900);
+		border-radius: var(--radius-md);
+		color: var(--color-green-900);
+		font-family: var(--font-body);
+		font-size: var(--text-sm);
+		font-weight: var(--font-weight-bold);
+		letter-spacing: var(--tracking-tight);
+		cursor: pointer;
+		transition: background-color var(--motion-base) var(--ease-out);
+	}
+	.row-claim-btn:hover:not(:disabled) {
+		background-color: rgba(115, 255, 131, 0.1);
+	}
+	.row-claim-btn:disabled {
+		cursor: not-allowed;
+		opacity: 0.7;
+	}
+	.row-claim-btn-error {
+		border-color: var(--color-danger);
+		color: var(--color-danger);
+	}
+	.row-claim-btn-success {
+		background-color: rgba(115, 255, 131, 0.12);
 	}
 	.token-logo {
 		display: inline-flex;
@@ -1445,7 +1659,7 @@
 		}
 		.tt-head,
 		.tt-row {
-			grid-template-columns: minmax(80px, 1fr) minmax(60px, 1fr) minmax(80px, 1fr);
+			grid-template-columns: minmax(80px, 1fr) minmax(60px, 1fr) minmax(80px, 1fr) minmax(56px, auto);
 			grid-template-rows: auto auto;
 			gap: 4px;
 		}
