@@ -70,6 +70,7 @@
  *      "claim status already initialized" error. Still, the right UX is
  *      to tell the user to wait.)
  */
+import { tick } from 'svelte';
 import {
 	Connection,
 	type PublicKey,
@@ -251,7 +252,7 @@ async function runClaim(row: PortfolioRow): Promise<void> {
 	try {
 		// ─── preparing ────────────────────────────────────────────────────
 		// Fetch fresh proof + parse the on-chain distributor in parallel.
-		// The distributor parse gives us `reward_vault` which the tx builder
+		// The distributor parse gives us `rewardVault` which the tx builder
 		// needs but isn't on PortfolioRow.
 		const [proof, distributorInfo] = await Promise.all([
 			fetchMerkleProof(proofStoreUrl, row.distributor, holder),
@@ -352,9 +353,15 @@ async function runClaim(row: PortfolioRow): Promise<void> {
 
 		// ─── broadcasting → confirming ────────────────────────────────────
 		setPhase(key, { phase: 'broadcasting', signature });
-		// Transition to confirming immediately — broadcasting is observable
-		// only as a brief flash (sig is already in flight by the time the
-		// wallet returns it).
+		// Flush the `broadcasting` phase to the UI before transitioning.
+		// Svelte runes batch synchronous state mutations, so without an
+		// explicit `tick()` boundary the broadcasting state would never be
+		// observable (the FSM would jump straight from awaiting-signature
+		// to confirming). Semantically: broadcasting = "tx submitted,
+		// waiting for blockhash to land", confirming = "signature seen,
+		// awaiting commitment" — keeping both phases distinct preserves
+		// the FSM contract for telemetry/debug, even if the UX is brief.
+		await tick();
 		setPhase(key, { phase: 'confirming', signature });
 
 		try {

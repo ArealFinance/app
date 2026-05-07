@@ -31,8 +31,7 @@ const DISTRIBUTOR_A = new PublicKey('11111111111111111111111111111116');
 const DISTRIBUTOR_B = new PublicKey('1111111111111111111111111111111C');
 const ATA_A = new PublicKey('11111111111111111111111111111114');
 const HOLDER = new PublicKey('11111111111111111111111111111112');
-const REWARD_VAULT_BYTES = new Uint8Array(32);
-REWARD_VAULT_BYTES[0] = 1;
+const REWARD_VAULT = new PublicKey('11111111111111111111111111111115');
 
 const PROGRAM_IDS = {
 	ownershipToken: new PublicKey('11111111111111111111111111111118'),
@@ -172,7 +171,7 @@ const distributorAccountInfo = {
 };
 
 const fakeMerkleDistributor = {
-	reward_vault: REWARD_VAULT_BYTES
+	rewardVault: REWARD_VAULT
 };
 
 async function settle(times = 6) {
