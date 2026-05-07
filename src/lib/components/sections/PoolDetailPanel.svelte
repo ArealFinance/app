@@ -1,4 +1,6 @@
 <script lang="ts" module>
+	import type { DepthResult } from '@areal/sdk/markets';
+
 	export type PoolToken = {
 		symbol: string;
 		bg: string;
@@ -24,6 +26,11 @@
 		binStep: string;
 		priceLabels: string[];
 		userBalance: string;
+		/**
+		 * Optional live depth ladder for Standard pools. When present it
+		 * replaces the mock distribution chart with the SDK-computed ladder.
+		 */
+		depth?: DepthResult | null;
 		/** Demo: user's current position, shown in "My Position" when wallet is connected. */
 		userPosition?: {
 			totalUsd: string;
@@ -40,6 +47,7 @@
 	import { wallet } from '$lib/stores/wallet.svelte';
 	import { walletDialog } from '$lib/stores/walletDialog.svelte';
 	import TickWheel from '$lib/components/charts/TickWheel.svelte';
+	import DepthChart from '$lib/components/charts/DepthChart.svelte';
 
 	type Props = {
 		pool: PoolInfo;
@@ -205,6 +213,8 @@
 				</div>
 
 				{#if isConcentrated}
+					<!-- Concentrated pools fall back to the Figma mockup chart —
+					     real per-bin depth needs a BinArray fetch (Phase 8 deferred). -->
 					<div class="dist-chart">
 						<div class="dist-bars dist-bars-a">
 							{#each PURPLE_HEIGHTS as h, i (i)}
@@ -250,6 +260,18 @@
 								<Minus size={16} />
 							</button>
 						</div>
+					</div>
+				{:else}
+					<!-- Standard pools: render the SDK-computed depth ladder. The
+					     chart's own empty state covers the case where depth has
+					     not been fetched yet. -->
+					<div class="depth-wrap">
+						<DepthChart
+							depth={pool.depth}
+							symbolA={pool.pairA.symbol}
+							symbolB={pool.pairB.symbol}
+							height={150}
+						/>
 					</div>
 				{/if}
 
@@ -1117,6 +1139,12 @@
 	}
 	.zoom-btn:first-child {
 		margin-right: -2px;
+	}
+
+	/* Wraps the SDK-driven DepthChart (Standard pools only) in the same
+	 * vertical rhythm as the concentrated mockup chart. */
+	.depth-wrap {
+		margin-bottom: 16px;
 	}
 
 	/* ─── My Position (empty) ────────────────────────────────────── */
