@@ -65,6 +65,17 @@ export type PortfolioStatus = 'idle' | 'loading' | 'ready' | 'error';
 
 const WS_DEBOUNCE_MS = 250;
 
+/**
+ * RWT mint decimals. Hardcoded to match the on-chain RWT mint (see contracts).
+ *
+ * Phase 7 will lift this into a real source — either by exposing the RWT mint
+ * address per network in `endpoints.ts` and reading mint metadata once on
+ * portfolio start, or by surfacing it via the SDK's `RwtVault` PDA. Until
+ * then, the constant lives here so the magic number isn't sprinkled through
+ * the page.
+ */
+export const RWT_DECIMALS = 6;
+
 /** One row's worth of WS subscriptions, captured against one Connection. */
 interface RowSubscription {
 	/** ATA listener id, registered against `wsConn`. */

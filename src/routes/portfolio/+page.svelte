@@ -6,7 +6,7 @@
 	import { Card } from '$lib/components/ui';
 	import { ArrowUpSmall, Check } from '$lib/icons';
 	import { wallet } from '$lib/stores/wallet.svelte';
-	import { portfolio } from '$lib/portfolio/store.svelte';
+	import { portfolio, RWT_DECIMALS } from '$lib/portfolio/store.svelte';
 	import { formatTokenAmount } from '$lib/portfolio/format';
 
 	const isConnected = $derived(wallet.isConnected);
@@ -58,9 +58,9 @@
 		portfolio.rows.reduce((sum, r) => sum + (r.claimableNow ?? 0n), 0n)
 	);
 	const claimableUnknown = $derived(portfolio.rows.some((r) => r.claimableNow === null));
-	// RWT decimals (6) — see contracts. Once we wire metadata for RWT itself,
-	// pull the decimals from its mint.
-	const unclaimedDisplay = $derived(formatTokenAmount(unclaimedRwt, 6, 6));
+	// RWT decimals are sourced from the RWT_DECIMALS constant; Phase 7 will
+	// replace the constant with a runtime mint-metadata read.
+	const unclaimedDisplay = $derived(formatTokenAmount(unclaimedRwt, RWT_DECIMALS, RWT_DECIMALS));
 
 	// TODO Phase 7 — LP positions come from native-dex/yield positions module.
 	const positions: LpPosition[] = [
