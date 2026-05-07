@@ -1,10 +1,13 @@
 <script lang="ts">
+	import { onMount, onDestroy } from 'svelte';
 	import AppShell from '$lib/components/sections/AppShell.svelte';
 	import AssetsDistributionChart from '$lib/components/charts/AssetsDistributionChart.svelte';
 	import TickWheel from '$lib/components/charts/TickWheel.svelte';
 	import { Card } from '$lib/components/ui';
 	import { ArrowUpSmall, Check } from '$lib/icons';
 	import { wallet } from '$lib/stores/wallet.svelte';
+	import { portfolio } from '$lib/portfolio/store.svelte';
+	import { formatTokenAmount } from '$lib/portfolio/format';
 
 	const isConnected = $derived(wallet.isConnected);
 
@@ -32,33 +35,36 @@
 		selected?: boolean;
 	};
 
-	const tokens: OwnershipToken[] = [
-		{
-			symbol: 'USDt',
-			logoBg: '#009393',
-			logoSrc: '/images/tokens/usdt-t.svg',
-			qty: '404.45',
-			apy: '3.8%',
-			apyTone: 'success',
-			price24h: '10.5%',
-			price24hTone: 'success',
-			price: '$4.72',
-			value: '$404.45'
-		},
-		{
-			symbol: 'RWT',
-			logoBg: '#A56EFF',
-			logoSrc: '/images/tokens/rwt-mark.svg',
-			qty: '829.55',
-			apy: '2.31%',
-			apyTone: 'success',
-			price24h: '1.89%',
-			price24hTone: 'danger',
-			price: '$3.57',
-			value: '$829.39'
-		},
-	];
+	// Phase 6: token list is sourced from on-chain holder portfolio. Price /
+	// APY / value columns are placeholder dashes — Phase 7 will pipe in
+	// pricing & APY signals.
+	const tokens = $derived<OwnershipToken[]>(
+		portfolio.rows.map((row) => ({
+			symbol: row.metadata.symbol,
+			logoBg: '#3C415F',
+			logoLetter: row.metadata.symbol.slice(0, 1).toUpperCase(),
+			qty: formatTokenAmount(row.balance, row.metadata.decimals, 2),
+			apy: '—',
+			apyTone: 'success' as const,
+			price24h: '—',
+			price24hTone: 'success' as const,
+			price: '—',
+			value: '—'
+		}))
+	);
 
+	// Sum claimable across rows. When ANY row's claimable is unknown
+	// (no proof published) we fall back to a dash — partial sums would
+	// under-state the actual entitlement.
+	const unclaimedRwt = $derived(
+		portfolio.rows.reduce((sum, r) => sum + (r.claimableNow ?? 0n), 0n)
+	);
+	const claimableUnknown = $derived(portfolio.rows.some((r) => r.claimableNow === null));
+	// RWT decimals (6) — see contracts. Once we wire metadata for RWT itself,
+	// pull the decimals from its mint.
+	const unclaimedDisplay = $derived(formatTokenAmount(unclaimedRwt, 6, 6));
+
+	// TODO Phase 7 — LP positions come from native-dex/yield positions module.
 	const positions: LpPosition[] = [
 		{ id: 'lp-1', pair: ['USDt', 'RWT'], apy: '3.8% APY', apyTone: 'success', selected: true },
 		{ id: 'lp-2', pair: ['USDt', 'RWT'], apy: '1.7% APY', apyTone: 'danger' },
@@ -68,6 +74,10 @@
 	];
 
 	let selectedLp = $state(positions[0]?.id);
+
+	// Lifecycle — store handles wallet/network re-fires on its own.
+	onMount(() => portfolio.start());
+	onDestroy(() => portfolio.stop());
 </script>
 
 <svelte:head>
@@ -118,7 +128,9 @@
 										alt=""
 										aria-hidden="true"
 									/>
-									<span class="rewards-amount">46.096039</span>
+									<span class="rewards-amount">
+										{claimableUnknown ? '—' : unclaimedDisplay}
+									</span>
 									<span class="rwt-pill">RWT</span>
 								</div>
 								<div class="rate-pill">
@@ -239,16 +251,48 @@
 						<header class="section-head">
 							<div class="section-head-left">
 								<h2>Ownership tokens</h2>
-								{#if isConnected}
+								{#if isConnected && portfolio.isReady}
 									<span class="count-badge count-badge-purple">{tokens.length}</span>
 								{/if}
 							</div>
-							{#if isConnected}
-								<span class="section-total">~ $3450.92</span>
+							{#if isConnected && portfolio.isReady && tokens.length > 0}
+								<!-- TODO Phase 7 — section total comes from price feed. -->
+								<span class="section-total">~ —</span>
 							{/if}
 						</header>
-						<div class="section-body" class:section-body-table={isConnected}>
+						<div
+							class="section-body"
+							class:section-body-table={isConnected && portfolio.isReady && tokens.length > 0}
+						>
 							{#if !isConnected}
+								<svg
+									class="empty-illu"
+									width="86"
+									height="64"
+									viewBox="0 0 86 64"
+									fill="none"
+									aria-hidden="true"
+								>
+									<rect x="0" y="0" width="86" height="22" rx="6" fill="#3C415F" opacity="0.7" />
+									<rect x="0" y="26" width="86" height="22" rx="6" fill="#3C415F" opacity="0.45" />
+									<rect x="0" y="52" width="64" height="12" rx="4" fill="#717390" opacity="0.3" />
+									<circle cx="12" cy="11" r="4" fill="#73FF83" />
+									<circle cx="12" cy="37" r="4" fill="#717390" opacity="0.6" />
+								</svg>
+								<p class="empty-title">You do not currently hold any tokens</p>
+								<p class="empty-sub">Start adding tokens</p>
+							{:else if portfolio.isLoading && !portfolio.snapshot}
+								<p class="empty-title">Loading…</p>
+								<p class="empty-sub">Reading on-chain balances</p>
+							{:else if portfolio.hasError}
+								<p class="empty-title">Could not load portfolio</p>
+								<p class="empty-sub">{portfolio.error}</p>
+								<button
+									type="button"
+									class="retry-btn"
+									onclick={() => portfolio.refresh()}>Retry</button
+								>
+							{:else if tokens.length === 0}
 								<svg
 									class="empty-illu"
 									width="86"
@@ -945,6 +989,25 @@
 		letter-spacing: -0.4px;
 		color: var(--color-text-muted);
 		text-align: center;
+	}
+
+	.retry-btn {
+		margin-top: var(--space-3);
+		padding: 8px 18px;
+		background-color: transparent;
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-md);
+		font-family: var(--font-sans);
+		font-size: var(--text-sm);
+		font-weight: var(--font-weight-bold);
+		letter-spacing: var(--tracking-tight);
+		text-transform: uppercase;
+		color: var(--color-text);
+		cursor: pointer;
+		transition: background-color var(--motion-base) var(--ease-out);
+	}
+	.retry-btn:hover {
+		background-color: rgba(255, 255, 255, 0.04);
 	}
 
 	/* ---------- Token table ----------
