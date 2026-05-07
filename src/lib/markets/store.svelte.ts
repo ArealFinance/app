@@ -55,8 +55,21 @@ import type { ClusterName } from '@areal/sdk/network';
 
 import { network } from '$lib/network/network.svelte';
 import type { NetworkId } from '$lib/network/endpoints';
+import { isPoolRowMaster } from './master-pool';
 
 export type MarketsStatus = 'idle' | 'loading' | 'ready' | 'error';
+
+/**
+ * `PoolRow` augmented with the cluster-aware master-pool flag the UI uses
+ * to disable user-facing add/zap CTAs. We compute this once on snapshot
+ * fetch — the mapping is pure (RWT/USDC/USDY mint comparison) and cheap,
+ * but doing it inside store.svelte.ts means `isPoolRowMaster` gets the
+ * same `cluster` value as the rest of the snapshot.
+ */
+export interface EnrichedPoolRow extends PoolRow {
+	/** `true` when `(tokenAMint, tokenBMint)` matches a protocol master pool. */
+	isMaster: boolean;
+}
 
 const WS_DEBOUNCE_MS = 250;
 
@@ -77,6 +90,7 @@ interface SubscriptionCycle {
 
 let status: MarketsStatus = $state('idle');
 let snapshot: MarketsSnapshot | null = $state(null);
+let enrichedPools: EnrichedPoolRow[] = $state([]);
 let error: string | null = $state(null);
 
 // Mutable bookkeeping (not reactive — never read from $derived).
@@ -198,6 +212,13 @@ async function doFetch(): Promise<void> {
 		if (activeNetwork !== networkId) return;
 
 		snapshot = snap;
+		// Compute master-pool flag here while we hold the active cluster —
+		// recomputing on each consumer read would re-derive the same bool
+		// per row on every reactive read.
+		enrichedPools = snap.pools.map((p) => ({
+			...p,
+			isMaster: isPoolRowMaster(p, networkId)
+		}));
 		status = 'ready';
 		error = null;
 		subscribePools(snap);
@@ -239,6 +260,7 @@ function effectBody() {
 	// wrong-cluster TVL across the switch.
 	teardownCycle();
 	snapshot = null;
+	enrichedPools = [];
 	// Invalidate any in-flight refresh — its result will be discarded by
 	// the activeNetwork guard, but clearing the slot here lets the next
 	// doFetch claim it cleanly.
@@ -267,6 +289,7 @@ function stop(): void {
 	pendingRefresh = null;
 	status = 'idle';
 	snapshot = null;
+	enrichedPools = [];
 	error = null;
 }
 
@@ -280,8 +303,8 @@ export const markets = {
 	get tokens(): TokenRow[] {
 		return snapshot?.tokens ?? [];
 	},
-	get pools(): PoolRow[] {
-		return snapshot?.pools ?? [];
+	get pools(): EnrichedPoolRow[] {
+		return enrichedPools;
 	},
 	get rwtVault(): { navBookValue: bigint; totalRwtSupply: bigint } | null {
 		return snapshot?.rwtVault ?? null;
