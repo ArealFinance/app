@@ -18,6 +18,48 @@ export interface ErrorDescriptor {
 }
 
 /**
+ * Per-error-name overrides for known Anchor errors.
+ *
+ * The SDK's `mapAnchorError` returns the IDL-declared `name` and `msg`. The
+ * IDL `msg` strings are written for contract developers, not end users —
+ * "Output below min_amount_out" is correct but unhelpful for someone who
+ * just clicked a Swap button. We translate a curated set into actionable
+ * one-liners. Any error not in this map falls back to the IDL `msg`.
+ *
+ * Keyed by `idlError.name` (e.g. "SlippageExceeded") so a DexError #6011
+ * and a YieldDistribution error of the same name would both translate —
+ * the contracts intentionally use distinct names so collisions are not a
+ * practical concern.
+ */
+const FRIENDLY_BY_NAME: Record<string, { title: string; body: string }> = {
+	// native-dex errors that surface to a user during a swap.
+	SlippageExceeded: {
+		title: 'Price moved',
+		body: 'Price moved during the swap, try increasing slippage tolerance.'
+	},
+	ZeroOutput: {
+		title: 'Amount too small',
+		body: 'Output amount is too small — try a larger swap.'
+	},
+	PoolNotActive: {
+		title: 'Pool paused',
+		body: 'This pool is currently paused.'
+	},
+	DexPaused: {
+		title: 'Trading paused',
+		body: 'Trading is temporarily paused.'
+	},
+	EmptyReserves: {
+		title: 'Empty pool',
+		body: 'No liquidity in this pool.'
+	},
+	InsufficientLiquidity: {
+		title: 'Low liquidity',
+		body: 'Not enough liquidity for this size.'
+	}
+};
+
+/**
  * Map an unknown thrown value to a toast-ready descriptor.
  *
  * `programId` lets us decode Anchor errors emitted by Areal programs. Pass
@@ -53,6 +95,15 @@ export function mapError(err: unknown, programId?: PublicKey): ErrorDescriptor {
 		if (programId) {
 			const mapped = mapAnchorError(err, programId);
 			if (mapped) {
+				const friendly = FRIENDLY_BY_NAME[mapped.name];
+				if (friendly) {
+					return {
+						tone: 'error',
+						title: friendly.title,
+						body: friendly.body,
+						code: mapped.code
+					};
+				}
 				return {
 					tone: 'error',
 					title: mapped.name,

@@ -218,6 +218,81 @@ describe('error-mapper', () => {
 		});
 	});
 
+	describe('mapError: native-dex friendly translations', () => {
+		const programId = new PublicKey('11111111111111111111111111111111');
+
+		// Each case: the SDK decoded an Anchor error to `{ name, message, code }`,
+		// and the mapper translates well-known names into user-friendly copy.
+		const TRANSLATIONS = [
+			{
+				name: 'SlippageExceeded',
+				code: 6011,
+				expectedTitle: 'Price moved',
+				expectedBodyMatch: /increasing slippage/
+			},
+			{
+				name: 'ZeroOutput',
+				code: 6012,
+				expectedTitle: 'Amount too small',
+				expectedBodyMatch: /larger swap/
+			},
+			{
+				name: 'PoolNotActive',
+				code: 6003,
+				expectedTitle: 'Pool paused',
+				expectedBodyMatch: /currently paused/
+			},
+			{
+				name: 'DexPaused',
+				code: 6002,
+				expectedTitle: 'Trading paused',
+				expectedBodyMatch: /temporarily paused/
+			},
+			{
+				name: 'EmptyReserves',
+				code: 6013,
+				expectedTitle: 'Empty pool',
+				expectedBodyMatch: /No liquidity/
+			},
+			{
+				name: 'InsufficientLiquidity',
+				code: 6008,
+				expectedTitle: 'Low liquidity',
+				expectedBodyMatch: /Not enough liquidity/
+			}
+		];
+
+		for (const t of TRANSLATIONS) {
+			it(`translates ${t.name} into a user-friendly descriptor`, () => {
+				vi.mocked(sdkErrorModule.mapAnchorError).mockReturnValue({
+					name: t.name,
+					message: 'Internal IDL message',
+					code: t.code,
+					program: 'nativeDex'
+				} as never);
+
+				const result = mapError(new Error('some'), programId);
+				expect(result.tone).toBe('error');
+				expect(result.title).toBe(t.expectedTitle);
+				expect(result.body).toMatch(t.expectedBodyMatch);
+				expect(result.code).toBe(t.code);
+			});
+		}
+
+		it('falls back to IDL message for unrecognised error names', () => {
+			vi.mocked(sdkErrorModule.mapAnchorError).mockReturnValue({
+				name: 'SomeRareError',
+				message: 'Internal IDL message',
+				code: 9999,
+				program: 'nativeDex'
+			} as never);
+
+			const result = mapError(new Error('some'), programId);
+			expect(result.title).toBe('SomeRareError');
+			expect(result.body).toBe('Internal IDL message');
+		});
+	});
+
 	describe('mapError: edge cases', () => {
 		it('should prioritize wallet rejection over Anchor error when both match', () => {
 			const mockMapAnchorError = vi.fn().mockReturnValue({
