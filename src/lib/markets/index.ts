@@ -1,5 +1,6 @@
 export { markets, type MarketsStatus, type EnrichedPoolRow } from './store.svelte';
 export { poolStore } from './pool-store.svelte';
+export { lpStore } from './lp-store.svelte';
 export { isPoolRowMaster } from './master-pool';
 export {
 	formatTvl,
