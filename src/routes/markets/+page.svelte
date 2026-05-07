@@ -1,8 +1,18 @@
 <script lang="ts">
-	import { AppShell, TokenStatCard } from '$lib/components/sections';
+	import { onMount, onDestroy } from 'svelte';
+
+	import {
+		AppShell,
+		TokenStatCard,
+		MarketsLoadingShimmer,
+		MarketsEmptyState
+	} from '$lib/components/sections';
 	import { WalletAddressChip, toast } from '$lib/components/ui';
 	import { wallet } from '$lib/stores/wallet.svelte';
 	import { walletDialog } from '$lib/stores/walletDialog.svelte';
+	import { network } from '$lib/network/network.svelte';
+	import { markets, formatTvl, formatPrice } from '$lib/markets';
+	import type { TokenRow } from '$lib/markets';
 
 	type AvatarSpec = {
 		src: string;
@@ -25,79 +35,83 @@
 
 	const avatarRwt: AvatarSpec = { src: '/images/tokens/rwt-mark.svg' };
 	const avatarSparkles: AvatarSpec = { src: '/images/tokens/sparkles.svg' };
-	const avatarUsdt: AvatarSpec = { src: '/images/tokens/usdt-t.svg' };
 	const avatarComing: AvatarSpec = { src: '/images/tokens/coming-soon.svg', bg: '#9e60f6' };
 
-	const protocolTokens: Token[] = [
-		{
-			symbol: 'RWT',
-			name: 'Real World Token',
-			tvl: '$41.3k',
-			price: '$0.9984',
-			delta: '+0.57%',
-			href: '/markets/rwt',
-			avatar: avatarRwt
-		},
-		{
-			symbol: 'SPRK',
-			name: 'Sparkles',
-			tvl: '$41.3k',
-			price: '$0.9984',
-			delta: '+0.57%',
-			href: '/markets/sprk',
-			external: true,
-			avatar: avatarSparkles
-		},
-		{
-			symbol: 'USDt',
-			name: 'Tether USDt',
-			tvl: '$41.3k',
-			price: '$0.9984',
-			delta: '+0.57%',
-			href: '/markets/usdt',
-			avatar: avatarUsdt
-		},
-		{
-			symbol: 'RWT',
-			name: 'Real World Token',
-			state: 'coming-soon',
-			avatar: avatarComing
-		}
-	];
+	/**
+	 * Map an on-chain `TokenRow` to the UI `Token` shape consumed by
+	 * `<TokenStatCard>`. We intentionally pass `delta = undefined` rather
+	 * than fabricating "0%" — the backend has no 24h price index yet, and
+	 * the card hides the delta pill when it's missing (honest scope-out).
+	 *
+	 * Per-token TVL = sum of USDC TVL across pools where this token appears
+	 * on either side. Computed against the snapshot's pool list.
+	 */
+	function avatarFor(symbol: string): AvatarSpec {
+		const upper = symbol.toUpperCase();
+		if (upper === 'RWT') return avatarRwt;
+		if (upper === 'SPRK') return avatarSparkles;
+		// Unknown OT — coming-soon placeholder until per-token assets ship.
+		return avatarComing;
+	}
 
-	const stockTokens: Token[] = [
-		{
-			symbol: 'SPYon',
-			name: 'S&P 500 ETH Token',
-			price: '$474.65',
-			delta: '+0.57%',
-			href: '/markets/spyon',
-			avatar: avatarRwt
-		},
-		{
-			symbol: 'APPLon',
-			name: 'Apple Stock Token',
-			price: '$257.98',
-			delta: '+0.57%',
-			href: '/markets/applon',
-			external: true,
-			avatar: avatarSparkles
-		},
-		{
-			symbol: 'GLDon',
-			name: 'Gold',
-			price: '$3.82',
-			delta: '+0.57%',
-			href: '/markets/gldon',
-			avatar: avatarUsdt
-		},
-		{
-			symbol: 'RWT',
-			name: 'Real World Token',
-			state: 'coming-soon',
-			avatar: avatarComing
+	function tokenTvl(row: TokenRow): number | null {
+		let sum = 0;
+		let priced = false;
+		for (const pool of markets.pools) {
+			if (
+				pool.tvlUsdc !== null &&
+				(pool.tokenAMint.equals(row.mint) || pool.tokenBMint.equals(row.mint))
+			) {
+				sum += pool.tvlUsdc;
+				priced = true;
+			}
 		}
-	];
+		return priced ? sum : null;
+	}
+
+	function toUiToken(row: TokenRow): Token {
+		return {
+			symbol: row.symbol,
+			name: row.name,
+			tvl: formatTvl(tokenTvl(row)),
+			price: formatPrice(row.priceUsdc),
+			// `delta` is intentionally omitted — see comment above.
+			href: `/markets/${row.symbol.toLowerCase()}`,
+			avatar: avatarFor(row.symbol)
+		};
+	}
+
+	const protocolTokens = $derived<Token[]>(
+		markets.tokens
+			.filter((t) => t.category === 'protocol' || t.category === 'ownership')
+			.map(toUiToken)
+	);
+
+	const stockTokens = $derived<Token[]>(
+		markets.tokens.filter((t) => t.category === 'stock').map(toUiToken)
+	);
+
+	// Coming-soon static placeholder (UI parity with the original design).
+	const comingSoonCard: Token = {
+		symbol: 'RWT',
+		name: 'Real World Token',
+		state: 'coming-soon',
+		avatar: avatarComing
+	};
+
+	// Mainnet pre-launch banner — only render when:
+	//   - we are on mainnet AND
+	//   - the snapshot is ready AND
+	//   - there are no tokens to show.
+	const showMainnetEmpty = $derived(
+		network.current === 'mainnet' &&
+			markets.isReady &&
+			protocolTokens.length === 0 &&
+			stockTokens.length === 0
+	);
+
+	onMount(() => markets.start());
+	onDestroy(() => markets.stop());
 </script>
 
 <svelte:head>
@@ -155,68 +169,112 @@
 		</div>
 	</section>
 
-	<section class="markets-section">
-		<!-- Inner L-shape frame (#181A29, lighter shade), built from two overlapping
-		     rounded rects: TAB (upper-left) + MAIN (lower full-width). Cards sit on top. -->
-		<span class="markets-frame markets-frame-tab" aria-hidden="true"></span>
-		<span class="markets-frame markets-frame-main" aria-hidden="true"></span>
+	{#if showMainnetEmpty}
+		<MarketsEmptyState variant="mainnet-coming-soon" />
+	{:else}
+		<section class="markets-section">
+			<!-- Inner L-shape frame (#181A29, lighter shade), built from two overlapping
+			     rounded rects: TAB (upper-left) + MAIN (lower full-width). Cards sit on top. -->
+			<span class="markets-frame markets-frame-tab" aria-hidden="true"></span>
+			<span class="markets-frame markets-frame-main" aria-hidden="true"></span>
 
-		<header class="markets-head">
-			<span class="markets-dot markets-dot-protocol" aria-hidden="true"></span>
-			<span class="markets-label">Protocol</span>
-			<span class="markets-count">{protocolTokens.length}</span>
-		</header>
-		<div class="markets-grid">
-			{#each protocolTokens as t}
-				<TokenStatCard
-					symbol={t.symbol}
-					name={t.name}
-					tvl={t.tvl}
-					price={t.price}
-					delta={t.delta}
-					state={t.state}
-					href={t.href}
-					external={t.external}
-				>
-					{#snippet icon()}
-						<span class="token-disk" style:background-color={t.avatar.bg ?? 'transparent'}>
-							<img src={t.avatar.src} alt="" />
-						</span>
-					{/snippet}
-				</TokenStatCard>
-			{/each}
-		</div>
-	</section>
+			<header class="markets-head">
+				<span class="markets-dot markets-dot-protocol" aria-hidden="true"></span>
+				<span class="markets-label">Protocol</span>
+				<span class="markets-count">{protocolTokens.length + 1}</span>
+			</header>
+			<div class="markets-grid">
+				{#if markets.isLoading}
+					<MarketsLoadingShimmer variant="card" />
+					<MarketsLoadingShimmer variant="card" />
+					<MarketsLoadingShimmer variant="card" />
+					<MarketsLoadingShimmer variant="card" />
+				{:else}
+					{#each protocolTokens as t (t.symbol)}
+						<TokenStatCard
+							symbol={t.symbol}
+							name={t.name}
+							tvl={t.tvl}
+							price={t.price}
+							delta={t.delta}
+							state={t.state}
+							href={t.href}
+							external={t.external}
+						>
+							{#snippet icon()}
+								<span class="token-disk" style:background-color={t.avatar.bg ?? 'transparent'}>
+									<img src={t.avatar.src} alt="" />
+								</span>
+							{/snippet}
+						</TokenStatCard>
+					{/each}
+					<TokenStatCard
+						symbol={comingSoonCard.symbol}
+						name={comingSoonCard.name}
+						state={comingSoonCard.state}
+					>
+						{#snippet icon()}
+							<span class="token-disk" style:background-color={comingSoonCard.avatar.bg ?? 'transparent'}>
+								<img src={comingSoonCard.avatar.src} alt="" />
+							</span>
+						{/snippet}
+					</TokenStatCard>
+				{/if}
+			</div>
+		</section>
 
-	<section class="markets-section">
-		<span class="markets-frame markets-frame-tab" aria-hidden="true"></span>
-		<span class="markets-frame markets-frame-main" aria-hidden="true"></span>
+		<section class="markets-section">
+			<span class="markets-frame markets-frame-tab" aria-hidden="true"></span>
+			<span class="markets-frame markets-frame-main" aria-hidden="true"></span>
 
-		<header class="markets-head">
-			<span class="markets-dot markets-dot-stocks" aria-hidden="true"></span>
-			<span class="markets-label">Stocks</span>
-			<span class="markets-count">{stockTokens.length}</span>
-		</header>
-		<div class="markets-grid">
-			{#each stockTokens as t}
-				<TokenStatCard
-					symbol={t.symbol}
-					name={t.name}
-					price={t.price}
-					delta={t.delta}
-					state={t.state}
-					href={t.href}
-					external={t.external}
-				>
-					{#snippet icon()}
-						<span class="token-disk" style:background-color={t.avatar.bg ?? 'transparent'}>
-							<img src={t.avatar.src} alt="" />
-						</span>
-					{/snippet}
-				</TokenStatCard>
-			{/each}
-		</div>
-	</section>
+			<header class="markets-head">
+				<span class="markets-dot markets-dot-stocks" aria-hidden="true"></span>
+				<span class="markets-label">Stocks</span>
+				<span class="markets-count">{stockTokens.length + 4}</span>
+			</header>
+			<div class="markets-grid">
+				{#if markets.isLoading}
+					<MarketsLoadingShimmer variant="card" />
+					<MarketsLoadingShimmer variant="card" />
+					<MarketsLoadingShimmer variant="card" />
+					<MarketsLoadingShimmer variant="card" />
+				{:else}
+					{#each stockTokens as t (t.symbol)}
+						<TokenStatCard
+							symbol={t.symbol}
+							name={t.name}
+							price={t.price}
+							delta={t.delta}
+							state={t.state}
+							href={t.href}
+							external={t.external}
+						>
+							{#snippet icon()}
+								<span class="token-disk" style:background-color={t.avatar.bg ?? 'transparent'}>
+									<img src={t.avatar.src} alt="" />
+								</span>
+							{/snippet}
+						</TokenStatCard>
+					{/each}
+					<!-- 4 coming-soon static placeholders maintain the Figma 4-card row
+					     until tokenised stocks ship on-chain. -->
+					{#each Array.from({ length: 4 }) as _, i (i)}
+						<TokenStatCard
+							symbol="STOCK"
+							name="Equity Token"
+							state="coming-soon"
+						>
+							{#snippet icon()}
+								<span class="token-disk" style:background-color={avatarComing.bg}>
+									<img src={avatarComing.src} alt="" />
+								</span>
+							{/snippet}
+						</TokenStatCard>
+					{/each}
+				{/if}
+			</div>
+		</section>
+	{/if}
 </AppShell>
 
 <style>
