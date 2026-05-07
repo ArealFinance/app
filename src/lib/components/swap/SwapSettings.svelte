@@ -18,7 +18,12 @@
 	 * Component emits `onslippagechange(bps)` for the parent to forward
 	 * into `quote.setSlippage(bps)`. We deliberately don't reach into the
 	 * store directly so the component stays composable.
+	 *
+	 * Bounds are imported from `$lib/swap/constants` so the store and the
+	 * UI cannot drift; the component-side clamp is retained as
+	 * defense-in-depth (covers stray callers that bypass the store).
 	 */
+	import { SLIPPAGE_MAX_BPS, SLIPPAGE_MIN_BPS } from '$lib/swap/constants';
 
 	let { slippageBps, onslippagechange }: SwapSettingsProps = $props();
 
@@ -28,8 +33,8 @@
 		{ bps: 100, label: '1%' }
 	];
 
-	const MIN_BPS = 10;
-	const MAX_BPS = 500;
+	const MIN_BPS = SLIPPAGE_MIN_BPS;
+	const MAX_BPS = SLIPPAGE_MAX_BPS;
 
 	function formatBpsAsPercent(bps: number): string {
 		return (bps / 100).toFixed(2).replace(/\.?0+$/, '');

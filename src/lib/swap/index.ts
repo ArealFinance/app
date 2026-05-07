@@ -11,6 +11,7 @@ export {
 	KNOWN_POOLS_BY_CLUSTER,
 	type PoolEntry
 } from './pool-catalogue';
+export { SLIPPAGE_DEFAULT_BPS, SLIPPAGE_MAX_BPS, SLIPPAGE_MIN_BPS } from './constants';
 export { quote } from './quote.svelte';
 export { swap, type SwapIntent, type SwapAttempt, type SwapPhase } from './swap.svelte';
 export { userBalances } from './balances.svelte';

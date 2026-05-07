@@ -7,6 +7,7 @@
  *   FQ-3. Switch pool tears down old subscription on the SAME Connection
  *         it was registered on (capture-instance pattern)
  *   FQ-4. Slippage change → does NOT recompute the quote
+ *   FQ-5. setSlippage clamps to shared [10, 500] bps bounds
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { PublicKey } from '@solana/web3.js';
@@ -235,5 +236,19 @@ describe('quote store', () => {
 		expect(mocks.quoteSwap).not.toHaveBeenCalled();
 		// But the public slippage state DID update.
 		expect(quote.slippageBps).toBe(10);
+	});
+
+	it('FQ-5: setSlippage clamps to [10, 500] bounds', () => {
+		// Below the floor — clamped up to the shared minimum.
+		quote.setSlippage(0);
+		expect(quote.slippageBps).toBe(10);
+
+		// Above the ceiling — clamped down to the shared maximum.
+		quote.setSlippage(10000);
+		expect(quote.slippageBps).toBe(500);
+
+		// Inside the window — passes through untouched.
+		quote.setSlippage(50);
+		expect(quote.slippageBps).toBe(50);
 	});
 });

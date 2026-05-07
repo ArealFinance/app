@@ -45,6 +45,7 @@ import { RWT_MINTS } from '@areal/sdk/network';
 
 import { network } from '$lib/network/network.svelte';
 import type { PoolEntry } from './pool-catalogue';
+import { SLIPPAGE_DEFAULT_BPS, SLIPPAGE_MAX_BPS, SLIPPAGE_MIN_BPS } from './constants';
 
 /** Recompute window after the last `setInput` keystroke. */
 const RECOMPUTE_DEBOUNCE_MS = 200;
@@ -52,7 +53,7 @@ const RECOMPUTE_DEBOUNCE_MS = 200;
 let input: bigint = $state(0n);
 let fromMint: PublicKey | null = $state(null);
 let toMint: PublicKey | null = $state(null);
-let slippageBps: number = $state(50); // default 0.5%
+let slippageBps: number = $state(SLIPPAGE_DEFAULT_BPS); // default 0.5%
 
 let pool: PoolState | null = $state(null);
 let config: DexConfig | null = $state(null);
@@ -241,7 +242,10 @@ function setInput(amount: bigint, from: PublicKey, to: PublicKey) {
 
 function setSlippage(bps: number) {
 	if (!Number.isFinite(bps)) return;
-	const clamped = Math.max(0, Math.min(5000, Math.round(bps)));
+	// Clamp to the same window the UI enforces — store is the single source
+	// of truth, so the bounds must agree across both layers. See
+	// `./constants.ts` for the rationale.
+	const clamped = Math.max(SLIPPAGE_MIN_BPS, Math.min(SLIPPAGE_MAX_BPS, Math.round(bps)));
 	slippageBps = clamped;
 	// Slippage change does NOT recompute the quote — `applySlippage()` runs
 	// at the call site against `result.quote.amountOut`. Quote depends only
