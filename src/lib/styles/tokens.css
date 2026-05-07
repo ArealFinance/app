@@ -35,6 +35,9 @@
 	--color-gray-900: #717390; /* muted text */
 	--color-gray-900-20: rgba(113, 115, 144, 0.2); /* chip/tag bg */
 
+	/* Slate — neutral chip/logo backgrounds (between dark-700 inset and gray text) */
+	--color-slate-700: #3c415f; /* default token-logo fallback bg */
+
 	/* Purple — brand */
 	--color-purple-900: #9e60f6; /* primary accent solid */
 	--color-purple-700: #602fdc; /* gradient end */
@@ -65,6 +68,7 @@
 	--color-surface: var(--color-dark-900); /* primary card surface */
 	--color-surface-muted: rgba(7, 12, 28, 0.4); /* translucent card (footer) */
 	--color-surface-inset: var(--color-dark-700); /* deeper inset */
+	--color-token-logo-fallback-bg: var(--color-slate-700); /* default bg behind token glyph */
 	--color-border: rgba(255, 255, 255, 0.07); /* faint border on surfaces */
 	--color-border-strong: var(--color-dark-700);
 	--color-divider: var(--color-dark-600);

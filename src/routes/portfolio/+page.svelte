@@ -15,7 +15,6 @@
 
 	type OwnershipToken = {
 		symbol: string;
-		logoBg: string;
 		logoSrc?: string;
 		logoLetter?: string;
 		qty: string;
@@ -41,7 +40,6 @@
 	const tokens = $derived<OwnershipToken[]>(
 		portfolio.rows.map((row) => ({
 			symbol: row.metadata.symbol,
-			logoBg: '#3C415F',
 			logoLetter: row.metadata.symbol.slice(0, 1).toUpperCase(),
 			qty: formatTokenAmount(row.balance, row.metadata.decimals, 2),
 			apy: '—',
@@ -323,7 +321,7 @@
 									{#each tokens as t (t.symbol)}
 										<div class="tt-row">
 											<div class="tt-cell tt-cell-asset">
-												<span class="token-logo" style:background-color={t.logoBg}>
+												<span class="token-logo">
 													{#if t.logoSrc}
 														<img src={t.logoSrc} alt="" aria-hidden="true" />
 													{:else}
@@ -1076,6 +1074,7 @@
 		border-radius: 9px;
 		flex-shrink: 0;
 		overflow: hidden;
+		background-color: var(--color-token-logo-fallback-bg);
 	}
 	.token-logo img {
 		width: 60%;
