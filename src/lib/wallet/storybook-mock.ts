@@ -43,3 +43,11 @@ export function createMockWallet(initial: Partial<MockWalletApi> = {}): MockWall
 		...initial
 	};
 }
+
+/**
+ * Convenience factory for stories that explicitly want a Solflare-connected
+ * wallet — avoids each story having to remember to flip `provider`.
+ */
+export function createMockSolflareWallet(initial: Partial<MockWalletApi> = {}): MockWalletApi {
+	return createMockWallet({ provider: 'solflare', ...initial });
+}

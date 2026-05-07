@@ -18,7 +18,14 @@
  */
 import type { PublicKey } from '@solana/web3.js';
 
-import { connectPhantom, disconnectPhantom, getPhantomProvider } from '$lib/wallet';
+import {
+	connectPhantom,
+	disconnectPhantom,
+	getPhantomProvider,
+	connectSolflare,
+	disconnectSolflare,
+	getSolflareProvider
+} from '$lib/wallet';
 import { showError } from '$lib/errors';
 import { truncateAddress } from '$lib/utils/address';
 
@@ -61,21 +68,23 @@ function clearErrorRevert() {
 async function connect(providerName: WalletProvider = 'phantom'): Promise<void> {
 	clearErrorRevert();
 
-	// Solflare not wired yet — surface explicitly, don't quietly fall through.
-	if (providerName !== 'phantom') {
-		showError(new Error(`Provider "${providerName}" not yet supported`));
+	// Pre-flight: surface a friendly "wallet not found" before we flip status,
+	// so we never strand the UI in `awaiting-signature` for a provider that
+	// isn't even installed.
+	if (providerName === 'phantom' && !getPhantomProvider()) {
+		showError(new Error('Phantom not found'));
 		return;
 	}
-
-	if (!getPhantomProvider()) {
-		showError(new Error('Phantom not found'));
+	if (providerName === 'solflare' && !getSolflareProvider()) {
+		showError(new Error('Solflare not found'));
 		return;
 	}
 
 	status = 'awaiting-signature';
-	provider = 'phantom';
+	provider = providerName;
 	try {
-		const pk = await connectPhantom();
+		const pk =
+			providerName === 'phantom' ? await connectPhantom() : await connectSolflare();
 		publicKey = pk;
 		address = pk.toBase58();
 		status = 'connected';
@@ -97,7 +106,12 @@ async function connect(providerName: WalletProvider = 'phantom'): Promise<void> 
 
 async function disconnect(): Promise<void> {
 	clearErrorRevert();
-	await disconnectPhantom();
+	if (provider === 'solflare') {
+		await disconnectSolflare();
+	} else {
+		// Default to Phantom for legacy / null provider — best-effort cleanup.
+		await disconnectPhantom();
+	}
 	publicKey = null;
 	address = null;
 	provider = null;

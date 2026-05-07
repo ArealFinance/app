@@ -3,10 +3,22 @@
 	import { Xmark } from '$lib/icons';
 	import { wallet } from '$lib/stores/wallet.svelte';
 	import { walletDialog } from '$lib/stores/walletDialog.svelte';
+	import { isPhantomInstalled, isSolflareInstalled } from '$lib/wallet';
 
 	const open = $derived(walletDialog.mode === 'connect');
 	const status = $derived(wallet.status);
 	const isAwaiting = $derived(status === 'awaiting-signature');
+
+	// Re-check provider availability whenever the dialog opens — the wallet
+	// extension may have been installed in another tab while this app was idle.
+	let phantomAvailable = $state(false);
+	let solflareAvailable = $state(false);
+	$effect(() => {
+		if (open) {
+			phantomAvailable = isPhantomInstalled();
+			solflareAvailable = isSolflareInstalled();
+		}
+	});
 
 	// Auto-close once the mock connection settles, and route the user to the
 	// transaction panel so they see what happened.
@@ -16,9 +28,14 @@
 		}
 	});
 
-	function handleSignIn() {
+	function handleConnectPhantom() {
 		if (isAwaiting) return;
 		wallet.connect('phantom');
+	}
+
+	function handleConnectSolflare() {
+		if (isAwaiting) return;
+		wallet.connect('solflare');
 	}
 </script>
 
@@ -52,14 +69,28 @@
 			</span>
 		</p>
 
-		<button
-			type="button"
-			class="wallet-dialog-cta"
-			onclick={handleSignIn}
-			disabled={isAwaiting}
-		>
-			Sign in
-		</button>
+		<div class="wallet-dialog-actions">
+			<button
+				type="button"
+				class="wallet-dialog-cta"
+				onclick={handleConnectPhantom}
+				disabled={isAwaiting || !phantomAvailable}
+				title={phantomAvailable ? undefined : 'Phantom is not installed'}
+			>
+				<img src="/images/wallet/phantom.svg" alt="" aria-hidden="true" />
+				<span>Connect Phantom</span>
+			</button>
+			<button
+				type="button"
+				class="wallet-dialog-cta wallet-dialog-cta--secondary"
+				onclick={handleConnectSolflare}
+				disabled={isAwaiting || !solflareAvailable}
+				title={solflareAvailable ? undefined : 'Solflare is not installed'}
+			>
+				<img src="/images/wallet/solflare.svg" alt="" aria-hidden="true" />
+				<span>Connect Solflare</span>
+			</button>
+		</div>
 
 		{#if isAwaiting}
 			<div class="wallet-dialog-status" role="status">Waiting for signature</div>
@@ -186,6 +217,14 @@
 		object-fit: contain;
 	}
 
+	/* Two stacked CTAs (Phantom primary, Solflare secondary). Stack vertically
+	 * with a small gap so the dialog still reads as a single column on mobile. */
+	.wallet-dialog-actions {
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-2);
+	}
+
 	/* White CTA — Halvar Bold 14 dark, 20-radius. Flows right after the helper
 	 * text via that block's 32px margin-bottom; we don't push it to the bottom
 	 * edge anymore (caused the 'big empty gap' imbalance). */
@@ -193,6 +232,7 @@
 		display: inline-flex;
 		align-items: center;
 		justify-content: center;
+		gap: var(--space-2);
 		height: 48px;
 		padding: 0 var(--space-5);
 		background-color: var(--color-white-900); /* #FBF2FF */
@@ -214,7 +254,23 @@
 	}
 	.wallet-dialog-cta:disabled {
 		opacity: 0.7;
-		cursor: progress;
+		cursor: not-allowed;
+	}
+	.wallet-dialog-cta img {
+		width: 20px;
+		height: 20px;
+		object-fit: contain;
+	}
+
+	/* Secondary CTA — translucent fill that lets the aurora bleed through, so
+	 * Phantom remains the visually-promoted action. */
+	.wallet-dialog-cta--secondary {
+		background-color: rgba(255, 255, 255, 0.08);
+		color: var(--color-text);
+		border: 1px solid rgba(255, 255, 255, 0.12);
+	}
+	.wallet-dialog-cta--secondary:hover:not(:disabled) {
+		background-color: rgba(255, 255, 255, 0.14);
 	}
 
 	.wallet-dialog-status {
