@@ -242,6 +242,12 @@ async function runClaim(row: PortfolioRow): Promise<void> {
 
 	const connection = network.connection;
 
+	// No explicit holder-change guard needed: the wallet adapter throws
+	// "Wallet not connected" if the user disconnects mid-flow, and the
+	// FSM is keyed by otMint.toBase58() (immutable per row). Late RPC
+	// results write to the (now-stale) attempt entry; portfolio.refresh()
+	// picks up the new wallet state via its own activeHolder guard in
+	// store.svelte.ts.
 	try {
 		// ─── preparing ────────────────────────────────────────────────────
 		// Fetch fresh proof + parse the on-chain distributor in parallel.
@@ -285,6 +291,16 @@ async function runClaim(row: PortfolioRow): Promise<void> {
 				error: 'Proof cumulative amount is malformed.'
 			});
 			toast.error('Proof cumulative amount is malformed.', { title: 'Cannot claim' });
+			scheduleCleanup(key);
+			return;
+		}
+
+		// Defense in depth: validate proof.proof shape before passing into
+		// buildClaimTx. SDK already validates at fetch time, but treat every
+		// boundary as untrusted.
+		if (!Array.isArray(proof.proof) || !proof.proof.every((s) => typeof s === 'string')) {
+			setPhase(key, { phase: 'error', error: 'Proof structure is malformed.' });
+			toast.error('Proof structure is malformed.', { title: 'Cannot claim' });
 			scheduleCleanup(key);
 			return;
 		}

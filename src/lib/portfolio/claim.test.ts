@@ -458,6 +458,46 @@ describe('claims service', () => {
 		expect(mocks.buildClaimTx).not.toHaveBeenCalled();
 	});
 
+	it('malformed proof.proof: not an array fails fast', async () => {
+		mocks.fetchMerkleProof.mockResolvedValue({
+			...makeProof(),
+			proof: 'not-an-array' as unknown as string[]
+		});
+		mocks.getAccountInfo.mockResolvedValue(distributorAccountInfo);
+		mocks.parseMerkleDistributor.mockReturnValue(fakeMerkleDistributor);
+
+		await claims.start(makeRow());
+		await settle();
+
+		const a = claims.attempts.get(OT_MINT_A.toBase58());
+		expect(a?.phase).toBe('error');
+		expect(a?.error).toBe('Proof structure is malformed.');
+		expect(mocks.buildClaimTx).not.toHaveBeenCalled();
+
+		await vi.advanceTimersByTimeAsync(3_000);
+		expect(claims.attempts.has(OT_MINT_A.toBase58())).toBe(false);
+	});
+
+	it('malformed proof.proof: array with non-string element fails fast', async () => {
+		mocks.fetchMerkleProof.mockResolvedValue({
+			...makeProof(),
+			proof: ['valid', 123 as unknown as string, 'valid']
+		});
+		mocks.getAccountInfo.mockResolvedValue(distributorAccountInfo);
+		mocks.parseMerkleDistributor.mockReturnValue(fakeMerkleDistributor);
+
+		await claims.start(makeRow());
+		await settle();
+
+		const a = claims.attempts.get(OT_MINT_A.toBase58());
+		expect(a?.phase).toBe('error');
+		expect(a?.error).toBe('Proof structure is malformed.');
+		expect(mocks.buildClaimTx).not.toHaveBeenCalled();
+
+		await vi.advanceTimersByTimeAsync(3_000);
+		expect(claims.attempts.has(OT_MINT_A.toBase58())).toBe(false);
+	});
+
 	it('isInFlight reflects in-flight attempts only (not terminal ones)', async () => {
 		setupHappyPathMocks();
 		// Hold confirmTransaction so we can sample isInFlight mid-flow.
