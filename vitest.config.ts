@@ -16,7 +16,14 @@ export default defineConfig({
   plugins: [svelte()],
   resolve: {
     alias: {
-      $lib: path.resolve('./src/lib')
+      $lib: path.resolve('./src/lib'),
+      // SvelteKit virtual env modules — vitest doesn't load the sveltekit
+      // plugin so we point the aliases at empty stubs that tests can
+      // override via `vi.mock(...)` at the spec level.
+      '$env/static/public': path.resolve('./src/test-stubs/env-static-public.ts'),
+      '$env/static/private': path.resolve('./src/test-stubs/env-static-private.ts'),
+      '$env/dynamic/public': path.resolve('./src/test-stubs/env-dynamic-public.ts'),
+      '$env/dynamic/private': path.resolve('./src/test-stubs/env-dynamic-private.ts')
     },
     conditions: ['browser']
   },
