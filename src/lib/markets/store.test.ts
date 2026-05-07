@@ -78,7 +78,11 @@ vi.mock('$lib/network/network.svelte', async () => {
 });
 
 vi.mock('@areal/sdk/markets', () => ({
-	getMarketsSnapshot: mocks.getMarketsSnapshot
+	getMarketsSnapshot: mocks.getMarketsSnapshot,
+	// `isPoolRowMaster` (used by the store to enrich pools) calls into this
+	// — return false uniformly so legacy tests are unaffected. Master-pool
+	// behaviour is exercised in `master-pool.test.ts` directly.
+	isMasterPool: vi.fn(() => false)
 }));
 
 vi.mock('@areal/sdk/pda', () => ({

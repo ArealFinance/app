@@ -19,12 +19,15 @@
 	import {
 		markets,
 		poolStore,
+		lpStore,
+		lpForm,
 		formatTvl,
 		formatPrice,
 		formatTokenAmount,
 		formatFee
 	} from '$lib/markets';
-	import type { PoolRow, TokenRow } from '$lib/markets';
+	import type { TokenRow, EnrichedPoolRow } from '$lib/markets';
+	import { wallet } from '$lib/stores/wallet.svelte';
 
 	const EM_DASH = '—';
 
@@ -38,7 +41,7 @@
 	const isVaultToken = $derived(tokenRow?.category === 'protocol');
 
 	/** Pools that touch this token on either side. */
-	const tokenPools = $derived<PoolRow[]>(
+	const tokenPools = $derived<EnrichedPoolRow[]>(
 		tokenRow
 			? markets.pools.filter(
 					(p) => p.tokenAMint.equals(tokenRow.mint) || p.tokenBMint.equals(tokenRow.mint)
@@ -181,7 +184,7 @@
 		pairB: { symbol: string; bg: string; iconLetter?: string };
 		tvl: string;
 		kind: 'Concentrated' | 'Standard';
-		raw: PoolRow;
+		raw: EnrichedPoolRow;
 	};
 
 	function symbolForMint(mint: PublicKey): string {
@@ -216,6 +219,21 @@
 	);
 
 	let openPoolId = $state<string | null>(null);
+
+	/**
+	 * Tracks whether the LP form FSM is mid-flight for the currently open
+	 * pool (awaiting signature, broadcasting, or confirming). Used to gate
+	 * backdrop click + Escape on the pool detail Modal so a stray dismiss
+	 * during signing doesn't visually orphan the user from the in-progress
+	 * transaction. The FSM itself remains correct on close — this guards UX
+	 * continuity, not state.
+	 */
+	const isLpInFlight = $derived.by((): boolean => {
+		if (!openPoolId) return false;
+		const lp = liquidityPools.find((p) => p.id === openPoolId);
+		if (!lp) return false;
+		return lpForm.isInFlight(lp.poolAddress);
+	});
 
 	const openedPool = $derived.by((): PoolInfo | null => {
 		if (!openPoolId) return null;
@@ -289,18 +307,29 @@
 			binStep: EM_DASH,
 			priceLabels: [],
 			userBalance: '0',
-			depth: poolStore.depth
+			depth: poolStore.depth,
+			row: raw,
+			decimalsA: decA,
+			decimalsB: decB
 		};
 	});
 
 	function openPool(lp: LiquidityPool) {
 		openPoolId = lp.id;
 		void poolStore.activate(lp.poolAddress);
+		// Activate the lpStore alongside the pool subscription when a wallet
+		// is connected — drives the LpPositionDerived + Withdraw flows. The
+		// effect below handles wallet-state changes after the modal opens.
+		const pk = wallet.publicKey;
+		if (pk) {
+			void lpStore.activate(lp.poolAddress, pk);
+		}
 	}
 
 	function closePool() {
 		openPoolId = null;
 		poolStore.deactivate();
+		lpStore.deactivate();
 	}
 
 	// Auto-close the pool detail panel on network change. The Modal's
@@ -313,6 +342,20 @@
 		void network.current; // track network changes
 		if (openPoolId !== null) {
 			closePool();
+		}
+	});
+
+	// Re-activate lpStore when the wallet connects/disconnects with the
+	// modal open. Active pool address is preserved in `openPoolId`.
+	$effect(() => {
+		const pk = wallet.publicKey;
+		if (openPoolId === null) return;
+		const lp = liquidityPools.find((p) => p.id === openPoolId);
+		if (!lp) return;
+		if (pk) {
+			void lpStore.activate(lp.poolAddress, pk);
+		} else {
+			lpStore.deactivate();
 		}
 	});
 
@@ -685,7 +728,12 @@
 		{/if}
 	</div>
 
-	<Modal open={openedPool !== null} onclose={closePool} aria-labelledby="pool-modal-title">
+	<Modal
+		open={openedPool !== null}
+		onclose={isLpInFlight ? () => {} : closePool}
+		closeOnBackdrop={!isLpInFlight}
+		aria-labelledby="pool-modal-title"
+	>
 		{#if openedPool}
 			<PoolDetailPanel pool={openedPool} onclose={closePool} />
 		{/if}
