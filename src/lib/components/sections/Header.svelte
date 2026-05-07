@@ -21,7 +21,7 @@
 </script>
 
 <script lang="ts">
-	import { ChartPie, ArrowUpDownSimple, Chart } from '$lib/icons';
+	import { ChartPie, ArrowUpDownSimple, Chart, Plus } from '$lib/icons';
 	import { WalletAddressChip } from '$lib/components/ui';
 	import NetworkSwitcher from '$lib/components/debug/NetworkSwitcher.svelte';
 	import DemoBanner from './DemoBanner.svelte';
@@ -39,6 +39,7 @@
 
 	const defaultNav: NavItem[] = [
 		{ label: 'Market', href: '/markets', icon: ChartPie, matchPrefix: ['/', '/markets'] },
+		{ label: 'Mint', href: '/mint', icon: Plus },
 		{ label: 'Swap', href: '/swap', icon: ArrowUpDownSimple },
 		{ label: 'Portfolio', href: '/portfolio', icon: Chart }
 	];

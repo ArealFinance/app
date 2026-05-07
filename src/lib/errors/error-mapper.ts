@@ -35,7 +35,7 @@ const FRIENDLY_BY_NAME: Record<string, { title: string; body: string }> = {
 	// native-dex errors that surface to a user during a swap.
 	SlippageExceeded: {
 		title: 'Price moved',
-		body: 'Price moved during the swap, try increasing slippage tolerance.'
+		body: 'Price moved, try increasing slippage tolerance.'
 	},
 	ZeroOutput: {
 		title: 'Amount too small',
@@ -56,6 +56,31 @@ const FRIENDLY_BY_NAME: Record<string, { title: string; body: string }> = {
 	InsufficientLiquidity: {
 		title: 'Low liquidity',
 		body: 'Not enough liquidity for this size.'
+	},
+
+	// rwt-engine errors that surface to a user during mint_rwt.
+	// Note: `SlippageExceeded` is a name collision with the dex error above;
+	// the friendly copy fits both paths (price moved during the action) so we
+	// reuse a single override.
+	MintPaused: {
+		title: 'Minting paused',
+		body: 'Minting is currently paused.'
+	},
+	BelowMinMint: {
+		title: 'Amount too small',
+		body: 'Amount is below the $1 minimum.'
+	},
+	ZeroSlippage: {
+		title: 'Slippage required',
+		body: 'Slippage tolerance must be greater than 0.'
+	},
+	ZeroRwtOutput: {
+		title: 'Amount too small',
+		body: 'Amount is too small for the current NAV.'
+	},
+	InvalidTokenAccount: {
+		title: 'Token account error',
+		body: 'Token account validation failed.'
 	}
 };
 
