@@ -303,6 +303,19 @@
 		poolStore.deactivate();
 	}
 
+	// Auto-close the pool detail panel on network change. The Modal's
+	// onclose only fires for backdrop/Escape — when the markets snapshot
+	// swaps under a network switch, `openedPool` derives to null and the
+	// modal unmounts silently, leaving `poolStore` listeners attached to
+	// the OLD wsConnection. This effect explicitly tears the pool subscription
+	// down so we don't leak a stale-cluster depth window.
+	$effect(() => {
+		void network.current; // track network changes
+		if (openPoolId !== null) {
+			closePool();
+		}
+	});
+
 	const vaultPositions: VaultPosition[] = [
 		{ id: 'sand', symbol: 'SAND', tokens: '82 000,00 tokens', usd: '$565.9k', yieldPct: '3620%', color: '#7D2BF4', bubbleSize: 205 },
 		{ id: 'usdc', symbol: 'USDC', tokens: '90 000,00 tokens', usd: '$101.4k', yieldPct: '1590%', color: '#447AD8', bubbleSize: 169 },
