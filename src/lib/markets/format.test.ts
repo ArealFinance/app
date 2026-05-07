@@ -24,7 +24,12 @@ describe('formatTvl', () => {
 	it('formats values >= 1K with K suffix and 1 dp', () => {
 		expect(formatTvl(1_000)).toBe('$1.0K');
 		expect(formatTvl(45_700)).toBe('$45.7K');
-		expect(formatTvl(999_999)).toBe('$1000.0K');
+	});
+
+	it('rounds values just under 1M into the M branch (no "$1000.0K" overflow)', () => {
+		expect(formatTvl(999_999)).toBe('$1.00M');
+		expect(formatTvl(999_500)).toBe('$1.00M');
+		expect(formatTvl(999_499)).toBe('$999.5K');
 	});
 
 	it('formats sub-thousand values with comma grouping, no decimals', () => {

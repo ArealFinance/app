@@ -18,13 +18,16 @@ const EM_DASH = '—';
  * Format a USDC TVL as "$1.23M" / "$45.7K" / "$1,234". Nulls and NaN
  * collapse to em-dash.
  *
- *   - >= 1e6   → "$X.XXM" (2 dp)
- *   - >= 1e3   → "$X.XK"  (1 dp)
- *   - else     → "$1,234" (no decimals, comma-grouped)
+ *   - >= 999_500 → "$X.XXM" (2 dp) — boundary is below 1e6 so values that
+ *     would otherwise render as "$1000.0K" round into the M branch instead.
+ *   - >= 1e3     → "$X.XK"  (1 dp)
+ *   - else       → "$1,234" (no decimals, comma-grouped)
  */
 export function formatTvl(usdc: number | null | undefined): string {
 	if (usdc === null || usdc === undefined || !Number.isFinite(usdc)) return EM_DASH;
-	if (usdc >= 1_000_000) return `$${(usdc / 1_000_000).toFixed(2)}M`;
+	// Threshold is 999_500 (not 1e6) so 999_999 rounds to "$1.00M" rather
+	// than overflowing the K branch as "$1000.0K".
+	if (usdc >= 999_500) return `$${(usdc / 1_000_000).toFixed(2)}M`;
 	if (usdc >= 1_000) return `$${(usdc / 1_000).toFixed(1)}K`;
 	return `$${Math.round(usdc).toLocaleString('en-US')}`;
 }

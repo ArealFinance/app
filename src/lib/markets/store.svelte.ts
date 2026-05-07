@@ -149,8 +149,11 @@ function subscribePools(snap: MarketsSnapshot) {
 		const [dexConfigPda] = findDexConfigPda(programIds.nativeDex);
 		const id = wsConn.onAccountChange(dexConfigPda, () => scheduleRefetch());
 		listenerIds.push(id);
-	} catch {
-		/* PDA derivation failure is non-fatal — pool subs still cover deltas. */
+	} catch (err) {
+		// PDA derivation failure is non-fatal — pool subs still cover deltas
+		// — but it indicates devnet drift in the program-id map, so surface
+		// it in DevTools rather than swallowing silently.
+		console.warn('[markets store] DexConfig PDA derivation failed:', err);
 	}
 
 	// Subscribe to RwtVault when NAV is part of the snapshot — keeps the
@@ -160,8 +163,8 @@ function subscribePools(snap: MarketsSnapshot) {
 			const [rwtVaultPda] = findRwtVaultPda(programIds.rwtEngine);
 			const id = wsConn.onAccountChange(rwtVaultPda, () => scheduleRefetch());
 			listenerIds.push(id);
-		} catch {
-			/* noop */
+		} catch (err) {
+			console.warn('[markets store] RwtVault PDA derivation failed:', err);
 		}
 	}
 
