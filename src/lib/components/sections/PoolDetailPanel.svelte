@@ -1,5 +1,5 @@
 <script lang="ts" module>
-	import type { DepthResult } from '@areal/sdk/markets';
+	import type { DepthResult, PoolRow } from '@areal/sdk/markets';
 
 	export type PoolToken = {
 		symbol: string;
@@ -31,14 +31,15 @@
 		 * replaces the mock distribution chart with the SDK-computed ladder.
 		 */
 		depth?: DepthResult | null;
-		/** Demo: user's current position, shown in "My Position" when wallet is connected. */
-		userPosition?: {
-			totalUsd: string;
-			tokenA: { qty: string; usd: string; pct: string };
-			tokenB: { qty: string; usd: string; pct: string };
-			/** Fraction (0..1) of pairA in the position — drives the donut split. */
-			aFraction: number;
-		};
+		/**
+		 * On-chain row + decimals required by the LP write-path. When omitted
+		 * (e.g. Storybook stories fed pure mocks) the panel falls back to
+		 * read-only behaviour and the CTAs render "Connect Wallet" without
+		 * wiring the FSM. The markets page sets this for every real pool.
+		 */
+		row?: PoolRow & { isMaster: boolean };
+		decimalsA?: number;
+		decimalsB?: number;
 	};
 </script>
 
@@ -46,8 +47,15 @@
 	import { Bolt, Plus, Minus } from '$lib/icons';
 	import { wallet } from '$lib/stores/wallet.svelte';
 	import { walletDialog } from '$lib/stores/walletDialog.svelte';
-	import TickWheel from '$lib/components/charts/TickWheel.svelte';
 	import DepthChart from '$lib/components/charts/DepthChart.svelte';
+	import MasterPoolGuard from '$lib/components/markets/MasterPoolGuard.svelte';
+	import LpPositionDerived from '$lib/components/markets/LpPositionDerived.svelte';
+	import { lpForm } from '$lib/markets/lp-form.svelte';
+	import { lpStore } from '$lib/markets/lp-store.svelte';
+	import { poolStore } from '$lib/markets/pool-store.svelte';
+	import { applySlippageU128 } from '@areal/sdk/native-dex';
+	import { formatTokenAmount } from '$lib/markets/format';
+	import { SLIPPAGE_DEFAULT_BPS } from '$lib/swap/constants';
 
 	type Props = {
 		pool: PoolInfo;
@@ -57,7 +65,8 @@
 	let { pool, onclose }: Props = $props();
 
 	const isConcentrated = $derived(pool.kind === 'Concentrated');
-	const hasActivePosition = $derived(wallet.isConnected && pool.userPosition !== undefined);
+	const hasOnChain = $derived(pool.row !== undefined);
+	const isMasterPool = $derived(pool.row?.isMaster ?? false);
 
 	type ModeTab = 'Add Liquidity' | 'Withdraw';
 	let modeTab = $state<ModeTab>('Add Liquidity');
@@ -69,20 +78,163 @@
 	let depositSide = $state<DepositSide>('B');
 	let depositAmount = $state('899');
 
+	// Slippage bps — single source for both Add/Zap minShares and Remove
+	// payout-floor derivation. Defaults to the swap-form default (50 bps);
+	// future iterations will surface a slippage popover here too.
+	const slippageBps = SLIPPAGE_DEFAULT_BPS;
+
+	// Live LP position from the lpStore (activated by the parent route).
+	const liveLpPosition = $derived(lpStore.position);
+	const livePool = $derived(poolStore.pool);
+	const liveShares = $derived(liveLpPosition?.shares ?? 0n);
+	const hasActivePosition = $derived(wallet.isConnected && liveShares > 0n);
+
+	// Disable Add/Zap CTAs on master pools (defense-in-depth — lpForm also
+	// guards). Withdraw CTA stays enabled regardless.
+	const addCtaDisabled = $derived(isMasterPool || !hasOnChain);
+
 	function setMax() {
 		depositAmount = pool.userBalance;
 	}
 
-	// Withdraw flow — assume the user owns 1000 LP shares for the demo.
-	const userShares = 1000;
+	// Parse the user's typed amount into base-units bigint. Returns 0n on
+	// any parse failure so the FSM's pre-flight zero-amount guard fires
+	// rather than crashing here.
+	function toBaseUnits(input: string, decimals: number): bigint {
+		const s = input.trim();
+		if (s === '' || !/^\d*(\.\d*)?$/.test(s)) return 0n;
+		const [whole = '0', frac = ''] = s.split('.');
+		const fracPadded = (frac + '0'.repeat(decimals)).slice(0, decimals);
+		try {
+			return BigInt(whole) * 10n ** BigInt(decimals) + BigInt(fracPadded || '0');
+		} catch {
+			return 0n;
+		}
+	}
+
+	function handleAddLiquidity() {
+		if (!pool.row || pool.decimalsA === undefined || pool.decimalsB === undefined) return;
+
+		// `depositSide` controls which mint the user is typing. For Add we
+		// require BOTH sides — derive the missing side via the pool's spot
+		// ratio. For Zap we send single-side and let the contract auto-balance.
+		const decA = pool.decimalsA;
+		const decB = pool.decimalsB;
+		const typedAmount = toBaseUnits(depositAmount, depositSide === 'A' ? decA : decB);
+
+		if (depositMode === 'Zap') {
+			const intent = {
+				pool: pool.row,
+				amountA: depositSide === 'A' ? typedAmount : 0n,
+				amountB: depositSide === 'B' ? typedAmount : 0n,
+				expectedShares: typedAmount, // best-effort placeholder; contract enforces min
+				minShares: applySlippageU128(typedAmount, slippageBps),
+				slippageBps
+			};
+			void lpForm.startZap(intent);
+			return;
+		}
+
+		// Standards (both-sided). Derive the counter side from spot ratio
+		// so the contract's "deposit at current ratio" check succeeds.
+		const ps = livePool;
+		if (!ps || ps.reserveA === 0n || ps.reserveB === 0n) {
+			// Empty pool — first-deposit branch. Use 1:1 as a placeholder;
+			// the user should pick both sides explicitly in a follow-up
+			// iteration of this UI.
+			const counterAmount = typedAmount;
+			const intent = {
+				pool: pool.row,
+				amountA: depositSide === 'A' ? typedAmount : counterAmount,
+				amountB: depositSide === 'B' ? typedAmount : counterAmount,
+				expectedShares: typedAmount,
+				minShares: applySlippageU128(typedAmount, slippageBps),
+				slippageBps
+			};
+			void lpForm.startAdd(intent);
+			return;
+		}
+
+		// Existing pool — derive counter side from on-chain ratio.
+		let amountA: bigint;
+		let amountB: bigint;
+		if (depositSide === 'A') {
+			amountA = typedAmount;
+			amountB = (typedAmount * ps.reserveB) / ps.reserveA;
+		} else {
+			amountB = typedAmount;
+			amountA = (typedAmount * ps.reserveA) / ps.reserveB;
+		}
+
+		// Expected shares: ratio of the typed-side amount to its reserve,
+		// scaled by total LP shares. Mirrors the contract's deposit math.
+		const total = ps.totalLpShares;
+		const expectedShares =
+			depositSide === 'A'
+				? (amountA * total) / ps.reserveA
+				: (amountB * total) / ps.reserveB;
+
+		const intent = {
+			pool: pool.row,
+			amountA,
+			amountB,
+			expectedShares,
+			minShares: applySlippageU128(expectedShares, slippageBps),
+			slippageBps
+		};
+		void lpForm.startAdd(intent);
+	}
+
+	function handleRemoveLiquidity() {
+		if (!pool.row) return;
+		if (liveShares === 0n) return;
+
+		// User picked a percentage of their position; convert to absolute
+		// shares (rounded down).
+		const sharesToBurn = (liveShares * BigInt(withdrawPct)) / 100n;
+		if (sharesToBurn === 0n) return;
+
+		// Pro-rata redemption preview from the live pool snapshot. Used by
+		// the FSM's stale-quote guard against the slippage floor.
+		const ps = livePool;
+		const expectedA =
+			ps && ps.totalLpShares > 0n ? (sharesToBurn * ps.reserveA) / ps.totalLpShares : 0n;
+		const expectedB =
+			ps && ps.totalLpShares > 0n ? (sharesToBurn * ps.reserveB) / ps.totalLpShares : 0n;
+
+		const intent = {
+			pool: pool.row,
+			sharesToBurn,
+			expectedA,
+			expectedB,
+			slippageBps
+		};
+		void lpForm.startRemove(intent);
+	}
+
+	const isAddInFlight = $derived(
+		pool.row ? lpForm.isInFlight(pool.row.poolAddress) : false
+	);
+
+	// Withdraw flow — driven by the live `LpPosition.shares` rather than a
+	// hard-coded demo number when the lpStore is active.
+	const userSharesDisplay = $derived(liveShares > 0n ? liveShares.toString() : '0');
 	let withdrawPct = $state(25);
 	const withdrawSnapPoints = [0, 25, 50, 75, 100];
-	// Mock pro-rata redemption — Figma shows 25% → 579 USDC + 1579 RWT,
-	// so anchor full position at 4× those values and scale linearly.
-	const FULL_RECEIVE_A = 6316; // pairA total user position
-	const FULL_RECEIVE_B = 2316; // pairB total user position
-	const withdrawReceiveA = $derived(((FULL_RECEIVE_A * withdrawPct) / 100).toFixed(0));
-	const withdrawReceiveB = $derived(((FULL_RECEIVE_B * withdrawPct) / 100).toFixed(0));
+	const withdrawReceiveA = $derived.by(() => {
+		const ps = livePool;
+		if (!ps || ps.totalLpShares === 0n || liveShares === 0n) return '0';
+		const sharesToBurn = (liveShares * BigInt(withdrawPct)) / 100n;
+		const a = (sharesToBurn * ps.reserveA) / ps.totalLpShares;
+		return formatTokenAmount(a, pool.decimalsA ?? 6);
+	});
+	const withdrawReceiveB = $derived.by(() => {
+		const ps = livePool;
+		if (!ps || ps.totalLpShares === 0n || liveShares === 0n) return '0';
+		const sharesToBurn = (liveShares * BigInt(withdrawPct)) / 100n;
+		const b = (sharesToBurn * ps.reserveB) / ps.totalLpShares;
+		return formatTokenAmount(b, pool.decimalsB ?? 6);
+	});
 
 	// Distribution chart bar heights — from Figma dump (left ramp + center
 	// peak; the right side mirrors). 24+24 keeps the marker between halves.
@@ -316,47 +468,13 @@
 			<article class="card position-card">
 				<p class="dist-title position-title">MY POSITION</p>
 
-				{#if hasActivePosition && pool.userPosition}
-					<div class="my-position">
-						<ul class="my-position-rows">
-							<li class="alloc-row">
-								<span class="alloc-row-dot alloc-row-dot-a"></span>
-								<span class="alloc-row-sym">{pool.pairA.symbol}</span>
-								<span class="alloc-row-spacer"></span>
-								<span class="alloc-row-qty">
-									<span class="alloc-row-qty-main">{pool.userPosition.tokenA.qty}</span>
-									<span class="alloc-row-qty-sub">{pool.userPosition.tokenA.usd}</span>
-								</span>
-								<span class="alloc-row-pct alloc-row-pct-a">{pool.userPosition.tokenA.pct}</span>
-							</li>
-							<li class="alloc-row">
-								<span class="alloc-row-dot alloc-row-dot-b"></span>
-								<span class="alloc-row-sym">{pool.pairB.symbol}</span>
-								<span class="alloc-row-spacer"></span>
-								<span class="alloc-row-qty">
-									<span class="alloc-row-qty-main">{pool.userPosition.tokenB.qty}</span>
-									<span class="alloc-row-qty-sub">{pool.userPosition.tokenB.usd}</span>
-								</span>
-								<span class="alloc-row-pct alloc-row-pct-b">{pool.userPosition.tokenB.pct}</span>
-							</li>
-						</ul>
-
-						<div class="my-position-donut">
-							<TickWheel
-								value={pool.userPosition.aFraction}
-								colorA="#A56EFF"
-								colorB="#009393"
-								size={134}
-								tickCount={48}
-								tickLength={10}
-								tickWidth={3}
-							/>
-							<div class="my-position-donut-center">
-								<p class="my-position-donut-label">Total value</p>
-								<p class="my-position-donut-value">{pool.userPosition.totalUsd}</p>
-							</div>
-						</div>
-					</div>
+				{#if hasActivePosition && hasOnChain}
+					<LpPositionDerived
+						symbolA={pool.pairA.symbol}
+						symbolB={pool.pairB.symbol}
+						decimalsA={pool.decimalsA ?? 6}
+						decimalsB={pool.decimalsB ?? 6}
+					/>
 				{:else}
 					<div class="empty">
 						<svg
@@ -532,9 +650,22 @@
 						</div>
 					</div>
 
+					{#if isMasterPool}
+						<MasterPoolGuard symbolA={pool.pairA.symbol} symbolB={pool.pairB.symbol} />
+					{/if}
+
 					{#if wallet.isConnected}
-						<button type="button" class="cta">
-							{depositMode === 'Zap' ? 'Zap & Add Liquidity' : 'Add Liquidity'}
+						<button
+							type="button"
+							class="cta"
+							disabled={addCtaDisabled || isAddInFlight}
+							onclick={handleAddLiquidity}
+						>
+							{#if isAddInFlight}
+								Processing…
+							{:else}
+								{depositMode === 'Zap' ? 'Zap & Add Liquidity' : 'Add Liquidity'}
+							{/if}
 						</button>
 					{:else}
 						<button type="button" class="cta" onclick={() => walletDialog.open('connect')}>
@@ -547,7 +678,7 @@
 						<div class="wd-head">
 							<p class="wd-label">Withdraw Liquidity</p>
 							<span class="wd-available">
-								<span>Available {userShares} shares</span>
+								<span>Available {userSharesDisplay} shares</span>
 								<svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
 									<circle cx="8" cy="8" r="7" stroke="#73FF83" stroke-width="1.4" fill="none" />
 									<rect x="7.3" y="4" width="1.4" height="5" rx="0.7" fill="#73FF83" />
@@ -626,8 +757,17 @@
 					</div>
 
 					{#if wallet.isConnected}
-						<button type="button" class="cta" disabled={withdrawPct === 0}>
-							Remove Liquidity
+						<button
+							type="button"
+							class="cta"
+							disabled={withdrawPct === 0 || liveShares === 0n || !hasOnChain || isAddInFlight}
+							onclick={handleRemoveLiquidity}
+						>
+							{#if isAddInFlight}
+								Processing…
+							{:else}
+								Remove Liquidity
+							{/if}
 						</button>
 					{:else}
 						<button type="button" class="cta" onclick={() => walletDialog.open('connect')}>
@@ -1185,55 +1325,6 @@
 		font-size: 13px;
 		letter-spacing: -0.4px;
 		color: var(--color-text-muted);
-	}
-
-	/* Active "My Position" — token rows on the left, donut on the right. */
-	.my-position {
-		display: grid;
-		grid-template-columns: 1fr auto;
-		gap: 24px;
-		align-items: center;
-	}
-	.my-position-rows {
-		list-style: none;
-		margin: 0;
-		padding: 0;
-		display: flex;
-		flex-direction: column;
-		gap: 12px;
-		min-width: 0;
-	}
-	.my-position-donut {
-		position: relative;
-		flex-shrink: 0;
-		width: 134px;
-		height: 134px;
-	}
-	.my-position-donut-center {
-		position: absolute;
-		inset: 0;
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		justify-content: center;
-		gap: 2px;
-		text-align: center;
-	}
-	.my-position-donut-label {
-		margin: 0;
-		font-family: var(--font-body);
-		font-weight: 500;
-		font-size: 13px;
-		letter-spacing: -0.4px;
-		color: var(--color-text-muted);
-	}
-	.my-position-donut-value {
-		margin: 0;
-		font-family: var(--font-numeric);
-		font-weight: 600;
-		font-size: 20px;
-		letter-spacing: -0.6px;
-		color: var(--color-text);
 	}
 
 	/* ─── Add Liquidity card ─────────────────────────────────────── */

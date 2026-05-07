@@ -19,12 +19,14 @@
 	import {
 		markets,
 		poolStore,
+		lpStore,
 		formatTvl,
 		formatPrice,
 		formatTokenAmount,
 		formatFee
 	} from '$lib/markets';
-	import type { PoolRow, TokenRow } from '$lib/markets';
+	import type { TokenRow, EnrichedPoolRow } from '$lib/markets';
+	import { wallet } from '$lib/stores/wallet.svelte';
 
 	const EM_DASH = '—';
 
@@ -38,7 +40,7 @@
 	const isVaultToken = $derived(tokenRow?.category === 'protocol');
 
 	/** Pools that touch this token on either side. */
-	const tokenPools = $derived<PoolRow[]>(
+	const tokenPools = $derived<EnrichedPoolRow[]>(
 		tokenRow
 			? markets.pools.filter(
 					(p) => p.tokenAMint.equals(tokenRow.mint) || p.tokenBMint.equals(tokenRow.mint)
@@ -181,7 +183,7 @@
 		pairB: { symbol: string; bg: string; iconLetter?: string };
 		tvl: string;
 		kind: 'Concentrated' | 'Standard';
-		raw: PoolRow;
+		raw: EnrichedPoolRow;
 	};
 
 	function symbolForMint(mint: PublicKey): string {
@@ -289,18 +291,29 @@
 			binStep: EM_DASH,
 			priceLabels: [],
 			userBalance: '0',
-			depth: poolStore.depth
+			depth: poolStore.depth,
+			row: raw,
+			decimalsA: decA,
+			decimalsB: decB
 		};
 	});
 
 	function openPool(lp: LiquidityPool) {
 		openPoolId = lp.id;
 		void poolStore.activate(lp.poolAddress);
+		// Activate the lpStore alongside the pool subscription when a wallet
+		// is connected — drives the LpPositionDerived + Withdraw flows. The
+		// effect below handles wallet-state changes after the modal opens.
+		const pk = wallet.publicKey;
+		if (pk) {
+			void lpStore.activate(lp.poolAddress, pk);
+		}
 	}
 
 	function closePool() {
 		openPoolId = null;
 		poolStore.deactivate();
+		lpStore.deactivate();
 	}
 
 	// Auto-close the pool detail panel on network change. The Modal's
@@ -313,6 +326,20 @@
 		void network.current; // track network changes
 		if (openPoolId !== null) {
 			closePool();
+		}
+	});
+
+	// Re-activate lpStore when the wallet connects/disconnects with the
+	// modal open. Active pool address is preserved in `openPoolId`.
+	$effect(() => {
+		const pk = wallet.publicKey;
+		if (openPoolId === null) return;
+		const lp = liquidityPools.find((p) => p.id === openPoolId);
+		if (!lp) return;
+		if (pk) {
+			void lpStore.activate(lp.poolAddress, pk);
+		} else {
+			lpStore.deactivate();
 		}
 	});
 
