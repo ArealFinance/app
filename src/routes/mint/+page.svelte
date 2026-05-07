@@ -216,9 +216,11 @@
 		modalOpen = false;
 		// Keep `pendingIntent` until the modal animation finishes — the FSM
 		// drops its attempt at the same time, so the modal would render
-		// stale data otherwise. Drop after a short delay.
+		// stale data otherwise. Drop after a short delay, but skip if the
+		// user re-opened the modal in the meantime (avoids briefly flashing
+		// the prior intent).
 		setTimeout(() => {
-			pendingIntent = null;
+			if (!modalOpen) pendingIntent = null;
 		}, 200);
 	}
 

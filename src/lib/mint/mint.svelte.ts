@@ -186,11 +186,10 @@ function fail(key: string, err: unknown, programId: PublicKey) {
 	scheduleCleanup(key);
 }
 
-function failSilent(key: string, message: string, programId: PublicKey) {
+function failSilent(key: string, message: string) {
 	// Pre-sign error path: surface a toast but don't expose a raw thrown
 	// value to `showError` (we built the message ourselves and it's
 	// user-friendly already).
-	void programId;
 	toast.error(message, { title: 'Mint failed' });
 	setPhase(key, { phase: 'error', error: message });
 	scheduleCleanup(key);
@@ -241,15 +240,14 @@ async function runMint(intent: MintIntent): Promise<void> {
 	if (cluster === 'mainnet' && isPlaceholderRwtMint(rwtMint)) {
 		failSilent(
 			key,
-			'Mainnet RWT mint is not yet deployed. Minting is unavailable on mainnet.',
-			programId
+			'Mainnet RWT mint is not yet deployed. Minting is unavailable on mainnet.'
 		);
 		return;
 	}
 
 	const holder = wallet.publicKey;
 	if (!holder) {
-		failSilent(key, 'Wallet not connected.', programId);
+		failSilent(key, 'Wallet not connected.');
 		return;
 	}
 
@@ -263,7 +261,7 @@ async function runMint(intent: MintIntent): Promise<void> {
 		// and another mint can land between click and signature.
 		const vaultInfo = await connection.getAccountInfo(vaultPda);
 		if (!vaultInfo) {
-			failSilent(key, 'RWT vault is not deployed on this network.', programId);
+			failSilent(key, 'RWT vault is not deployed on this network.');
 			return;
 		}
 
@@ -271,14 +269,14 @@ async function runMint(intent: MintIntent): Promise<void> {
 		try {
 			freshVault = parseRwtVault(vaultInfo.data);
 		} catch {
-			failSilent(key, 'RWT vault account is malformed.', programId);
+			failSilent(key, 'RWT vault account is malformed.');
 			return;
 		}
 
 		// Paused-flip guard: refuse to sign a tx that the contract would
 		// revert with `MintPaused`.
 		if (freshVault.mintPaused) {
-			failSilent(key, 'Minting is currently paused.', programId);
+			failSilent(key, 'Minting is currently paused.');
 			return;
 		}
 
@@ -292,8 +290,7 @@ async function runMint(intent: MintIntent): Promise<void> {
 		if (!freshQuote.ok) {
 			failSilent(
 				key,
-				`Cannot price mint: ${freshQuote.error}.`,
-				programId
+				`Cannot price mint: ${freshQuote.error}.`
 			);
 			return;
 		}
@@ -303,8 +300,7 @@ async function runMint(intent: MintIntent): Promise<void> {
 		if (freshQuote.quote.rwtOut < intent.minRwtOut) {
 			failSilent(
 				key,
-				'NAV moved. Try increasing slippage tolerance or refresh the quote.',
-				programId
+				'NAV moved. Try increasing slippage tolerance or refresh the quote.'
 			);
 			return;
 		}
