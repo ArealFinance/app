@@ -16,7 +16,11 @@
  * this file in Phase 4. Phase 6+ will wire them to the backend; until then
  * we don't lie to the user with stale fixture data.
  */
-import type { PublicKey } from '@solana/web3.js';
+import type {
+	PublicKey,
+	Transaction as SolanaTransaction,
+	VersionedTransaction
+} from '@solana/web3.js';
 
 import {
 	connectPhantom,
@@ -135,6 +139,41 @@ function loadMore(): void {
 	// no-op until the backend transaction history endpoint is wired
 }
 
+/**
+ * Sign and send a transaction via the active wallet provider.
+ *
+ * The active provider's `signAndSendTransaction` does the work — we only
+ * dispatch by the currently connected provider. Both Phantom and Solflare
+ * expose the same `{ signature: string }` shape, so the call site doesn't
+ * need to branch.
+ *
+ * Throws:
+ *   - `Wallet not connected` when there is no provider / no public key
+ *     (status check is intentional — we won't dispatch into a stale
+ *     `provider === null` setting from a half-finished disconnect).
+ *   - Whatever the underlying provider throws (user rejection, RPC errors).
+ *     User rejection messages are passed through unchanged so callers /
+ *     `mapError` can detect "User rejected" cleanly.
+ */
+async function signAndSendTransaction(
+	tx: SolanaTransaction | VersionedTransaction
+): Promise<{ signature: string }> {
+	if (status !== 'connected' || !publicKey || !provider) {
+		throw new Error('Wallet not connected');
+	}
+
+	if (provider === 'phantom') {
+		const p = getPhantomProvider();
+		if (!p) throw new Error('Wallet not connected');
+		return p.signAndSendTransaction(tx);
+	}
+
+	// provider === 'solflare'
+	const p = getSolflareProvider();
+	if (!p) throw new Error('Wallet not connected');
+	return p.signAndSendTransaction(tx);
+}
+
 export const wallet = {
 	get status() {
 		return status;
@@ -164,5 +203,6 @@ export const wallet = {
 	connect,
 	disconnect,
 	copyAddress,
-	loadMore
+	loadMore,
+	signAndSendTransaction
 };
