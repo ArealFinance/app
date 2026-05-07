@@ -284,11 +284,11 @@
 		background-color: var(--color-surface-inset);
 	}
 	.status-icon-success {
-		background-color: rgba(115, 255, 131, 0.15);
+		background-color: var(--color-success-bg-strong);
 		color: var(--color-success);
 	}
 	.status-icon-error {
-		background-color: rgba(216, 67, 71, 0.15);
+		background-color: var(--color-danger-bg-strong);
 		color: var(--color-danger);
 	}
 	.status-icon-neutral {
