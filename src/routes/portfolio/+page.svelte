@@ -141,11 +141,10 @@
 	}
 	function closeClaimModal() {
 		modalOpen = false;
-		// Defer clearing modalRow — the closing animation needs it briefly.
-		// Setting it null on next tick prevents a flash of "no row" copy.
-		setTimeout(() => {
-			modalRow = null;
-		}, 200);
+		// Modal primitive uses {#if open} (no Svelte transition / exit animation),
+		// so the dialog DOM unmounts in the same microtask — clearing modalRow
+		// immediately is safe and removes a dead-code 200ms setTimeout.
+		modalRow = null;
 	}
 	function confirmClaim() {
 		if (!modalRow) return;
