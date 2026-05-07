@@ -141,11 +141,10 @@
 	}
 	function closeClaimModal() {
 		modalOpen = false;
-		// Defer clearing modalRow — the closing animation needs it briefly.
-		// Setting it null on next tick prevents a flash of "no row" copy.
-		setTimeout(() => {
-			modalRow = null;
-		}, 200);
+		// Modal primitive uses {#if open} (no Svelte transition / exit animation),
+		// so the dialog DOM unmounts in the same microtask — clearing modalRow
+		// immediately is safe and removes a dead-code 200ms setTimeout.
+		modalRow = null;
 	}
 	function confirmClaim() {
 		if (!modalRow) return;
@@ -868,7 +867,7 @@
 		gap: var(--space-2);
 		align-self: flex-start;
 		padding: 2px 8px;
-		background-color: rgba(115, 255, 131, 0.15);
+		background-color: var(--color-success-bg-strong);
 		border-radius: 8px;
 		font-family: var(--font-body);
 		font-size: var(--text-base);
@@ -898,7 +897,7 @@
 		transition: background-color var(--motion-base) var(--ease-out);
 	}
 	.claim-btn:hover:not(:disabled) {
-		background-color: rgba(115, 255, 131, 0.08);
+		background-color: var(--color-success-bg-soft);
 	}
 	.claim-btn:disabled {
 		cursor: not-allowed;
@@ -920,7 +919,7 @@
 		color: var(--color-danger);
 	}
 	.claim-btn-success {
-		background-color: rgba(115, 255, 131, 0.12);
+		background-color: var(--color-success-bg-medium);
 	}
 
 	/* Inline button spinner — shared by aggregate CTA and per-row buttons. */
@@ -1292,7 +1291,7 @@
 		transition: background-color var(--motion-base) var(--ease-out);
 	}
 	.row-claim-btn:hover:not(:disabled) {
-		background-color: rgba(115, 255, 131, 0.1);
+		background-color: var(--color-success-bg-faint);
 	}
 	.row-claim-btn:disabled {
 		cursor: not-allowed;
@@ -1303,7 +1302,7 @@
 		color: var(--color-danger);
 	}
 	.row-claim-btn-success {
-		background-color: rgba(115, 255, 131, 0.12);
+		background-color: var(--color-success-bg-medium);
 	}
 	.token-logo {
 		display: inline-flex;
@@ -1344,7 +1343,7 @@
 		letter-spacing: var(--tracking-tight);
 	}
 	.apy-pill-success {
-		background-color: rgba(115, 255, 131, 0.15);
+		background-color: var(--color-success-bg-strong);
 		color: var(--color-green-900);
 	}
 	.apy-pill-danger {

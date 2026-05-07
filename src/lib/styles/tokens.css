@@ -177,6 +177,14 @@
 	--color-danger-tint: rgba(216, 67, 71, 0.16);
 	--color-info-tint: rgba(158, 96, 246, 0.16);
 
+	/* Soft success/danger background fills — used by hover states, success pills,
+	 * status icon backplates. Stepped alpha scale: soft (hover) → strong (pill bg). */
+	--color-success-bg-soft: rgba(115, 255, 131, 0.08);
+	--color-success-bg-faint: rgba(115, 255, 131, 0.1);
+	--color-success-bg-medium: rgba(115, 255, 131, 0.12);
+	--color-success-bg-strong: rgba(115, 255, 131, 0.15);
+	--color-danger-bg-strong: rgba(216, 67, 71, 0.15);
+
 	/* Chart-specific (PriceChart axis labels, on-success badge text). */
 	--color-chart-axis: rgba(131, 164, 148, 0.4); /* X-axis date labels — muted green-gray */
 	--color-chart-line: var(--color-green-900); /* Area chart line + glow */
