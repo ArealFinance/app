@@ -62,6 +62,15 @@
 	// replace the constant with a runtime mint-metadata read.
 	const unclaimedDisplay = $derived(formatTokenAmount(unclaimedRwt, RWT_DECIMALS, RWT_DECIMALS));
 
+	// "Updated HH:MM:SS" — surfaced when the snapshot has a fetchedAt epoch.
+	// `toLocaleTimeString()` defaults to the user's locale; no explicit format
+	// to match because no other timestamp exists in the app yet.
+	const lastUpdatedDisplay = $derived(
+		portfolio.snapshot?.fetchedAt
+			? new Date(portfolio.snapshot.fetchedAt).toLocaleTimeString()
+			: ''
+	);
+
 	// TODO Phase 7 — LP positions come from native-dex/yield positions module.
 	const positions: LpPosition[] = [
 		{ id: 'lp-1', pair: ['USDt', 'RWT'], apy: '3.8% APY', apyTone: 'success', selected: true },
@@ -253,10 +262,15 @@
 									<span class="count-badge count-badge-purple">{tokens.length}</span>
 								{/if}
 							</div>
-							{#if isConnected && portfolio.isReady && tokens.length > 0}
-								<!-- TODO Phase 7 — section total comes from price feed. -->
-								<span class="section-total">~ —</span>
-							{/if}
+							<div class="section-head-right">
+								{#if isConnected && portfolio.isReady && lastUpdatedDisplay}
+									<span class="last-updated">Updated {lastUpdatedDisplay}</span>
+								{/if}
+								{#if isConnected && portfolio.isReady && tokens.length > 0}
+									<!-- TODO Phase 7 — section total comes from price feed. -->
+									<span class="section-total">~ —</span>
+								{/if}
+							</div>
 						</header>
 						<div
 							class="section-body"
@@ -928,6 +942,18 @@
 		font-weight: var(--font-weight-medium);
 		letter-spacing: var(--tracking-tight);
 		color: #7e7190;
+	}
+	.section-head-right {
+		display: inline-flex;
+		align-items: baseline;
+		gap: var(--space-3);
+	}
+	.last-updated {
+		font-family: var(--font-body);
+		font-size: var(--text-xs);
+		font-weight: var(--font-weight-medium);
+		letter-spacing: var(--tracking-tight);
+		color: var(--color-text-muted);
 	}
 
 	.section-body {
