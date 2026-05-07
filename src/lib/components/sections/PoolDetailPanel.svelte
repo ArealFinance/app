@@ -1,5 +1,6 @@
 <script lang="ts" module>
-	import type { DepthResult, PoolRow } from '@areal/sdk/markets';
+	import type { DepthResult } from '@areal/sdk/markets';
+	import type { EnrichedPoolRow } from '$lib/markets';
 
 	export type PoolToken = {
 		symbol: string;
@@ -37,7 +38,7 @@
 		 * read-only behaviour and the CTAs render "Connect Wallet" without
 		 * wiring the FSM. The markets page sets this for every real pool.
 		 */
-		row?: PoolRow & { isMaster: boolean };
+		row?: EnrichedPoolRow;
 		decimalsA?: number;
 		decimalsB?: number;
 	};

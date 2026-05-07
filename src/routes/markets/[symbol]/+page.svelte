@@ -20,6 +20,7 @@
 		markets,
 		poolStore,
 		lpStore,
+		lpForm,
 		formatTvl,
 		formatPrice,
 		formatTokenAmount,
@@ -218,6 +219,21 @@
 	);
 
 	let openPoolId = $state<string | null>(null);
+
+	/**
+	 * Tracks whether the LP form FSM is mid-flight for the currently open
+	 * pool (awaiting signature, broadcasting, or confirming). Used to gate
+	 * backdrop click + Escape on the pool detail Modal so a stray dismiss
+	 * during signing doesn't visually orphan the user from the in-progress
+	 * transaction. The FSM itself remains correct on close — this guards UX
+	 * continuity, not state.
+	 */
+	const isLpInFlight = $derived.by((): boolean => {
+		if (!openPoolId) return false;
+		const lp = liquidityPools.find((p) => p.id === openPoolId);
+		if (!lp) return false;
+		return lpForm.isInFlight(lp.poolAddress);
+	});
 
 	const openedPool = $derived.by((): PoolInfo | null => {
 		if (!openPoolId) return null;
@@ -712,7 +728,12 @@
 		{/if}
 	</div>
 
-	<Modal open={openedPool !== null} onclose={closePool} aria-labelledby="pool-modal-title">
+	<Modal
+		open={openedPool !== null}
+		onclose={isLpInFlight ? () => {} : closePool}
+		closeOnBackdrop={!isLpInFlight}
+		aria-labelledby="pool-modal-title"
+	>
 		{#if openedPool}
 			<PoolDetailPanel pool={openedPool} onclose={closePool} />
 		{/if}
