@@ -8,11 +8,13 @@ import { Connection } from '@solana/web3.js';
  *
  * - `commitment: 'confirmed'` — matches the SDK & dashboard convention. We
  *   don't need finalized for UX-side reads; finalized adds ~12s round trips.
- * - `wsEndpoint: false as unknown as string` — disable the websocket entirely.
+ * - `wsEndpoint: false` — disable the websocket subscription pump entirely.
  *   No idle WS connection means no surprise reconnects, less console noise,
- *   and survives corporate proxies that block ws upgrades. The cast is a
- *   known web3.js typing hole — `wsEndpoint` is typed as `string`, but the
- *   runtime accepts `false`.
+ *   and survives corporate proxies that block ws upgrades. See the
+ *   `@ts-expect-error` below: web3.js types `wsEndpoint` as `string`, but the
+ *   constructor's runtime contract accepts `false` to skip ws setup. Saves
+ *   one idle ws connection per Connection instance (we create many).
+ *   Re-evaluate at every `@solana/web3.js` upgrade — F-A16 in plan/follow-ups.md.
  * - `confirmTransactionInitialTimeout: 120_000` — give txs up to 2 minutes
  *   before bailing. Solana's default 60s is occasionally too tight under
  *   congestion (and harmless when traffic is light).
@@ -20,7 +22,10 @@ import { Connection } from '@solana/web3.js';
 export function createConnection(rpcUrl: string): Connection {
 	return new Connection(rpcUrl, {
 		commitment: 'confirmed',
-		wsEndpoint: false as unknown as string,
+		// @ts-expect-error — web3.js types `wsEndpoint` as `string|undefined`,
+		// but passing `false` is the documented runtime escape hatch to skip
+		// websocket subscription setup entirely. See block comment above.
+		wsEndpoint: false,
 		confirmTransactionInitialTimeout: 120_000
 	});
 }

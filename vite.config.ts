@@ -12,7 +12,15 @@ export default defineConfig({
 			// so an automatic injector is redundant. Vite 8 / Rolldown can't
 			// resolve the inject's `vite-plugin-node-polyfills/shims/buffer` path
 			// from inside transitively-installed deps' node_modules subtrees.
-			globals: { Buffer: false, global: true, process: true },
+			// `process: false` — W4 audit (2026-05-07): no app code under src/
+			// references `process`, and @solana/web3.js's browser ESM bundle has
+			// zero `process.` occurrences (only the Node-targeted ESM uses
+			// `process.version` for an http-agent shim, which never runs in the
+			// browser). Keeping the `process` shim importable via `include` for
+			// any module that does `import process from 'process'` explicitly,
+			// but skipping the global injector saves bundle weight and avoids
+			// surprise globals. Re-audit if a new dep starts touching globals.
+			globals: { Buffer: false, global: true, process: false },
 			overrides: { fs: 'empty' }
 		})
 	],
