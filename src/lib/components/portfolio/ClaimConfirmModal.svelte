@@ -240,7 +240,7 @@
 		border: 1px solid var(--color-border);
 	}
 	.btn-ghost:hover {
-		background-color: rgba(255, 255, 255, 0.04);
+		background-color: var(--color-hover-tint);
 	}
 	.btn-primary {
 		background-color: var(--color-primary);

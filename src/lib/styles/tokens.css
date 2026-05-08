@@ -157,6 +157,7 @@
 	/* Component-specific aliases */
 	--radius-button: var(--radius-lg);
 	--radius-card: var(--radius-xl);
+	--radius-token-logo: 9px; /* token/asset logo squircle (between xs=4 and md=12) */
 
 	/* ============================================================
 	 * Effects (Figma uses minimal shadows — mostly glows on accents)
@@ -176,6 +177,9 @@
 	--color-warning-tint: rgba(255, 140, 0, 0.14);
 	--color-danger-tint: rgba(216, 67, 71, 0.16);
 	--color-info-tint: rgba(158, 96, 246, 0.16);
+
+	/* Subtle hover overlay for ghost-style buttons over dark surfaces. */
+	--color-hover-tint: rgba(255, 255, 255, 0.04);
 
 	/* Soft success/danger background fills — used by hover states, success pills,
 	 * status icon backplates. Stepped alpha scale: soft (hover) → strong (pill bg). */

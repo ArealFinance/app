@@ -87,6 +87,7 @@ let kind: HistoryKind | null = $state(null);
 let activeHolder: string | null = null;
 let activeFilterToken: number = 0;
 let pendingLoadMore: Promise<void> | null = null;
+let pendingRefresh: Promise<void> | null = null;
 let stopEffect: (() => void) | null = null;
 let refCount: number = 0;
 
@@ -248,13 +249,21 @@ async function doLoadMore(): Promise<void> {
 }
 
 /**
- * Refresh — drops current page and refetches from cursor=null. Idempotent
- * single-flight via the same `pendingLoadMore` slot is intentionally NOT
- * used here: refresh ALWAYS triggers a new fetch (the user clicked Retry,
- * or the effect re-fired on context change).
+ * Refresh — drops current page and refetches from cursor=null.
+ *
+ * Single-flight via `pendingRefresh`: a second concurrent call (e.g. the
+ * user clicks Retry twice quickly, or the wallet effect fires while a
+ * Retry is still in flight) returns the in-flight promise instead of
+ * spawning a parallel first-page fetch. Without this, the second fetch
+ * would briefly clear `items` to `[]` and flash the empty state between
+ * the two responses. Mirrors the `pendingLoadMore` idiom below.
  */
 function refresh(): Promise<void> {
-	return doFetchFirstPage();
+	if (pendingRefresh) return pendingRefresh;
+	pendingRefresh = doFetchFirstPage().finally(() => {
+		pendingRefresh = null;
+	});
+	return pendingRefresh;
 }
 
 function loadMore(): Promise<void> {
@@ -269,6 +278,13 @@ function loadMore(): Promise<void> {
 function setKind(next: HistoryKind | null): void {
 	if (next === kind) return;
 	kind = next;
+	// Drop any in-flight refresh slot before kicking a new one. Without
+	// this, a filter change while the previous first-page fetch is still
+	// pending would be deduped into the stale promise — and the new
+	// kind's results would never be requested. The stale fetch's late
+	// response is discarded by the (holder, filterToken) guard inside
+	// doFetchFirstPage().
+	pendingRefresh = null;
 	// Filter change resets the entire list. The effect intentionally does
 	// NOT track `kind` (reads are wrapped in `untrack`), so this explicit
 	// `void refresh()` is the sole driver of post-setKind refetches —
@@ -293,11 +309,20 @@ function effectBody() {
 		activeHolder = null;
 		// New token invalidates any in-flight loadMore that resolves later.
 		activeFilterToken++;
+		// Disconnect must not dedup into a refresh from before the
+		// disconnect — the next reconnect would otherwise inherit the
+		// stale promise. The orphan's late response is dropped by the
+		// (holder, filterToken) guard.
+		pendingRefresh = null;
 		status = 'idle';
 		resetReactiveState();
 		return;
 	}
 
+	// Context (wallet/network) changed — drop any stale in-flight refresh
+	// slot so the new context spawns its own fetch instead of being
+	// deduped into the previous holder's pending promise.
+	pendingRefresh = null;
 	void refresh();
 }
 
@@ -311,6 +336,16 @@ function start(): void {
 	});
 }
 
+/**
+ * Tear down the store on full unmount.
+ *
+ * Kind-filter survival policy: the `kind` filter is a UI preference, NOT
+ * persisted data. It survives wallet disconnect, network switch, and any
+ * effect re-runs — only a full unmount via `stop()` (refCount → 0) clears
+ * it back to "All". This way a stale filter never silently persists into
+ * a different page or session, but quick wallet swaps don't lose the
+ * user's chosen tab.
+ */
 function stop(): void {
 	if (refCount > 0) refCount--;
 	if (refCount > 0) return;
@@ -322,6 +357,7 @@ function stop(): void {
 	// Bump the token so any late response from before stop() is discarded.
 	activeFilterToken++;
 	pendingLoadMore = null;
+	pendingRefresh = null;
 	status = 'idle';
 	// Reset the kind filter — start() should always begin from "All". This
 	// also matters in tests where the singleton persists across cases:

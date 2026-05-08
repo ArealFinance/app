@@ -122,19 +122,17 @@ describe('history store', () => {
 		mocks.getTransactions.mockReset();
 		const mod = await import('./history.svelte');
 		store = mod.historyStore;
-		// Force-stop any residual ref-count from a previous test by calling
-		// stop() defensively until the effect tears down. The store keeps
-		// internal refCount, so we drain here.
-		while (store.status !== 'idle' || store.items.length > 0) {
-			store.stop();
-			// Defensive: prevent infinite loop if stop() doesn't reset state.
-			break;
-		}
+		// Drain any residual refCount from a previous test. `stop()` is
+		// refCount-safe — once refCount hits 0 further calls are a no-op,
+		// so two stops cover the common (start once) and edge (start twice)
+		// cases without a defensive loop.
+		store.stop();
 		store.stop();
 	});
 
 	afterEach(() => {
 		store?.stop();
+		store?.stop(); // refCount safety: a second stop is a no-op (refCount won't go negative).
 	});
 
 	it('start with connected wallet → loads first page', async () => {

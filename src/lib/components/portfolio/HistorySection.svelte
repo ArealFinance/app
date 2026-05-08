@@ -92,11 +92,18 @@
 		void store.loadMore();
 	}
 
-	// `now` is captured once per render so all relativeTime calls inside one
-	// render use the same anchor — avoids a frame where row #1 says "5m ago"
-	// and row #2 (rendered 2ms later) says "5m 1s ago". Re-renders refresh
-	// it naturally.
-	const now = $derived(Date.now());
+	// `now` is the shared anchor for all relativeTime calls inside one render
+	// (avoids a frame where row #1 says "5m ago" and row #2, rendered 2ms
+	// later, says "5m 1s ago"). It also ticks every 30s so labels like
+	// "5m ago" auto-refresh while the user is on the page; the interval is
+	// cleaned up automatically when the component unmounts.
+	let now = $state(Date.now());
+	$effect(() => {
+		const id = setInterval(() => {
+			now = Date.now();
+		}, 30_000);
+		return () => clearInterval(id);
+	});
 
 	function renderRow(row: TransactionRow) {
 		return {
@@ -229,7 +236,7 @@
 	}
 
 	.history-head {
-		padding: 20px 20px 12px;
+		padding: var(--space-5) var(--space-5) var(--space-3);
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
@@ -263,7 +270,7 @@
 		display: flex;
 		flex-wrap: wrap;
 		gap: var(--space-2);
-		padding: 0 20px 12px;
+		padding: 0 var(--space-5) var(--space-3);
 	}
 	.filter-btn {
 		display: inline-flex;
@@ -286,7 +293,7 @@
 			color var(--motion-base) var(--ease-out);
 	}
 	.filter-btn:hover {
-		background-color: rgba(255, 255, 255, 0.04);
+		background-color: var(--color-hover-tint);
 		color: var(--color-text);
 	}
 	.filter-btn-active {
@@ -351,7 +358,7 @@
 		transition: background-color var(--motion-base) var(--ease-out);
 	}
 	.retry-btn:hover {
-		background-color: rgba(255, 255, 255, 0.04);
+		background-color: var(--color-hover-tint);
 	}
 
 	/* ------------ Rows ------------ */
@@ -379,7 +386,7 @@
 		width: 32px;
 		height: 32px;
 		background-color: var(--color-surface-inset);
-		border-radius: 9px;
+		border-radius: var(--radius-token-logo);
 		color: var(--color-text);
 	}
 	.row-text {
@@ -464,7 +471,7 @@
 	.row-skeleton .row-icon {
 		width: 32px;
 		height: 32px;
-		border-radius: 9px;
+		border-radius: var(--radius-token-logo);
 	}
 	.row-skeleton .row-meta {
 		width: 60px;
@@ -504,7 +511,7 @@
 		transition: background-color var(--motion-base) var(--ease-out);
 	}
 	.load-more-btn:hover:not(:disabled) {
-		background-color: rgba(255, 255, 255, 0.04);
+		background-color: var(--color-hover-tint);
 	}
 	.load-more-btn:disabled {
 		cursor: not-allowed;
