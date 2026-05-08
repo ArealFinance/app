@@ -38,10 +38,10 @@
 		align-items: flex-start;
 		gap: 10px;
 		padding: 12px 16px;
-		background-color: rgba(110, 151, 255, 0.08);
-		border: 1px solid rgba(110, 151, 255, 0.3);
+		background-color: var(--color-accent-info-bg-soft);
+		border: 1px solid var(--color-accent-info-border);
 		border-radius: 16px;
-		color: #6e97ff;
+		color: var(--color-accent-info);
 	}
 	.master-icon {
 		flex-shrink: 0;
@@ -59,7 +59,7 @@
 		font-weight: 700;
 		font-size: 13px;
 		letter-spacing: -0.4px;
-		color: #6e97ff;
+		color: var(--color-accent-info);
 	}
 	.master-text {
 		margin: 0;

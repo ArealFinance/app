@@ -219,6 +219,50 @@ describe('quote store', () => {
 		expect(mocks.connectionB.removeAccountChangeListener).not.toHaveBeenCalled();
 	});
 
+	it('does not recompute quote during pool switch transition window (FQ-3 explicit assertion)', async () => {
+		// Activate pool A and capture the WS listener registered against
+		// connectionA. The store wires the listener with a closure over the
+		// poolKey; once we switch to pool B the closure becomes stale.
+		await quote.activatePool(makeEntry(POOL_PDA_A));
+		await settle();
+		const stalePoolListener = mocks.connectionA.onAccountChange.mock.calls[0][1];
+
+		// Set an input so the quote pipeline is "warm" — without an input,
+		// recomputeQuote bails out early anyway and the assertion would be
+		// vacuous.
+		quote.setInput(500n, USDC_MINT, RWT_MINT);
+		await vi.advanceTimersByTimeAsync(200);
+
+		// Switch to a different pool. Mid-flight (between activatePool returning
+		// and any new account info loading), the OLD subscription is the only
+		// path that could mutate quote state — and the stale-cycle guard inside
+		// the listener must drop the late notification.
+		const switchPromise = quote.activatePool(makeEntry(POOL_PDA_B));
+
+		// Spy on quoteSwap from this point. Anything called during the
+		// transition window is a regression — the new pool isn't loaded yet,
+		// and the old listener fires against state that no longer matches the
+		// active poolKey.
+		mocks.quoteSwap.mockClear();
+
+		// Simulate a late WS push from the OLD connection (e.g., a pool reserve
+		// update queued before our teardown completed). The stale-cycle guard
+		// should observe `activePoolKey !== POOL_PDA_A.toBase58()` and bail
+		// before calling parsePoolState/quoteSwap.
+		const LATE_DATA = { data: new Uint8Array([42]), executable: false, lamports: 0, owner: USDC_MINT };
+		stalePoolListener(LATE_DATA);
+
+		// Explicit invariant: zero recomputes triggered by the stale listener.
+		expect(mocks.quoteSwap).not.toHaveBeenCalled();
+		// And parsePoolState was not even invoked — the guard runs BEFORE the
+		// parse, so a malformed late update can't crash us either.
+		expect(mocks.parsePoolState).not.toHaveBeenCalledWith(LATE_DATA.data);
+
+		// Drain the switch so afterEach teardown is clean.
+		await switchPromise;
+		await settle();
+	});
+
 	it('FQ-4 slippage change does NOT recompute the quote', async () => {
 		await quote.activatePool(makeEntry(POOL_PDA_A));
 		await settle();

@@ -1,12 +1,17 @@
 <script lang="ts" module>
-	export type MarketsLoadingShimmerVariant = 'card' | 'row';
+	export type MarketsLoadingShimmerVariant = 'card' | 'row' | 'detail';
 </script>
 
 <script lang="ts">
 	type Props = {
 		/**
-		 * `card` — matches `TokenStatCard` shape (avatar disk + 2 text lines).
-		 * `row`  — matches a list-row shape (logos + text + spacer + pill).
+		 * `card`   — matches `TokenStatCard` shape (avatar disk + 2 text lines).
+		 * `row`    — matches a list-row shape (logos + text + spacer + pill).
+		 * `detail` — matches `routes/markets/[symbol]/+page.svelte` skeleton:
+		 *            token header (logo + symbol + price), KPI strip, large
+		 *            chart placeholder. Used while the markets snapshot is
+		 *            still resolving and we don't yet know if the token
+		 *            exists on this network.
 		 */
 		variant?: MarketsLoadingShimmerVariant;
 	};
@@ -29,12 +34,51 @@
 			<span class="shimmer-block shimmer-line shimmer-line-pill"></span>
 		</div>
 	</article>
-{:else}
+{:else if variant === 'row'}
 	<div class="shimmer-row" aria-hidden="true" aria-label="Loading">
 		<span class="shimmer-block shimmer-row-logo"></span>
 		<span class="shimmer-block shimmer-row-text"></span>
 		<span class="shimmer-row-spacer"></span>
 		<span class="shimmer-block shimmer-row-pill"></span>
+	</div>
+{:else}
+	<!-- Detail layout: header (logo + symbol/sub-line + price column),
+	     KPI strip (4 metrics), chart placeholder.
+	     Mirrors the loaded structure of routes/markets/[symbol]/+page.svelte
+	     so the layout doesn't shift on hydration. -->
+	<div class="shimmer-detail" aria-hidden="true" aria-label="Loading">
+		<header class="shimmer-detail-head">
+			<span class="shimmer-block shimmer-detail-logo"></span>
+			<div class="shimmer-detail-title">
+				<span class="shimmer-block shimmer-line shimmer-detail-symbol"></span>
+				<span class="shimmer-block shimmer-line shimmer-detail-meta"></span>
+			</div>
+			<div class="shimmer-detail-price">
+				<span class="shimmer-block shimmer-line shimmer-detail-price-value"></span>
+				<span class="shimmer-block shimmer-line shimmer-detail-price-delta"></span>
+			</div>
+		</header>
+
+		<div class="shimmer-detail-kpis">
+			<div class="shimmer-detail-kpi">
+				<span class="shimmer-block shimmer-line shimmer-detail-kpi-label"></span>
+				<span class="shimmer-block shimmer-line shimmer-detail-kpi-value"></span>
+			</div>
+			<div class="shimmer-detail-kpi">
+				<span class="shimmer-block shimmer-line shimmer-detail-kpi-label"></span>
+				<span class="shimmer-block shimmer-line shimmer-detail-kpi-value"></span>
+			</div>
+			<div class="shimmer-detail-kpi">
+				<span class="shimmer-block shimmer-line shimmer-detail-kpi-label"></span>
+				<span class="shimmer-block shimmer-line shimmer-detail-kpi-value"></span>
+			</div>
+			<div class="shimmer-detail-kpi">
+				<span class="shimmer-block shimmer-line shimmer-detail-kpi-label"></span>
+				<span class="shimmer-block shimmer-line shimmer-detail-kpi-value"></span>
+			</div>
+		</div>
+
+		<div class="shimmer-block shimmer-detail-chart"></div>
 	</div>
 {/if}
 
@@ -166,5 +210,90 @@
 		width: 80px;
 		height: 32px;
 		border-radius: 12px;
+	}
+
+	/* ─── Detail variant — mirrors `routes/markets/[symbol]/+page.svelte`
+	 *      header + KPI strip + chart skeleton. ─── */
+	.shimmer-detail {
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-6);
+		padding: var(--space-6);
+		background-color: var(--color-surface);
+		border-radius: var(--radius-lg);
+	}
+	.shimmer-detail-head {
+		display: grid;
+		grid-template-columns: auto 1fr auto;
+		align-items: center;
+		gap: var(--space-4);
+	}
+	.shimmer-detail-logo {
+		width: 56px;
+		height: 56px;
+		border-radius: var(--radius-md);
+	}
+	.shimmer-detail-title {
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+		min-width: 0;
+	}
+	.shimmer-detail-symbol {
+		width: 60%;
+		max-width: 220px;
+		height: 24px;
+	}
+	.shimmer-detail-meta {
+		width: 40%;
+		max-width: 160px;
+		height: 14px;
+	}
+	.shimmer-detail-price {
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+		align-items: flex-end;
+	}
+	.shimmer-detail-price-value {
+		width: 120px;
+		height: 24px;
+	}
+	.shimmer-detail-price-delta {
+		width: 70px;
+		height: 14px;
+	}
+
+	.shimmer-detail-kpis {
+		display: grid;
+		grid-template-columns: repeat(2, 1fr);
+		gap: var(--space-3);
+	}
+	@media (min-width: 768px) {
+		.shimmer-detail-kpis {
+			grid-template-columns: repeat(4, 1fr);
+		}
+	}
+	.shimmer-detail-kpi {
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+		padding: var(--space-3);
+		background-color: var(--color-surface-inset);
+		border-radius: var(--radius-md);
+	}
+	.shimmer-detail-kpi-label {
+		width: 50%;
+		height: 12px;
+	}
+	.shimmer-detail-kpi-value {
+		width: 80%;
+		height: 20px;
+	}
+
+	.shimmer-detail-chart {
+		width: 100%;
+		height: 240px;
+		border-radius: var(--radius-md);
 	}
 </style>

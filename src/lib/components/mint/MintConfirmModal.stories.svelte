@@ -13,6 +13,7 @@
 		minRwtOut: 99_500_000n, // 99.5 RWT (0.5% slip)
 		expectedRwt: 99_750_000n, // 99.75 RWT
 		navAtQuote: 1_002_500n, // $1.0025 NAV
+		navAfter: 1_002_650n, // $1.002650 NAV — vault-fee accrual nudge (+1.5 bps)
 		fees: {
 			feeTotal: 250_000n,
 			feeDao: 100_000n,

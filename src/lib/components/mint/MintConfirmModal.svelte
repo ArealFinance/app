@@ -90,6 +90,33 @@
 	const navDisplay = $derived(
 		intent ? formatTokenAmount(intent.navAtQuote, USDC_DECIMALS, 4) : '0'
 	);
+	// NAV impact: post-mint NAV (rendered with the same formatter) plus the
+	// bps delta vs `navAtQuote`. Vault-fee accrual typically nudges this up
+	// a fraction of a bp; we render the sign explicitly so a no-op shows
+	// "+0.00 bps" rather than ambiguity.
+	const navAfterDisplay = $derived(
+		intent ? formatTokenAmount(intent.navAfter, USDC_DECIMALS, 4) : '0'
+	);
+	const navDeltaBps = $derived.by((): number | null => {
+		if (!intent) return null;
+		if (intent.navAtQuote === 0n) return null;
+		// Compute in bigint at higher precision (8 decimals → 4 decimals of bps),
+		// then collapse to a Number for display. Safe: bps deltas on a NAV mint
+		// never exceed a few hundred, well within Number range.
+		const SCALE = 10_000n;
+		const numerator = (intent.navAfter - intent.navAtQuote) * SCALE * 100n;
+		const bpsTimes100 = numerator / intent.navAtQuote;
+		return Number(bpsTimes100) / 100;
+	});
+	const navDeltaTone = $derived.by((): 'pos' | 'neg' | 'flat' => {
+		if (navDeltaBps === null || navDeltaBps === 0) return 'flat';
+		return navDeltaBps > 0 ? 'pos' : 'neg';
+	});
+	const navDeltaDisplay = $derived.by((): string => {
+		if (navDeltaBps === null) return '';
+		const sign = navDeltaBps > 0 ? '+' : navDeltaBps < 0 ? '−' : '±';
+		return `${sign}${Math.abs(navDeltaBps).toFixed(2)} bps`;
+	});
 
 	// Fee breakdown — vault and DAO fees are both expressed in net-deposit
 	// USDC lamports (6 decimals).
@@ -135,6 +162,13 @@
 					<div class="quote-row">
 						<dt>NAV at quote</dt>
 						<dd>${navDisplay} <span class="muted">(1 RWT)</span></dd>
+					</div>
+					<div class="quote-row">
+						<dt>NAV after mint</dt>
+						<dd>
+							${navAfterDisplay}
+							<span class="nav-delta nav-delta-{navDeltaTone}">{navDeltaDisplay}</span>
+						</dd>
 					</div>
 					<div class="quote-row">
 						<dt>Minimum received</dt>
@@ -290,6 +324,22 @@
 		color: var(--color-text-muted);
 		font-weight: var(--font-weight-medium);
 	}
+	.nav-delta {
+		display: inline-block;
+		margin-left: var(--space-2);
+		font-family: var(--font-mono);
+		font-size: var(--text-xs);
+		font-weight: var(--font-weight-medium);
+	}
+	.nav-delta-pos {
+		color: var(--color-success);
+	}
+	.nav-delta-neg {
+		color: var(--color-danger);
+	}
+	.nav-delta-flat {
+		color: var(--color-text-muted);
+	}
 
 	.modal-actions {
 		display: flex;
@@ -324,7 +374,7 @@
 		border: 1px solid var(--color-border);
 	}
 	.btn-ghost:hover {
-		background-color: rgba(255, 255, 255, 0.04);
+		background-color: var(--color-hover-tint);
 	}
 	.btn-primary {
 		background-color: var(--color-primary);

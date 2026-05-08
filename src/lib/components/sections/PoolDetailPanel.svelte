@@ -45,16 +45,17 @@
 </script>
 
 <script lang="ts">
-	import { Bolt, Plus, Minus } from '$lib/icons';
+	import { Bolt, Plus, Minus, Gear } from '$lib/icons';
 	import { wallet } from '$lib/stores/wallet.svelte';
 	import { walletDialog } from '$lib/stores/walletDialog.svelte';
 	import DepthChart from '$lib/components/charts/DepthChart.svelte';
 	import MasterPoolGuard from '$lib/components/markets/MasterPoolGuard.svelte';
 	import LpPositionDerived from '$lib/components/markets/LpPositionDerived.svelte';
+	import SwapSettings from '$lib/components/swap/SwapSettings.svelte';
 	import { lpForm } from '$lib/markets/lp-form.svelte';
 	import { lpStore } from '$lib/markets/lp-store.svelte';
 	import { poolStore } from '$lib/markets/pool-store.svelte';
-	import { applySlippageU128 } from '@areal/sdk/native-dex';
+	import { applySlippageU128, quoteLpShares } from '@areal/sdk/native-dex';
 	import { formatTokenAmount } from '$lib/markets/format';
 	import { SLIPPAGE_DEFAULT_BPS } from '$lib/swap/constants';
 
@@ -80,9 +81,21 @@
 	let depositAmount = $state('899');
 
 	// Slippage bps — single source for both Add/Zap minShares and Remove
-	// payout-floor derivation. Defaults to the swap-form default (50 bps);
-	// future iterations will surface a slippage popover here too.
-	const slippageBps = SLIPPAGE_DEFAULT_BPS;
+	// payout-floor derivation. Surfaced via the gear popover (mirrors the
+	// swap form pattern) so users can override the 50 bps default before
+	// confirming. Persists for the lifetime of this panel only — closing
+	// the modal resets to the default on next open.
+	let slippageBps = $state<number>(SLIPPAGE_DEFAULT_BPS);
+	let settingsOpen = $state(false);
+
+	$effect(() => {
+		if (!settingsOpen) return;
+		const close = () => {
+			settingsOpen = false;
+		};
+		document.addEventListener('click', close);
+		return () => document.removeEventListener('click', close);
+	});
 
 	// Live LP position from the lpStore (activated by the parent route).
 	const liveLpPosition = $derived(lpStore.position);
@@ -113,6 +126,68 @@
 		}
 	}
 
+	// Estimated LP shares for the current draft input — surfaced under the
+	// CTA so the user sees "Est. shares: X (min: Y at Z% slippage)" before
+	// signing. Pure derivation; the FSM still re-quotes against fresh state
+	// on submit. Returns null when we lack enough info to quote.
+	const draftSharesQuote = $derived.by((): { expected: bigint; min: bigint } | null => {
+		if (!pool.row || pool.decimalsA === undefined || pool.decimalsB === undefined) return null;
+		const decA = pool.decimalsA;
+		const decB = pool.decimalsB;
+		const typedAmount = toBaseUnits(depositAmount, depositSide === 'A' ? decA : decB);
+		if (typedAmount === 0n) return null;
+
+		const ps = livePool;
+		if (depositMode === 'Zap') {
+			if (!ps || ps.totalLpShares === 0n) return null;
+			const half = typedAmount / 2n;
+			const otherHalf =
+				depositSide === 'A'
+					? (half * ps.reserveB) / (ps.reserveA + half)
+					: (half * ps.reserveA) / (ps.reserveB + half);
+			const expected = quoteLpShares({
+				reserveA: ps.reserveA,
+				reserveB: ps.reserveB,
+				supply: ps.totalLpShares,
+				amountA: depositSide === 'A' ? half : otherHalf,
+				amountB: depositSide === 'B' ? half : otherHalf
+			}).shares;
+			return { expected, min: applySlippageU128(expected, slippageBps) };
+		}
+
+		// Standards
+		if (!ps || ps.reserveA === 0n || ps.reserveB === 0n) {
+			const expected = quoteLpShares({
+				reserveA: 0n,
+				reserveB: 0n,
+				supply: 0n,
+				amountA: depositSide === 'A' ? typedAmount : typedAmount,
+				amountB: depositSide === 'B' ? typedAmount : typedAmount
+			}).shares;
+			return { expected, min: applySlippageU128(expected, slippageBps) };
+		}
+		const amountA =
+			depositSide === 'A' ? typedAmount : (typedAmount * ps.reserveA) / ps.reserveB;
+		const amountB =
+			depositSide === 'B' ? typedAmount : (typedAmount * ps.reserveB) / ps.reserveA;
+		const expected = quoteLpShares({
+			reserveA: ps.reserveA,
+			reserveB: ps.reserveB,
+			supply: ps.totalLpShares,
+			amountA,
+			amountB
+		}).shares;
+		return { expected, min: applySlippageU128(expected, slippageBps) };
+	});
+
+	const slippagePct = $derived((slippageBps / 100).toFixed(2).replace(/\.?0+$/, ''));
+	const draftExpectedSharesDisplay = $derived(
+		draftSharesQuote ? formatTokenAmount(draftSharesQuote.expected, 6, 4) : null
+	);
+	const draftMinSharesDisplay = $derived(
+		draftSharesQuote ? formatTokenAmount(draftSharesQuote.min, 6, 4) : null
+	);
+
 	function handleAddLiquidity() {
 		if (!pool.row || pool.decimalsA === undefined || pool.decimalsB === undefined) return;
 
@@ -124,12 +199,33 @@
 		const typedAmount = toBaseUnits(depositAmount, depositSide === 'A' ? decA : decB);
 
 		if (depositMode === 'Zap') {
+			// Zap deposits one side and lets the contract auto-balance via an
+			// internal swap. Quote the shares by approximating the post-swap
+			// state: half the typed amount lands as the same side, half lands
+			// as the opposite side at spot ratio. This is a UI-side estimate —
+			// the on-chain handler enforces `min_shares` regardless.
+			const ps = livePool;
+			const expectedShares = (() => {
+				if (!ps || ps.totalLpShares === 0n) return typedAmount;
+				const half = typedAmount / 2n;
+				const otherHalf =
+					depositSide === 'A'
+						? (half * ps.reserveB) / (ps.reserveA + half)
+						: (half * ps.reserveA) / (ps.reserveB + half);
+				return quoteLpShares({
+					reserveA: ps.reserveA,
+					reserveB: ps.reserveB,
+					supply: ps.totalLpShares,
+					amountA: depositSide === 'A' ? half : otherHalf,
+					amountB: depositSide === 'B' ? half : otherHalf
+				}).shares;
+			})();
 			const intent = {
 				pool: pool.row,
 				amountA: depositSide === 'A' ? typedAmount : 0n,
 				amountB: depositSide === 'B' ? typedAmount : 0n,
-				expectedShares: typedAmount, // best-effort placeholder; contract enforces min
-				minShares: applySlippageU128(typedAmount, slippageBps),
+				expectedShares,
+				minShares: applySlippageU128(expectedShares, slippageBps),
 				slippageBps
 			};
 			void lpForm.startZap(intent);
@@ -142,14 +238,24 @@
 		if (!ps || ps.reserveA === 0n || ps.reserveB === 0n) {
 			// Empty pool — first-deposit branch. Use 1:1 as a placeholder;
 			// the user should pick both sides explicitly in a follow-up
-			// iteration of this UI.
+			// iteration of this UI. quoteLpShares handles the supply==0 case
+			// via the isqrt(amountA * amountB) - MIN_LIQUIDITY formula.
 			const counterAmount = typedAmount;
+			const amountA = depositSide === 'A' ? typedAmount : counterAmount;
+			const amountB = depositSide === 'B' ? typedAmount : counterAmount;
+			const expectedShares = quoteLpShares({
+				reserveA: 0n,
+				reserveB: 0n,
+				supply: 0n,
+				amountA,
+				amountB
+			}).shares;
 			const intent = {
 				pool: pool.row,
-				amountA: depositSide === 'A' ? typedAmount : counterAmount,
-				amountB: depositSide === 'B' ? typedAmount : counterAmount,
-				expectedShares: typedAmount,
-				minShares: applySlippageU128(typedAmount, slippageBps),
+				amountA,
+				amountB,
+				expectedShares,
+				minShares: applySlippageU128(expectedShares, slippageBps),
 				slippageBps
 			};
 			void lpForm.startAdd(intent);
@@ -167,13 +273,17 @@
 			amountA = (typedAmount * ps.reserveA) / ps.reserveB;
 		}
 
-		// Expected shares: ratio of the typed-side amount to its reserve,
-		// scaled by total LP shares. Mirrors the contract's deposit math.
-		const total = ps.totalLpShares;
-		const expectedShares =
-			depositSide === 'A'
-				? (amountA * total) / ps.reserveA
-				: (amountB * total) / ps.reserveB;
+		// Expected shares — single source of truth via the SDK's quote helper
+		// (mirrors amm.rs::calculate_lp_shares). Replaces the hand-rolled
+		// formula so SDK rounding edges and contract-side updates flow here
+		// automatically.
+		const expectedShares = quoteLpShares({
+			reserveA: ps.reserveA,
+			reserveB: ps.reserveB,
+			supply: ps.totalLpShares,
+			amountA,
+			amountB
+		}).shares;
 
 		const intent = {
 			pool: pool.row,
@@ -654,6 +764,53 @@
 					{#if isMasterPool}
 						<MasterPoolGuard symbolA={pool.pairA.symbol} symbolB={pool.pairB.symbol} />
 					{/if}
+
+					<div class="lp-meta">
+						<div class="lp-meta-shares">
+							{#if draftExpectedSharesDisplay && draftMinSharesDisplay}
+								<span class="lp-meta-label">Est. shares</span>
+								<span class="lp-meta-value">{draftExpectedSharesDisplay}</span>
+								<span class="lp-meta-min">
+									(min: {draftMinSharesDisplay} at {slippagePct}%)
+								</span>
+							{:else}
+								<span class="lp-meta-label lp-meta-empty">
+									Enter an amount to preview LP shares
+								</span>
+							{/if}
+						</div>
+						<div class="lp-settings-anchor">
+							<button
+								type="button"
+								class="lp-settings-btn"
+								aria-label="Slippage settings"
+								aria-expanded={settingsOpen}
+								onclick={(e) => {
+									e.stopPropagation();
+									settingsOpen = !settingsOpen;
+								}}
+							>
+								<Gear size={16} variant="duotone" />
+							</button>
+							{#if settingsOpen}
+								<div
+									class="lp-settings-popover"
+									role="dialog"
+									aria-label="Slippage settings"
+									onclick={(e) => e.stopPropagation()}
+									onkeydown={(e) => {
+										if (e.key === 'Escape') settingsOpen = false;
+									}}
+									tabindex="-1"
+								>
+									<SwapSettings
+										{slippageBps}
+										onslippagechange={(bps) => (slippageBps = bps)}
+									/>
+								</div>
+							{/if}
+						</div>
+					</div>
 
 					{#if wallet.isConnected}
 						<button
@@ -1756,5 +1913,64 @@
 		font-weight: 700;
 		font-size: 12px;
 		color: #fff;
+	}
+
+	/* ─── LP slippage popover + estimated shares ─────────────────────── */
+	.lp-meta {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: var(--space-3);
+		padding: 0 var(--space-2);
+	}
+	.lp-meta-shares {
+		display: flex;
+		align-items: baseline;
+		gap: var(--space-2);
+		flex-wrap: wrap;
+		min-width: 0;
+		font-family: 'Onest', var(--font-body);
+		font-size: var(--text-sm);
+	}
+	.lp-meta-label {
+		color: var(--color-text-muted);
+		font-weight: var(--font-weight-medium);
+	}
+	.lp-meta-value {
+		color: var(--color-text);
+		font-weight: var(--font-weight-semibold);
+	}
+	.lp-meta-min {
+		color: var(--color-text-muted);
+		font-size: var(--text-xs);
+	}
+	.lp-meta-empty {
+		font-style: italic;
+	}
+	.lp-settings-anchor {
+		position: relative;
+		flex-shrink: 0;
+	}
+	.lp-settings-btn {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 32px;
+		height: 32px;
+		background-color: var(--color-bg);
+		color: var(--color-text);
+		border: 0;
+		border-radius: var(--radius-md);
+		cursor: pointer;
+		transition: background-color var(--motion-base) var(--ease-out);
+	}
+	.lp-settings-btn:hover {
+		background-color: var(--color-dark-700);
+	}
+	.lp-settings-popover {
+		position: absolute;
+		top: calc(100% + var(--space-2));
+		right: 0;
+		z-index: var(--z-dropdown);
 	}
 </style>

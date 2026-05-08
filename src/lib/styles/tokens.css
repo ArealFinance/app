@@ -54,6 +54,7 @@
 	--color-teal-900: #44d8ba;
 	--color-teal-700: #009393;
 	--color-blue-900: #4265ff;
+	--color-blue-500: #6e97ff; /* soft blue — info banners (master-pool guard) */
 	--color-magenta-900: #d844c6;
 	--color-red-900: #d84347; /* danger */
 	--color-orange-900: #ff8c00; /* status dot (demo banner) */
@@ -188,6 +189,13 @@
 	--color-success-bg-medium: rgba(115, 255, 131, 0.12);
 	--color-success-bg-strong: rgba(115, 255, 131, 0.15);
 	--color-danger-bg-strong: rgba(216, 67, 71, 0.15);
+
+	/* Soft info accent — used by advisory banners (master-pool guard).
+	 * Distinct from `--color-info` (saturated #4265ff): this is a calmer
+	 * sky-blue tone meant for inline notes rather than alerts. */
+	--color-accent-info: var(--color-blue-500);
+	--color-accent-info-bg-soft: rgba(110, 151, 255, 0.08);
+	--color-accent-info-border: rgba(110, 151, 255, 0.3);
 
 	/* Chart-specific (PriceChart axis labels, on-success badge text). */
 	--color-chart-axis: rgba(131, 164, 148, 0.4); /* X-axis date labels — muted green-gray */

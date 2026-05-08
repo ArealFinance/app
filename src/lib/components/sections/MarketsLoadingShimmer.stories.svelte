@@ -8,7 +8,7 @@
 		tags: ['autodocs'],
 		parameters: { layout: 'centered' },
 		argTypes: {
-			variant: { control: 'select', options: ['card', 'row'] }
+			variant: { control: 'select', options: ['card', 'row', 'detail'] }
 		},
 		args: { variant: 'card' }
 	});
@@ -40,5 +40,11 @@
 		<MarketsLoadingShimmer variant="row" />
 		<MarketsLoadingShimmer variant="row" />
 		<MarketsLoadingShimmer variant="row" />
+	</div>
+</Story>
+
+<Story name="Detail">
+	<div style="width: 920px;">
+		<MarketsLoadingShimmer variant="detail" />
 	</div>
 </Story>

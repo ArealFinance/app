@@ -5,6 +5,7 @@
 	import { page } from '$app/state';
 	import AppShell from '$lib/components/sections/AppShell.svelte';
 	import MarketsEmptyState from '$lib/components/sections/MarketsEmptyState.svelte';
+	import MarketsLoadingShimmer from '$lib/components/sections/MarketsLoadingShimmer.svelte';
 	import PriceChart from '$lib/components/charts/PriceChart.svelte';
 	import TickWheel from '$lib/components/charts/TickWheel.svelte';
 	import VaultBubbleChart from '$lib/components/charts/VaultBubbleChart.svelte';
@@ -723,8 +724,9 @@
 			</div>
 		{:else}
 			<!-- Markets snapshot still loading and we don't yet know if the
-			     token is missing — render minimal scaffold. -->
-			<div class="loading-scaffold" aria-busy="true">Loading…</div>
+			     token is missing — render the layout-aware skeleton so the
+			     page doesn't shift on hydration. -->
+			<MarketsLoadingShimmer variant="detail" />
 		{/if}
 	</div>
 
@@ -749,13 +751,6 @@
 		max-width: 1340px;
 		margin: 0 auto;
 		width: 100%;
-	}
-
-	.loading-scaffold {
-		padding: 48px;
-		text-align: center;
-		font-family: var(--font-body);
-		color: var(--color-text-muted);
 	}
 
 	/* ---------- Left column: header + divider + stats ---------- */
