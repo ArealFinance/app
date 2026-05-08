@@ -27,21 +27,10 @@
  */
 import type { Connection, PublicKey } from '@solana/web3.js';
 
-import { parseRwtVault, type RwtVault } from '@areal/sdk/rwt-engine';
+import { INITIAL_NAV, parseRwtVault, type RwtVault } from '@areal/sdk/rwt-engine';
 import { findRwtVaultPda } from '@areal/sdk/pda';
 
 import { network } from '$lib/network/network.svelte';
-
-/**
- * Initial NAV in lamports — mirrors `rwt-engine::constants::INITIAL_NAV`.
- * When `totalRwtSupply == 0` the vault has no priced backing yet, so the
- * UI shows 1.00 USDC per RWT (1e6 lamports of USDC, 6 decimals).
- *
- * Hardcoded here rather than imported because the SDK does not currently
- * expose the constant as a value (only as part of the quote helper). When
- * the SDK ships a `INITIAL_NAV` export, swap to it.
- */
-const INITIAL_NAV: bigint = 1_000_000n;
 
 let vault: RwtVault | null = $state(null);
 let isLoading: boolean = $state(false);
