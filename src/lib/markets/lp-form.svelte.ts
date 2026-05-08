@@ -653,8 +653,18 @@ async function runRemove(intent: RemoveLiquidityIntent): Promise<void> {
 			return;
 		}
 		// Apply slippage floor: fresh must be >= expected * (1 - bps/10_000).
+		// Defence-in-depth: validate bps range BEFORE arithmetic. UI clamps
+		// [10, 500] in SwapSettings, but the FSM must not trust intent-side
+		// values blindly — a bps > 10_000 would flip slipNum negative and
+		// the floor check below would trivially pass. Mirrors the SDK's
+		// applySlippageU128 contract.
 		const slipDen = 10_000n;
-		const slipNum = slipDen - BigInt(intent.slippageBps);
+		const { slippageBps } = intent;
+		if (!Number.isInteger(slippageBps) || slippageBps < 0 || slippageBps > 10_000) {
+			failSilent(key, 'Invalid slippage tolerance.', 'remove');
+			return;
+		}
+		const slipNum = slipDen - BigInt(slippageBps);
 		const minA = (intent.expectedA * slipNum) / slipDen;
 		const minB = (intent.expectedB * slipNum) / slipDen;
 		if (freshPayout.a < minA || freshPayout.b < minB) {
