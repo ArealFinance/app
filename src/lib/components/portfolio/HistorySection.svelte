@@ -172,7 +172,7 @@
 				</div>
 			{:else}
 				<div class="rows">
-					{#each store.items as row (row.signature + ':' + row.logIndex)}
+					{#each store.items as row (row.id || row.signature + ':' + row.logIndex)}
 						{@const view = renderRow(row)}
 						<div class="row">
 							<span class="row-icon" aria-hidden="true">

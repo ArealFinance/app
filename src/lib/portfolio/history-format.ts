@@ -110,9 +110,18 @@ export function rowDescription(row: TransactionRow): string {
  * - mainnet  → https://solscan.io/tx/<sig>
  * - devnet   → https://solscan.io/tx/<sig>?cluster=devnet
  * - localnet → null (no public explorer; UI hides the link)
+ *
+ * Defense-in-depth: validates the signature is base58-shaped before composing
+ * the URL. The SDK row mapper does not assert the wire payload's signature
+ * format, so a malformed (or attacker-controlled) backend response could put
+ * `?`/`#`/path segments into the URL. Returning `null` is safer than rendering
+ * a broken or spoofed link — the UI falls back to a non-link signature span.
  */
+const SOLANA_SIG_RE = /^[1-9A-HJ-NP-Za-km-z]{64,128}$/;
+
 export function solscanLink(signature: string, cluster: NetworkId): string | null {
 	if (cluster === 'localnet') return null;
+	if (!SOLANA_SIG_RE.test(signature)) return null;
 	const base = `https://solscan.io/tx/${signature}`;
 	return cluster === 'devnet' ? `${base}?cluster=devnet` : base;
 }

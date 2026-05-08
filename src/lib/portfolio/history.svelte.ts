@@ -101,9 +101,27 @@ let refCount: number = 0;
  * "Unknown cluster" so the user gets an actionable error instead of a raw
  * SDK TypeError.
  */
+let warnedHttpOverride = false;
+
 function resolveBaseUrl(): string | null {
 	const override = publicEnv.PUBLIC_HISTORY_API_URL;
-	if (override && override.length > 0) return override;
+	if (override && override.length > 0) {
+		// Production deploys must use HTTPS. Warn once if a plain-HTTP override
+		// leaked into a prod build (operator misconfig); never warn in dev.
+		if (
+			!warnedHttpOverride &&
+			import.meta.env.PROD &&
+			!override.startsWith('https://')
+		) {
+			warnedHttpOverride = true;
+			// eslint-disable-next-line no-console
+			console.warn(
+				'[history] PUBLIC_HISTORY_API_URL is non-HTTPS in production build:',
+				override,
+			);
+		}
+		return override;
+	}
 	const fromCluster = HISTORY_API_BASE_URLS[network.current];
 	if (fromCluster && fromCluster.length > 0) return fromCluster;
 	return null;

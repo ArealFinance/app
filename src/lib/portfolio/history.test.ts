@@ -381,4 +381,45 @@ describe('history store', () => {
 		const secondArgs = mocks.getTransactions.mock.calls[1][0];
 		expect(secondArgs.wallet).toBe(HOLDER_B.toBase58());
 	});
+
+	it('stop() during in-flight loadMore: late response is discarded', async () => {
+		// First page returns with a cursor so loadMore is meaningful.
+		mocks.getTransactions.mockResolvedValueOnce(
+			makePage([makeRow('first')], 'CURSOR_1' as Cursor)
+		);
+
+		mockWalletState.publicKey = HOLDER_A;
+		store.start();
+		flushSync();
+		await settle();
+		flushSync();
+
+		expect(store.items.length).toBe(1);
+
+		// Pending loadMore — won't resolve until we say so.
+		let resolveLoadMore: (v: HistoryPage<TransactionRow>) => void;
+		const loadMorePromise = new Promise<HistoryPage<TransactionRow>>((r) => {
+			resolveLoadMore = r;
+		});
+		mocks.getTransactions.mockImplementationOnce(() => loadMorePromise);
+
+		const p = store.loadMore();
+		flushSync();
+
+		// Stop the store while the loadMore is mid-flight.
+		store.stop();
+		flushSync();
+
+		// State must reset to idle immediately.
+		expect(store.status).toBe('idle');
+		expect(store.items).toEqual([]);
+
+		// Now resolve the stale loadMore — it must NOT push items into state.
+		resolveLoadMore!(makePage([makeRow('stale')], null));
+		await p;
+		flushSync();
+
+		expect(store.status).toBe('idle');
+		expect(store.items).toEqual([]);
+	});
 });
