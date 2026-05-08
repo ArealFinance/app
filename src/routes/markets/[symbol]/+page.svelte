@@ -9,6 +9,9 @@
 	import PriceChart from '$lib/components/charts/PriceChart.svelte';
 	import TickWheel from '$lib/components/charts/TickWheel.svelte';
 	import VaultBubbleChart from '$lib/components/charts/VaultBubbleChart.svelte';
+	import PoolHistoryChart from '$lib/components/markets/PoolHistoryChart.svelte';
+	import PoolVolumeBar from '$lib/components/markets/PoolVolumeBar.svelte';
+	import type { Period } from '$lib/markets/snapshots.svelte';
 	import QuickSwap from '$lib/components/sections/QuickSwap.svelte';
 	import type { SwapToken } from '$lib/components/sections/QuickSwap.svelte';
 	import PoolDetailPanel from '$lib/components/sections/PoolDetailPanel.svelte';
@@ -126,36 +129,10 @@
 			: null
 	);
 
-	const periods = ['24H', '7D', '1M', '3M', '6M', '1Y', 'ALL'] as const;
-	let activePeriod = $state<(typeof periods)[number]>('7D');
-
-	const PERIOD_DAYS: Record<(typeof periods)[number], number> = {
-		'24H': 1,
-		'7D': 7,
-		'1M': 30,
-		'3M': 90,
-		'6M': 180,
-		'1Y': 365,
-		ALL: 720
-	};
-
-	const chartXLabels = $derived<string[]>(buildXLabels(activePeriod));
-	function buildXLabels(period: (typeof periods)[number]): string[] {
-		const days = PERIOD_DAYS[period];
-		const now = new Date();
-		const labels: string[] = [];
-		const TICK_COUNT = 9;
-		for (let i = 0; i < TICK_COUNT; i += 1) {
-			const fraction = i / (TICK_COUNT - 1);
-			const offsetDays = (1 - fraction) * days;
-			const d = new Date(now);
-			d.setDate(now.getDate() - offsetDays);
-			const dd = String(d.getDate()).padStart(2, '0');
-			const mm = String(d.getMonth() + 1).padStart(2, '0');
-			labels.push(`${dd}.${mm}`);
-		}
-		return labels;
-	}
+	// Active chart period — bound through to <PoolHistoryChart>. The chart
+	// component owns the tabs UI + labels; we keep this state here so it
+	// survives modal opens / detail-tab switches without losing user intent.
+	let activePeriod = $state<Period>('7D');
 
 	type DetailTab = 'RWA’s' | 'Liquidity' | 'Data' | 'Governance' | 'RWT Vault';
 	const detailTabs = $derived<DetailTab[]>(
@@ -218,6 +195,22 @@
 			};
 		})
 	);
+
+	/**
+	 * Primary pool driving the time-series chart + 24h KPI strip. Pick the
+	 * highest-TVL pool that touches this token; ties fall back to insertion
+	 * order. `null` until the markets snapshot has at least one matching pool.
+	 */
+	const primaryPool = $derived.by((): PublicKey | null => {
+		if (tokenPools.length === 0) return null;
+		let best = tokenPools[0]!;
+		for (const p of tokenPools) {
+			const bestTvl = best.tvlUsdc ?? 0;
+			const cur = p.tvlUsdc ?? 0;
+			if (cur > bestTvl) best = p;
+		}
+		return best.poolAddress;
+	});
 
 	let openPoolId = $state<string | null>(null);
 
@@ -497,29 +490,13 @@
 
 				<!-- ========== CENTER COLUMN: chart + about + tabs + RWA + NFT ========== -->
 				<div class="token-center">
-					<section class="chart-card">
-						<div class="chart-tabs" role="tablist">
-							{#each periods as p (p)}
-								<button
-									type="button"
-									class="chart-tab"
-									class:chart-tab-active={activePeriod === p}
-									role="tab"
-									aria-selected={activePeriod === p}
-									onclick={() => (activePeriod = p)}
-								>
-									{p}
-								</button>
-							{/each}
-						</div>
+					<PoolHistoryChart
+						pool={primaryPool}
+						currentPrice={formatPrice(t.priceUsdc).replace(/^\$/, '')}
+						bind:period={activePeriod}
+					/>
 
-						<div class="chart-area">
-							<PriceChart
-								currentPrice={formatPrice(t.priceUsdc).replace(/^\$/, '')}
-								xLabels={chartXLabels}
-							/>
-						</div>
-					</section>
+					<PoolVolumeBar pool={primaryPool} />
 
 					<section class="about">
 						<h3 class="about-title">About {t.symbol}</h3>
@@ -906,57 +883,7 @@
 		color: var(--color-text);
 	}
 
-	/* ---------- Chart card (centre) ---------- */
-	.chart-card {
-		position: relative;
-		min-height: 455px;
-		background-color: transparent;
-		border: 1px solid rgba(255, 255, 255, 0.1);
-		border-radius: 24px;
-		padding: 16px 24px;
-		display: flex;
-		flex-direction: column;
-		gap: 16px;
-	}
-	.chart-tabs {
-		display: inline-flex;
-		gap: 24px;
-		padding: 4px 0;
-	}
-	.chart-tab {
-		position: relative;
-		background: transparent;
-		border: 0;
-		padding: 4px 2px;
-		cursor: pointer;
-		font-family: var(--font-body);
-		font-size: 14px;
-		font-weight: 500;
-		letter-spacing: -0.2px;
-		color: var(--color-text-muted);
-		transition: color var(--motion-base) var(--ease-out);
-	}
-	.chart-tab:hover {
-		color: var(--color-text);
-	}
-	.chart-tab-active {
-		color: var(--color-text);
-	}
-	.chart-tab-active::after {
-		content: '';
-		position: absolute;
-		left: 0;
-		right: 0;
-		bottom: -4px;
-		height: 2px;
-		background-color: var(--color-text);
-		border-radius: 2px;
-	}
-	.chart-area {
-		display: flex;
-		flex-direction: column;
-		height: 320px;
-	}
+	/* Chart card styles moved to <PoolHistoryChart> in 12.3.3. */
 
 	/* ---------- Detail tabs + RWA breakdown ---------- */
 	.detail-section {
