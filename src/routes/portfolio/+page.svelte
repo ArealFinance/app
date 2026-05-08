@@ -9,7 +9,8 @@
 	import { portfolio, RWT_DECIMALS } from '$lib/portfolio/store.svelte';
 	import { formatTokenAmount } from '$lib/portfolio/format';
 	import { claims, type ClaimAttempt } from '$lib/portfolio/claim.svelte';
-	import { ClaimConfirmModal } from '$lib/components/portfolio';
+	import { historyStore } from '$lib/portfolio/history.svelte';
+	import { ClaimConfirmModal, HistorySection } from '$lib/components/portfolio';
 	import type { PortfolioRow } from '@areal/sdk/portfolio';
 
 	const isConnected = $derived(wallet.isConnected);
@@ -151,9 +152,15 @@
 		void claims.start(modalRow);
 	}
 
-	// Lifecycle — store handles wallet/network re-fires on its own.
-	onMount(() => portfolio.start());
-	onDestroy(() => portfolio.stop());
+	// Lifecycle — stores handle wallet/network re-fires on their own.
+	onMount(() => {
+		portfolio.start();
+		historyStore.start();
+	});
+	onDestroy(() => {
+		portfolio.stop();
+		historyStore.stop();
+	});
 </script>
 
 <svelte:head>
@@ -633,6 +640,9 @@
 				</Card>
 			</div>
 		</div>
+
+		<!-- Phase 12.2.2 — Recent activity, full-width below the grid. -->
+		<HistorySection />
 	</div>
 
 	<!-- Phase 7 — claim confirmation modal. Stays open across the entire
