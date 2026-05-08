@@ -150,6 +150,7 @@ function makeIntent() {
 		minRwtOut: 9_900_000n,
 		expectedRwt: 9_950_000n,
 		navAtQuote: 1_000_000n,
+		navAfter: 1_000_025n,
 		fees: { feeTotal: 50_000n, feeDao: 25_000n, feeVault: 25_000n, netDeposit: 9_950_000n },
 		slippageBps: 50
 	};

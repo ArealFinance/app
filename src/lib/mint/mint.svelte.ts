@@ -112,6 +112,11 @@ export interface MintIntent {
 	expectedRwt: bigint;
 	/** Cached NAV used to price this mint — modal display only. */
 	navAtQuote: bigint;
+	/** Cached post-mint NAV (vault state after this mint applies) — modal
+	 *  display only. Pairs with `navAtQuote` to show the user the NAV
+	 *  delta their mint induces (typically a small upward push from the
+	 *  vault-fee accrual). */
+	navAfter: bigint;
 	/** Cached fee breakdown — modal display only. */
 	fees: MintQuoteFees;
 	/** Slippage in bps the user picked. */

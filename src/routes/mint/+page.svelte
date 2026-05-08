@@ -114,6 +114,9 @@
 	const navAtQuote = $derived(
 		quoteResult && quoteResult.ok ? quoteResult.quote.navAtQuote : null
 	);
+	const navAfter = $derived(
+		quoteResult && quoteResult.ok ? quoteResult.quote.navAfter : null
+	);
 	const fees = $derived(quoteResult && quoteResult.ok ? quoteResult.quote.fees : null);
 	const toAmountDisplay = $derived(
 		expectedRwt !== null ? formatTokenAmount(expectedRwt, RWT_DECIMALS, RWT_DECIMALS) : ''
@@ -196,7 +199,7 @@
 		if (amountInBigint === null) return;
 		if (expectedRwt === null || minRwtOut === null) return;
 		if (!quoteResult || !quoteResult.ok) return;
-		if (navAtQuote === null || fees === null) return;
+		if (navAtQuote === null || navAfter === null || fees === null) return;
 
 		// Freeze a fresh intent — the FSM re-validates these against fresh
 		// vault state before signature, so this snapshot is allowed to be
@@ -206,6 +209,7 @@
 			minRwtOut,
 			expectedRwt,
 			navAtQuote,
+			navAfter,
 			fees,
 			slippageBps
 		};
