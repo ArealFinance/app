@@ -608,13 +608,13 @@
 	}
 	.row-label {
 		font-family: 'Onest', var(--font-body);
-		font-size: 11px;
+		font-size: var(--text-xs);
 		font-weight: var(--font-weight-medium);
 		color: var(--color-text-muted);
 	}
 	.row-balance {
 		font-family: 'Onest', var(--font-body);
-		font-size: 11px;
+		font-size: var(--text-xs);
 		font-weight: var(--font-weight-medium);
 		color: var(--color-text-muted);
 	}
