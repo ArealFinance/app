@@ -240,4 +240,60 @@ describe('lp store', () => {
 		// Parser should not have been called — no data to parse.
 		expect(mocks.parseLpPosition).not.toHaveBeenCalled();
 	});
+
+	it('LP-7: malformed account bytes hit the catch branch without crashing the caller', async () => {
+		// `parseLpPosition` throws when the account exists but its bytes
+		// fail Anchor decode (truncated buffer, wrong discriminator, etc).
+		// The store's catch branch must:
+		//   1. Swallow the throw — `await fetchPosition(...)` must NOT
+		//      bubble the error to the caller (modal/UI would crash).
+		//   2. Drop `isLoading` so the user isn't stuck on a spinner.
+		//   3. Keep the prior `position` value untouched — the modal
+		//      already shows last known good state, and a transient
+		//      malformed update shouldn't blank that.
+		const PRIOR_GOOD_LP = { shares: 1234n, pool: POOL_A, owner: WALLET_A };
+		const goodInfo = {
+			data: new Uint8Array([1, 1, 1]),
+			executable: false,
+			lamports: 0,
+			owner: PROGRAM_IDS.nativeDex
+		};
+		const malformedInfo = {
+			data: new Uint8Array([0xff, 0xff, 0xff]),
+			executable: false,
+			lamports: 0,
+			owner: PROGRAM_IDS.nativeDex
+		};
+
+		// First fetch resolves cleanly — establishes the prior-good
+		// position. Second fetch (driven by a WS-debounced recompute)
+		// returns malformed bytes that fail Anchor decode.
+		mocks.getAccountInfo.mockReset();
+		mocks.getAccountInfo.mockResolvedValueOnce(goodInfo).mockResolvedValueOnce(malformedInfo);
+		mocks.parseLpPosition.mockReset();
+		mocks.parseLpPosition.mockImplementation((data: Uint8Array) => {
+			if (data[0] === 0xff) {
+				throw new Error('Anchor decode failed: discriminator mismatch');
+			}
+			return PRIOR_GOOD_LP;
+		});
+
+		await lpStore.activate(POOL_A, WALLET_A);
+		await settle();
+		expect(lpStore.position).toStrictEqual(PRIOR_GOOD_LP);
+
+		// Drive a second fetch through the WS-debounced path. The malformed
+		// account hits the catch branch in fetchPosition.
+		const wsListener = mocks.connectionA.onAccountChange.mock.calls[0][1];
+		wsListener(malformedInfo);
+		// Advance past the debounce window — fetchPosition is invoked.
+		await vi.advanceTimersByTimeAsync(200);
+		await settle();
+
+		// Caller did NOT receive a thrown error (the await above would
+		// propagate it). And the prior position remains — malformed
+		// updates do not blank the last known good state.
+		expect(lpStore.position).toStrictEqual(PRIOR_GOOD_LP);
+		expect(lpStore.isLoading).toBe(false);
+	});
 });
