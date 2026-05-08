@@ -1,7 +1,7 @@
 <script lang="ts" module>
 	import type { PublicKey } from '@solana/web3.js';
 	import type { Period, SnapshotsStore } from '$lib/markets/snapshots.svelte';
-	import type { SnapshotRow, DailyAggregateRow } from '@areal/sdk/markets-rest';
+	import type { SnapshotRow } from '@areal/sdk/markets-rest';
 
 	export type PoolHistoryChartProps = {
 		/** Pool to track. `null` means the parent page is still resolving. */
@@ -66,18 +66,10 @@
 		return null;
 	}
 
-	function priceFromAggregate(row: DailyAggregateRow): number | null {
-		// Aggregate rows do NOT carry tvl/reserve; we only have volume + APY.
-		// Use APY as a proxy y-axis when present; otherwise the aggregate-
-		// driven chart renders a flat line via 0. Documented limitation —
-		// see module-level note above.
-		if (row.apy24h !== null && Number.isFinite(row.apy24h)) return row.apy24h;
-		return 0;
-	}
-
 	const chartData = $derived<PricePoint[]>(
 		(() => {
 			// 24H period uses live snapshot rows (sorted ASC).
+			// We render USD-per-LP-share on the y-axis (see priceFromSnapshot).
 			if (period === '24H' && store.rows.length > 0) {
 				const points: PricePoint[] = [];
 				for (const r of store.rows) {
@@ -87,15 +79,19 @@
 				}
 				return points;
 			}
-			// Aggregate periods — use the daily rollup. Aggregate is `day
-			// DESC` server-side; flip to ASC and use day-index as x.
-			if (period !== '24H' && store.aggregate.length > 0) {
-				const sorted = [...store.aggregate].reverse();
-				return sorted.map((r, i) => ({ x: i, y: priceFromAggregate(r) ?? 0 }));
-			}
+			// 7D / 1M / 3M / 6M / 1Y / ALL — daily aggregate rows.
+			// Phase 12.3.3 limitation: aggregate rows carry only volume + APY,
+			// NOT a USD-denominated per-token / per-LP price series. Plotting
+			// APY on the same y-axis as 24H's USD-per-LP would mix unrelated
+			// units and mislead users. Until backend wire-shape exposes a
+			// historical price series for non-24H periods (escalation to
+			// Phase 12.3.4 wire-shape extension), return EMPTY → component
+			// renders empty-state "Daily price data unavailable in 12.3.3 —
+			// switch to 24H for live snapshots".
 			return [];
 		})()
 	);
+
 
 	function formatTimestamp(blockTime: number, p: Period): string {
 		const d = new Date(blockTime * 1000);
@@ -198,6 +194,11 @@
 				>
 					Retry
 				</button>
+			</div>
+		{:else if chartData.length === 0 && period !== '24H'}
+			<div class="state state-empty">
+				<p class="state-title">Daily price data unavailable in 12.3.3</p>
+				<p class="state-sub">Switch to 24H for live on-chain snapshots.</p>
 			</div>
 		{:else if chartData.length === 0}
 			<div class="state state-empty">
