@@ -7,7 +7,7 @@
 		MarketsLoadingShimmer,
 		MarketsEmptyState
 	} from '$lib/components/sections';
-	import { WalletAddressChip, toast } from '$lib/components/ui';
+	import { WalletAddressChip, Picture, toast } from '$lib/components/ui';
 	import { wallet } from '$lib/stores/wallet.svelte';
 	import { walletDialog } from '$lib/stores/walletDialog.svelte';
 	import { network } from '$lib/network/network.svelte';
@@ -165,12 +165,12 @@
 		</div>
 
 		<div class="hero-art" aria-hidden="true">
-			<img
+			<Picture
 				src="/images/hero/crystal-composite.png"
 				alt=""
 				class="hero-crystal"
-				width="790"
-				height="748"
+				width={790}
+				height={748}
 				fetchpriority="high"
 				loading="eager"
 			/>
@@ -477,7 +477,7 @@
 	 * crystal compositions (370:3763 + 370:3764) with blur halos already applied.
 	 * The PNG has empty transparent padding around the crystal — render it big and
 	 * absolutely position so it overlaps the surrounding area like in Figma. */
-	.hero-crystal {
+	.hero-art :global(.hero-crystal) {
 		position: absolute;
 		top: -220px;
 		right: -110px;
