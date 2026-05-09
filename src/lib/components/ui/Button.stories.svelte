@@ -13,18 +13,18 @@
 			docs: {
 				description: {
 					component:
-						'Primary clickable primitive. Renders as `<button>` or `<a>` via `href`. Variants: primary (filled purple), outline (transparent + border), inverse (white). Sizes: `md` (default 48px) and `icon` (48×48). Optional `full`, `iconLeft`, `iconRight`.'
+						'Primary clickable primitive. Renders as `<button>` or `<a>` via `href`. Variants: primary (filled purple, white text, uppercase), outline (transparent + border), inverse (white bg, dark text), accent (lavender bg, dark text — header CTAs). Sizes: `md` (default 48px, uppercase), `lg` (56px, no uppercase — header / Figma macet CTAs), `icon` (48×48). Optional `full`, `iconLeft`, `iconRight`.'
 				}
 			}
 		},
 		argTypes: {
 			variant: {
 				control: 'select',
-				options: ['primary', 'outline', 'inverse']
+				options: ['primary', 'outline', 'inverse', 'accent']
 			},
 			size: {
 				control: 'select',
-				options: ['md', 'icon']
+				options: ['md', 'lg', 'icon']
 			},
 			disabled: { control: 'boolean' },
 			full: { control: 'boolean' },
@@ -51,11 +51,16 @@
 	<Button variant="inverse">Inverse</Button>
 </Story>
 
+<Story name="Accent">
+	<Button variant="accent" size="lg">Accent (lg)</Button>
+</Story>
+
 <Story name="Variants">
 	<div style="display: flex; gap: 12px; flex-wrap: wrap;">
 		<Button variant="primary">Primary</Button>
 		<Button variant="outline">Outline</Button>
 		<Button variant="inverse">Inverse</Button>
+		<Button variant="accent" size="lg">Accent</Button>
 	</div>
 </Story>
 
@@ -64,7 +69,17 @@
 		<Button variant="primary" disabled>Primary</Button>
 		<Button variant="outline" disabled>Outline</Button>
 		<Button variant="inverse" disabled>Inverse</Button>
+		<Button variant="accent" size="lg" disabled>Accent</Button>
 	</div>
+</Story>
+
+<Story name="LargeWithIcon">
+	<Button variant="accent" size="lg">
+		{#snippet iconLeft()}
+			<span style="display:inline-block;width:18px;height:18px;border-radius:4px;background:#080a0f;"></span>
+		{/snippet}
+		Connect Wallet
+	</Button>
 </Story>
 
 <Story name="IconSize">

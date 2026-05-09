@@ -1,6 +1,6 @@
 <script lang="ts" module>
-	export type ButtonVariant = 'primary' | 'outline' | 'inverse';
-	export type ButtonSize = 'md' | 'icon';
+	export type ButtonVariant = 'primary' | 'outline' | 'inverse' | 'accent';
+	export type ButtonSize = 'md' | 'lg' | 'icon';
 </script>
 
 <script lang="ts">
@@ -143,10 +143,33 @@
 		background-color: var(--color-white-700);
 	}
 
+	/* Accent — lavender bg (#a984f3) + dark text. Per Figma `connect wallet`
+	 * Default (9:719). Used for header CTA on dark surface; `:hover` flips
+	 * to white per Figma Variant2 (9:721). */
+	.btn-accent {
+		background-color: var(--color-purple-400);
+		color: var(--color-text-inverse);
+	}
+	.btn-accent:hover {
+		background-color: var(--color-white-900);
+	}
+	.btn-accent:active {
+		background-color: var(--color-white-700);
+	}
+
 	/* Sizes */
 	.btn-size-icon {
 		width: var(--btn-height);
 		padding: 0;
+	}
+
+	/* Large — 56px tall, no uppercase. Matches Figma CTAs that aren't
+	 * legacy "shouted" buttons (header `connect wallet`, future macets). */
+	.btn-size-lg {
+		height: 56px;
+		padding: 0 16px;
+		text-transform: none;
+		font-size: 14px;
 	}
 
 	.btn-icon-slot {
