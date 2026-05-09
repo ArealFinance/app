@@ -146,9 +146,7 @@
 				</span>
 				<span class="hero-line">
 					<span>with</span>
-					<span class="hero-glyph hero-glyph-pill" aria-hidden="true">
-						<img class="hero-pill-spark" src="/images/hero/sparkline-pill.svg" alt="" />
-					</span>
+					<img class="hero-glyph hero-glyph-pill" src="/images/hero/sparkline-pill.svg" alt="" />
 					<span>yield-</span>
 				</span>
 				<span class="hero-line">
@@ -409,33 +407,14 @@
 		height: 1em;
 	}
 
-	/* Pill = rounded-rect bg + clean sparkline SVG fitting the pill aspect (100×51).
-	 * Figma stacks Rectangle 39622 (#6D76B3 solid) + Rectangle 39623 (rgba 0.31)
-	 * — visible result is solid #6D76B3 (the bottom layer shows through the alpha). */
+	/* Pill glyph — single self-contained SVG (Figma `Group 2087330722` /
+	 * 289:3674) that bakes in the rounded mask, translucent bg, sparkline
+	 * fill, and stroked curve. Display-block sizing only. */
 	.hero-glyph-pill {
-		position: relative;
 		display: inline-block;
 		width: 2.08em; /* 100 / 48 */
 		height: 1.06em; /* 51 / 48 */
-		background-color: #6d76b3;
-		border-radius: 0.42em; /* 20 / 48 */
 		flex-shrink: 0;
-		overflow: hidden;
-	}
-
-	/* Per Figma `Group 2087330722` (289:3674): the sparkline graph asset is
-	 * 200×110 with the curve drawn near the bottom edge — designed to be
-	 * rotated 180° + masked to fit the 100×51 pill. We replicate the
-	 * rotation here so the curve sits at the top half of the pill with
-	 * the gradient fill fading downward. */
-	.hero-pill-spark {
-		position: absolute;
-		inset: 0;
-		width: 100%;
-		height: 100%;
-		object-fit: cover;
-		transform: rotate(180deg);
-		pointer-events: none;
 	}
 
 	/* A-mark SVG has viewBox 95×88 with the actual letter content occupying only
