@@ -4,7 +4,7 @@
 	import AppShell from '$lib/components/sections/AppShell.svelte';
 	import AssetsDistributionChart from '$lib/components/charts/AssetsDistributionChart.svelte';
 	import TickWheel from '$lib/components/charts/TickWheel.svelte';
-	import { Card } from '$lib/components/ui';
+	import { Card, Picture } from '$lib/components/ui';
 	import { ArrowUpSmall, Check, Xmark } from '$lib/icons';
 	import { wallet } from '$lib/stores/wallet.svelte';
 	import { auth } from '$lib/auth';
@@ -411,11 +411,12 @@
 						     crystal silhouette in the upper portion and a soft purple
 						     aurora taking the lower half — no extra drop-shadow needed.
 						     Sits over the upper-right corner of the card. -->
-						<img
+						<Picture
 							class="claim-crystal"
 							src="/images/hero/crystal-glow.png"
 							alt=""
-							aria-hidden="true"
+							width={936}
+							height={943}
 							loading="lazy"
 						/>
 					</div>
@@ -937,8 +938,10 @@
 	 * up with the upper-right of the card and the glow bleeds down across
 	 * the cut into the upper part of the bottom section. No CSS drop-shadow
 	 * — the asset carries it. Last DOM child of .claim-shell → paints on
-	 * top of every section and the cut overlays. */
-	.claim-crystal {
+	 * top of every section and the cut overlays.
+	 * :global() lift: <Picture> wraps <img> in <picture display:contents>,
+	 * so the .claim-crystal class lives on the <img> outside scoped reach. */
+	:global(.claim-crystal) {
 		position: absolute;
 		top: 0;
 		right: 0;
@@ -1763,7 +1766,7 @@
 			padding: var(--space-5);
 			gap: var(--space-4);
 		}
-		.claim-crystal {
+		:global(.claim-crystal) {
 			/* Mobile uses the same full-width anchoring — asset has glow
 			 * baked in, scales naturally. */
 			top: 0;

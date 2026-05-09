@@ -46,7 +46,7 @@
 
 <Story name="WithImage">
 	<div style="display:flex; gap:12px;">
-		<TokenAvatar src="/images/hero/crystal.png" alt="Crystal" />
-		<TokenAvatar src="/images/hero/crystal.png" alt="Crystal" size="lg" />
+		<TokenAvatar src="/images/tokens/rwt-mark.svg" alt="RWT" />
+		<TokenAvatar src="/images/tokens/rwt-mark.svg" alt="RWT" size="lg" />
 	</div>
 </Story>

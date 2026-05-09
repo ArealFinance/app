@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { page } from '$app/state';
-	import { Button } from '$lib/components/ui';
+	import { Button, Picture } from '$lib/components/ui';
 	import Logo from '$lib/components/sections/Logo.svelte';
 
 	const isNotFound = $derived(page.status === 404);
@@ -24,7 +24,15 @@
 		</header>
 
 		<main class="error-main">
-			<img class="error-hero" src="/images/404/hero.png" alt="404" />
+			<Picture
+				class="error-hero"
+				src="/images/404/hero.png"
+				alt="404"
+				width={983}
+				height={964}
+				loading="eager"
+				fetchpriority="high"
+			/>
 
 			<h1 class="error-title">{headline}</h1>
 
@@ -102,8 +110,10 @@
 	/* Hero composite (crystal + 4·4) — width capped at 482px (Figma) AND height
 	 * capped at 45% of the viewport so it always leaves room for the title /
 	 * description / CTAs underneath. The img keeps its 983:964 aspect ratio
-	 * automatically because both width and height are auto. */
-	.error-hero {
+	 * automatically because both width and height are auto. The :global() lift
+	 * is needed because <Picture> wraps the <img> in <picture display:contents>
+	 * which puts the class-bearing <img> outside the route's scoped CSS reach. */
+	:global(.error-hero) {
 		display: block;
 		width: auto;
 		height: auto;
@@ -173,7 +183,7 @@
 	/* Short viewports (laptops, landscape mobile): drop the hero further so the
 	 * CTAs never get pushed below the fold. */
 	@media (max-height: 720px) {
-		.error-hero {
+		:global(.error-hero) {
 			max-height: 38vh;
 		}
 		.error-content {

@@ -193,6 +193,11 @@
 		inset: 0;
 		pointer-events: none;
 		background-image: url('/images/wallet/panel-blur.png');
+		background-image: image-set(
+			url('/images/wallet/panel-blur.avif') type('image/avif'),
+			url('/images/wallet/panel-blur.webp') type('image/webp'),
+			url('/images/wallet/panel-blur.png') type('image/png')
+		);
 		background-size: cover;
 		background-position: top center;
 		background-repeat: no-repeat;

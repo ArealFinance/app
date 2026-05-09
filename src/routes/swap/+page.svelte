@@ -845,6 +845,11 @@
 		inset: 0;
 		pointer-events: none;
 		background-image: url('/images/swap/dex-blur.png');
+		background-image: image-set(
+			url('/images/swap/dex-blur.avif') type('image/avif'),
+			url('/images/swap/dex-blur.webp') type('image/webp'),
+			url('/images/swap/dex-blur.png') type('image/png')
+		);
 		background-size: cover;
 		background-position: center;
 		background-repeat: no-repeat;

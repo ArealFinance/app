@@ -121,6 +121,11 @@
 		inset: 0;
 		pointer-events: none;
 		background-image: url('/images/wallet/dialog-blur.png');
+		background-image: image-set(
+			url('/images/wallet/dialog-blur.avif') type('image/avif'),
+			url('/images/wallet/dialog-blur.webp') type('image/webp'),
+			url('/images/wallet/dialog-blur.png') type('image/png')
+		);
 		background-size: cover;
 		background-position: center;
 		background-repeat: no-repeat;

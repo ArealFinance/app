@@ -16,7 +16,7 @@
 	import type { SwapToken } from '$lib/components/sections/QuickSwap.svelte';
 	import PoolDetailPanel from '$lib/components/sections/PoolDetailPanel.svelte';
 	import type { PoolInfo } from '$lib/components/sections/PoolDetailPanel.svelte';
-	import { Modal } from '$lib/components/ui';
+	import { Modal, Picture } from '$lib/components/ui';
 	import { ArrowUpSmall, AngleRightSmall, FileText } from '$lib/icons';
 
 	import { network } from '$lib/network/network.svelte';
@@ -567,7 +567,7 @@
 									<article class="nft-card">
 										<div class="nft-cover" aria-hidden="true">
 											{#if nft.image}
-												<img src={nft.image} alt="" loading="lazy" />
+												<Picture src={nft.image} alt="" loading="lazy" />
 											{/if}
 										</div>
 										<div class="nft-body">
@@ -1354,7 +1354,9 @@
 			linear-gradient(135deg, rgba(167, 139, 250, 0.35), rgba(96, 47, 220, 0.6)),
 			#818181;
 	}
-	.nft-cover img {
+	/* :global(img) lift: <Picture> renders <picture display:contents><img></picture>,
+	 * placing the <img> outside this route's scoped CSS reach. */
+	.nft-cover :global(img) {
 		width: 100%;
 		height: 100%;
 		object-fit: cover;
