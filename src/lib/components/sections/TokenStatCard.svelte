@@ -85,25 +85,31 @@
 	</div>
 
 	<div class="card-price">
-		<div class="card-price-label" class:dim={isComingSoon}>Price</div>
+		<!-- Top row: "PRICE" label on the left, delta + period chips on the
+		     right. Per Figma macet — both anchored at top:36-38% of the card,
+		     same horizontal baseline. Coming-soon cards put dimmer empty
+		     placeholder pills below the value instead. -->
+		<div class="card-price-row-top">
+			<span class="card-price-label" class:dim={isComingSoon}>Price</span>
+			{#if !isComingSoon}
+				<div class="card-pills">
+					{#if delta}
+						<span class="chip chip-delta chip-delta-{deltaTone}">
+							<img class="caret" src="/images/cards/caret-up.svg" alt="" />
+							<span>{delta}</span>
+						</span>
+					{/if}
+					<span class="chip chip-period">{period}</span>
+				</div>
+			{/if}
+		</div>
+		<div class="card-price-value">
+			{isComingSoon ? 'Coming soon' : (price ?? '—')}
+		</div>
 		{#if isComingSoon}
-			<div class="card-price-value">Coming soon</div>
 			<div class="card-pills">
 				<span class="chip chip-empty chip-empty-l"></span>
 				<span class="chip chip-empty chip-empty-r"></span>
-			</div>
-		{:else}
-			<div class="card-price-row">
-				<div class="card-price-value">{price ?? '—'}</div>
-			</div>
-			<div class="card-pills">
-				{#if delta}
-					<span class="chip chip-delta chip-delta-{deltaTone}">
-						<img class="caret" src="/images/cards/caret-up.svg" alt="" />
-						<span>{delta}</span>
-					</span>
-				{/if}
-				<span class="chip chip-period">{period}</span>
 			</div>
 		{/if}
 	</div>
@@ -288,9 +294,12 @@
 		color: rgba(113, 115, 144, 0.3);
 	}
 
-	.card-price-row {
+	/* Top row: "PRICE" label + (delta + period) chips, same horizontal
+	 * baseline per Figma macet. Chips right-aligned via space-between. */
+	.card-price-row-top {
 		display: flex;
-		align-items: baseline;
+		align-items: center;
+		justify-content: space-between;
 		gap: var(--space-2);
 	}
 
