@@ -1,17 +1,23 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
+	import { Rooms } from '@areal/sdk/realtime';
 	import AppShell from '$lib/components/sections/AppShell.svelte';
 	import AssetsDistributionChart from '$lib/components/charts/AssetsDistributionChart.svelte';
 	import TickWheel from '$lib/components/charts/TickWheel.svelte';
 	import { Card } from '$lib/components/ui';
 	import { ArrowUpSmall, Check, Xmark } from '$lib/icons';
 	import { wallet } from '$lib/stores/wallet.svelte';
+	import { auth } from '$lib/auth';
+	import { network } from '$lib/network/network.svelte';
+	import { realtimeClient } from '$lib/realtime/client.svelte';
+	import { toast } from '$lib/components/ui';
 	import { portfolio, RWT_DECIMALS } from '$lib/portfolio/store.svelte';
 	import { formatTokenAmount } from '$lib/portfolio/format';
 	import { claims, type ClaimAttempt } from '$lib/portfolio/claim.svelte';
 	import { historyStore } from '$lib/portfolio/history.svelte';
 	import { ClaimConfirmModal, HistorySection } from '$lib/components/portfolio';
 	import type { PortfolioRow } from '@areal/sdk/portfolio';
+	import type { TransactionIndexedEvent } from '@areal/sdk/realtime';
 
 	const isConnected = $derived(wallet.isConnected);
 
@@ -161,6 +167,83 @@
 		portfolio.stop();
 		historyStore.stop();
 	});
+
+	/*
+	 * Phase 12.3.4 — wallet-room toasts.
+	 *
+	 * When the user is signed-in for the currently connected wallet we
+	 * subscribe to `wallet:<base58>` and surface a transaction confirmation
+	 * toast. The realtime client gates wallet-room subscriptions behind
+	 * `auth.isSignedInForCurrentWallet` already, but we mirror the check
+	 * here so we don't even attach a listener while the session is invalid.
+	 *
+	 * Dedup window: 5 minutes — the indexer can rebroadcast on retry; we
+	 * don't want to ring the toast twice for one tx.
+	 *
+	 * Visibility gate: drop events while the tab is hidden (the user can't
+	 * see toasts that flicker in a background tab anyway).
+	 */
+	const RECENT_SIG_TTL_MS = 5 * 60 * 1000;
+	const recentSigs = new Map<string, number>();
+
+	const KIND_COPY: Record<TransactionIndexedEvent['kind'], string> = {
+		claim: 'Rewards claimed',
+		swap: 'Swap confirmed',
+		add_lp: 'Liquidity added',
+		remove_lp: 'Liquidity removed',
+		zap_lp: 'Zap confirmed',
+		mint_rwt: 'RWT minted'
+	};
+
+	function explorerHost(): string {
+		// devnet/localnet → solscan with explicit cluster suffix.
+		const cluster = network.current;
+		return cluster === 'mainnet' ? '' : `?cluster=${cluster}`;
+	}
+
+	function shortenSig(sig: string): string {
+		if (sig.length <= 12) return sig;
+		return `${sig.slice(0, 6)}…${sig.slice(-4)}`;
+	}
+
+	function handleTxIndexed(payload: TransactionIndexedEvent) {
+		// Drop events for a different wallet (defence in depth — the room
+		// gate should already do this).
+		const expected = wallet.publicKey?.toBase58();
+		if (!expected || payload.wallet !== expected) return;
+
+		// Visibility gate.
+		if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return;
+
+		const now = Date.now();
+		// Dedup + GC.
+		if (recentSigs.has(payload.signature)) return;
+		recentSigs.set(payload.signature, now);
+		for (const [sig, ts] of recentSigs) {
+			if (now - ts > RECENT_SIG_TTL_MS) recentSigs.delete(sig);
+		}
+
+		const headline = KIND_COPY[payload.kind] ?? `${payload.kind} confirmed`;
+		// Toast API has no clickable link; embed the shortened signature in
+		// the body text so the user can correlate with their explorer
+		// search. The full URL is included for screen readers / copy.
+		const body = `${shortenSig(payload.signature)} · ${`https://solscan.io/tx/${payload.signature}${explorerHost()}`}`;
+		toast.success(body, { title: headline });
+	}
+
+	$effect(() => {
+		if (!wallet.isConnected) return;
+		if (!auth.isSignedInForCurrentWallet) return;
+		const pk = wallet.publicKey;
+		if (!pk) return;
+
+		const handle = realtimeClient.useRoom(Rooms.wallet(pk.toBase58()));
+		const off = realtimeClient.on('transaction_indexed', handleTxIndexed);
+		return () => {
+			off();
+			handle.off();
+		};
+	});
 </script>
 
 <svelte:head>
@@ -174,6 +257,34 @@
 			<h1 class="portfolio-title">Portfolio</h1>
 			<p class="portfolio-sub">Track and manage your DeFi positions</p>
 		</header>
+
+		{#if wallet.isConnected && auth.status === 'expired'}
+			<!--
+				Phase 12.3.4 — re-sign banner. Inline (not a Banner primitive)
+				because Portfolio is the only consumer in this phase. If a
+				second consumer appears, extract — until then, the inline
+				block keeps the architecture flat.
+			-->
+			<div class="resign-banner resign-banner-warning" role="alert">
+				<p class="resign-banner-text">
+					Your session expired. Sign in again to receive transaction notifications.
+				</p>
+				<button
+					type="button"
+					class="resign-banner-btn"
+					onclick={() => void auth.signIn()}>Sign in</button
+				>
+			</div>
+		{:else if wallet.isConnected && auth.status === 'signed-out'}
+			<div class="resign-banner resign-banner-info" role="status">
+				<p class="resign-banner-text">Sign in to see live transaction updates.</p>
+				<button
+					type="button"
+					class="resign-banner-btn"
+					onclick={() => void auth.signIn()}>Sign in</button
+				>
+			</div>
+		{/if}
 
 		<div class="portfolio-grid" class:portfolio-grid-filled={isConnected}>
 			<!-- ========== LEFT COLUMN ========== -->
@@ -663,6 +774,55 @@
 		flex-direction: column;
 		gap: var(--space-6);
 		padding: var(--space-6) 0 var(--space-12);
+	}
+
+	/* ---------- Re-sign banner (Phase 12.3.4) ---------- */
+	.resign-banner {
+		display: flex;
+		align-items: center;
+		gap: var(--space-3);
+		justify-content: space-between;
+		padding: var(--space-3) var(--space-4);
+		border: 1px solid transparent;
+		border-radius: var(--radius-lg);
+	}
+	.resign-banner-warning {
+		background-color: var(--color-warning-tint);
+		border-color: var(--color-warning);
+		color: var(--color-text);
+	}
+	.resign-banner-info {
+		background-color: var(--color-info-tint);
+		border-color: var(--color-info);
+		color: var(--color-text);
+	}
+	.resign-banner-text {
+		margin: 0;
+		font-family: var(--font-body);
+		font-size: var(--text-sm);
+		font-weight: var(--font-weight-medium);
+		letter-spacing: var(--tracking-tight);
+	}
+	.resign-banner-btn {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		height: var(--control-height-sm);
+		padding: 0 var(--space-4);
+		font-family: var(--font-sans);
+		font-size: var(--text-sm);
+		font-weight: var(--font-weight-bold);
+		letter-spacing: var(--tracking-tight);
+		text-transform: uppercase;
+		color: var(--color-white-900);
+		background-color: var(--color-primary);
+		border: 0;
+		border-radius: var(--radius-md);
+		cursor: pointer;
+		white-space: nowrap;
+	}
+	.resign-banner-btn:hover {
+		background-color: var(--color-purple-700);
 	}
 
 	/* ---------- Hero ---------- */

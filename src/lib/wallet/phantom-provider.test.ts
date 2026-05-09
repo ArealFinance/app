@@ -44,6 +44,7 @@ describe('phantom-provider', () => {
 				disconnect: vi.fn(),
 				signTransaction: vi.fn(),
 				signAndSendTransaction: vi.fn(),
+				signMessage: vi.fn(),
 				on: vi.fn(),
 				off: vi.fn()
 			};
@@ -56,6 +57,7 @@ describe('phantom-provider', () => {
 				disconnect: vi.fn(),
 				signTransaction: vi.fn(),
 				signAndSendTransaction: vi.fn(),
+				signMessage: vi.fn(),
 				on: vi.fn(),
 				off: vi.fn()
 			};
@@ -78,6 +80,7 @@ describe('phantom-provider', () => {
 				disconnect: vi.fn(),
 				signTransaction: vi.fn(),
 				signAndSendTransaction: vi.fn(),
+				signMessage: vi.fn(),
 				on: vi.fn(),
 				off: vi.fn()
 			};
@@ -99,6 +102,7 @@ describe('phantom-provider', () => {
 				disconnect: vi.fn(),
 				signTransaction: vi.fn(),
 				signAndSendTransaction: vi.fn(),
+				signMessage: vi.fn(),
 				on: vi.fn(),
 				off: vi.fn()
 			};
@@ -119,6 +123,7 @@ describe('phantom-provider', () => {
 				disconnect: vi.fn(),
 				signTransaction: vi.fn(),
 				signAndSendTransaction: vi.fn(),
+				signMessage: vi.fn(),
 				on: vi.fn(),
 				off: vi.fn()
 			};
@@ -139,6 +144,7 @@ describe('phantom-provider', () => {
 				disconnect: vi.fn(),
 				signTransaction: vi.fn(),
 				signAndSendTransaction: vi.fn(),
+				signMessage: vi.fn(),
 				on: vi.fn(),
 				off: vi.fn()
 			};
@@ -163,6 +169,7 @@ describe('phantom-provider', () => {
 				disconnect: vi.fn(),
 				signTransaction: vi.fn(),
 				signAndSendTransaction: vi.fn(),
+				signMessage: vi.fn(),
 				on: vi.fn(),
 				off: vi.fn()
 			};
@@ -198,6 +205,7 @@ describe('phantom-provider', () => {
 				disconnect: vi.fn(),
 				signTransaction: vi.fn(),
 				signAndSendTransaction: vi.fn(),
+				signMessage: vi.fn(),
 				on: vi.fn(),
 				off: vi.fn()
 			};
@@ -222,6 +230,7 @@ describe('phantom-provider', () => {
 				disconnect: vi.fn(),
 				signTransaction: vi.fn(),
 				signAndSendTransaction: vi.fn(),
+				signMessage: vi.fn(),
 				on: vi.fn(),
 				off: vi.fn()
 			};
@@ -250,6 +259,7 @@ describe('phantom-provider', () => {
 				disconnect: vi.fn(),
 				signTransaction: vi.fn(),
 				signAndSendTransaction: vi.fn(),
+				signMessage: vi.fn(),
 				on: vi.fn(),
 				off: vi.fn()
 			};
@@ -270,6 +280,7 @@ describe('phantom-provider', () => {
 				disconnect: vi.fn(),
 				signTransaction: vi.fn(),
 				signAndSendTransaction: vi.fn(),
+				signMessage: vi.fn(),
 				on: vi.fn(),
 				off: vi.fn()
 			};
@@ -292,6 +303,7 @@ describe('phantom-provider', () => {
 				disconnect: vi.fn(),
 				signTransaction: vi.fn(),
 				signAndSendTransaction: vi.fn(),
+				signMessage: vi.fn(),
 				on: vi.fn(),
 				off: vi.fn()
 			};
@@ -315,6 +327,7 @@ describe('phantom-provider', () => {
 				disconnect: vi.fn().mockResolvedValue(undefined),
 				signTransaction: vi.fn(),
 				signAndSendTransaction: vi.fn(),
+				signMessage: vi.fn(),
 				on: vi.fn(),
 				off: vi.fn()
 			};
@@ -343,6 +356,7 @@ describe('phantom-provider', () => {
 				disconnect: vi.fn().mockRejectedValue(new Error('Disconnect failed')),
 				signTransaction: vi.fn(),
 				signAndSendTransaction: vi.fn(),
+				signMessage: vi.fn(),
 				on: vi.fn(),
 				off: vi.fn()
 			};
@@ -364,6 +378,7 @@ describe('phantom-provider', () => {
 				disconnect: vi.fn().mockResolvedValue(undefined),
 				signTransaction: vi.fn(),
 				signAndSendTransaction: vi.fn(),
+				signMessage: vi.fn(),
 				on: vi.fn(),
 				off: vi.fn()
 			};
@@ -388,6 +403,7 @@ describe('phantom-provider', () => {
 				disconnect: vi.fn().mockResolvedValue(undefined),
 				signTransaction: vi.fn(),
 				signAndSendTransaction: vi.fn(),
+				signMessage: vi.fn(),
 				on: vi.fn(),
 				off: vi.fn()
 			};
@@ -413,6 +429,7 @@ describe('phantom-provider', () => {
 				disconnect: vi.fn().mockResolvedValue(undefined),
 				signTransaction: vi.fn(),
 				signAndSendTransaction: vi.fn(),
+				signMessage: vi.fn(),
 				on: vi.fn(),
 				off: vi.fn()
 			};
@@ -440,6 +457,7 @@ describe('phantom-provider', () => {
 				disconnect: vi.fn(),
 				signTransaction: vi.fn(),
 				signAndSendTransaction: vi.fn(),
+				signMessage: vi.fn(),
 				on: vi.fn(),
 				off: vi.fn()
 			};

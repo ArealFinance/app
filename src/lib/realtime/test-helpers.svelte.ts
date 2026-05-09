@@ -15,6 +15,18 @@ export const mockNetworkState: MockNetworkState = $state({
 	current: 'devnet'
 });
 
+export interface MockAuthState {
+	accessToken: string | null;
+	wallet: string | null;
+}
+
+export const mockAuthState: MockAuthState = $state({
+	accessToken: null,
+	wallet: null
+});
+
 export function resetMockState() {
 	mockNetworkState.current = 'devnet';
+	mockAuthState.accessToken = null;
+	mockAuthState.wallet = null;
 }

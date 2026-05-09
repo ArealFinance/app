@@ -7,6 +7,7 @@
 	import { WalletDialog, WalletPanel } from '$lib/components/wallet';
 	import { wallet } from '$lib/stores/wallet.svelte';
 	import { walletDialog } from '$lib/stores/walletDialog.svelte';
+	import { auth } from '$lib/auth';
 
 	type Props = {
 		currentPath?: string;
@@ -50,6 +51,11 @@
 	);
 	const liveOnConnect = $derived(onConnect ?? (() => walletDialog.open('connect')));
 	const liveOnWalletClick = $derived(onWalletClick ?? (() => walletDialog.open('panel')));
+	const liveAuthStatus = $derived(auth.status);
+	const liveIsSignedInForCurrentWallet = $derived(auth.isSignedInForCurrentWallet);
+	const liveOnSignIn = $derived(() => {
+		void auth.signIn();
+	});
 </script>
 
 <div class="shell">
@@ -62,6 +68,9 @@
 			{nav}
 			onConnect={liveOnConnect}
 			onWalletClick={liveOnWalletClick}
+			authStatus={liveAuthStatus}
+			isSignedInForCurrentWallet={liveIsSignedInForCurrentWallet}
+			onSignIn={liveOnSignIn}
 		/>
 	{/if}
 

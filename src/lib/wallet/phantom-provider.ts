@@ -37,6 +37,19 @@ export interface PhantomProvider {
 	signAndSendTransaction<T extends Transaction | VersionedTransaction>(
 		tx: T
 	): Promise<{ signature: string }>;
+	/*
+	 * Sign an arbitrary byte payload (used for the wallet-signature auth
+	 * handshake, NOT for transactions). Phantom's documented surface accepts
+	 * a `display` hint of `'utf8' | 'hex'` — `'utf8'` shows the message as
+	 * plain text in the approval prompt (which is what we want for the
+	 * `Login to Areal at <ts> for wallet <pk>` payload). The resolved object
+	 * carries the ed25519 signature; `publicKey` is included by the wallet
+	 * for convenience but we trust `wallet.publicKey` from the connect step.
+	 */
+	signMessage(
+		message: Uint8Array,
+		display?: 'utf8' | 'hex'
+	): Promise<{ signature: Uint8Array; publicKey?: PublicKey }>;
 	on(event: 'connect', handler: PhantomConnectHandler): void;
 	on(event: 'disconnect', handler: PhantomDisconnectHandler): void;
 	on(event: 'accountChanged', handler: PhantomAccountChangedHandler): void;
