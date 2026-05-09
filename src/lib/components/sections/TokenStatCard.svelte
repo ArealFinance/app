@@ -271,14 +271,18 @@
 		color: var(--color-green-700);
 	}
 
-	/* Price section */
+	/* Price section. Sits on top (z:1) of the .card-spark graph rect (z:0).
+	 * `padding-top: var(--space-5)` pushes the PRICE label + delta/period
+	 * chip row down so they land INSIDE the rect (rect top ≈ y=81 from
+	 * card top in Figma, chips inside at y=87+) with a proper buffer
+	 * from the rect's top edge. */
 	.card-price {
 		position: relative;
 		z-index: 1;
 		display: flex;
 		flex-direction: column;
 		gap: var(--space-1);
-		padding-top: var(--space-2);
+		padding-top: var(--space-5);
 	}
 
 	.card-price-label {
@@ -382,14 +386,12 @@
 		left: 4px;
 		right: 4px;
 		bottom: 4px;
-		/* top:30% — rect starts higher than the period/delta chip row so
-		 * the chips sit comfortably INSIDE the rect with breathing room
-		 * (chip bottom ≈ y=115 from card top, rect top at 30% × 230 ≈ y=69
-		 * → chips have ~46px clearance inside the rect from its top edge).
-		 * Figma macet draws the rect at 35.22% but the hover-state
-		 * #121725 highlight made any chip-edge overlap read as a
-		 * collision, so we let the rect breathe upwards instead. */
-		top: 30%;
+		/* top:35.22% per Figma macet — rect starts right after the header
+		 * (avatar + name + ticker chips), forming the visible horizontal
+		 * separator between header and body. Period/delta chips below sit
+		 * INSIDE the rect with breathing room (~12px from rect top edge)
+		 * controlled via .card-price padding-top. */
+		top: 35.22%;
 		pointer-events: none;
 		z-index: 0;
 		overflow: hidden;
