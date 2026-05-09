@@ -283,6 +283,35 @@ describe('snapshotsStore', () => {
 		expect(snapshotsStore.rows.map((r) => r.reserveA)).toEqual(['999', '777']);
 	});
 
+	it('out-of-order tick: insert at sorted position, dedupe by blockTime', async () => {
+		const now = Math.floor(Date.now() / 1000);
+		const initial = [
+			makeRow(now - 300, { reserveA: 'AAA' }),
+			makeRow(now - 100, { reserveA: 'CCC' })
+		];
+		mocks.getPoolSnapshots.mockResolvedValue({ items: initial });
+		mocks.getPoolAggregate.mockResolvedValue({ items: [] });
+
+		snapshotsStore.setPeriod('24H');
+		snapshotsStore.activate(POOL_A);
+		flushSync();
+		await settle();
+
+		// Out-of-order tick lands between the two existing rows.
+		realtimeClientStub.__emit('pool_snapshot', makeRow(now - 200, { reserveA: 'BBB' }));
+		await settle();
+		flushSync();
+
+		expect(snapshotsStore.rows.map((r) => r.reserveA)).toEqual(['AAA', 'BBB', 'CCC']);
+
+		// Out-of-order tick that DEDUPES the middle row by blockTime match.
+		realtimeClientStub.__emit('pool_snapshot', makeRow(now - 200, { reserveA: 'BBB2' }));
+		await settle();
+		flushSync();
+
+		expect(snapshotsStore.rows.map((r) => r.reserveA)).toEqual(['AAA', 'BBB2', 'CCC']);
+	});
+
 	it('live-tick gating (period !== 24H → ignored)', async () => {
 		mocks.getPoolAggregate.mockResolvedValue({ items: [makeAgg('2026-05-09')] });
 

@@ -126,17 +126,38 @@ function trimSlidingWindow(input: SnapshotRow[]): SnapshotRow[] {
 	return input.filter((r) => r.blockTime > cutoff);
 }
 
-/** Merge or append a new tick for the active pool. */
+/**
+ * Merge or insert a new tick into the active-pool series, sorted by
+ * blockTime ASC. Handles out-of-order ticks (rare under SDK's in-order
+ * delivery, but possible if the SDK ever buffers + flushes a batch):
+ *   - exact-blockTime match → replace at that index (dedupe)
+ *   - tick.blockTime > last → append (fast path, common case)
+ *   - tick.blockTime < last → binary-search the insertion point
+ */
 function mergeTick(tick: SnapshotRow): SnapshotRow[] {
 	if (rows.length === 0) return [tick];
 	const last = rows[rows.length - 1]!;
-	if (tick.blockTime <= last.blockTime) {
-		// Dedup: replace the last row (same-or-earlier timestamp).
-		const next = rows.slice(0, -1);
-		next.push(tick);
+	// Fast path: in-order tick → append.
+	if (tick.blockTime > last.blockTime) {
+		return [...rows, tick];
+	}
+	// Binary search for the insertion point. `lo` ends up at the smallest
+	// index whose `blockTime >= tick.blockTime`.
+	let lo = 0;
+	let hi = rows.length;
+	while (lo < hi) {
+		const mid = (lo + hi) >>> 1;
+		if (rows[mid]!.blockTime < tick.blockTime) lo = mid + 1;
+		else hi = mid;
+	}
+	if (lo < rows.length && rows[lo]!.blockTime === tick.blockTime) {
+		// Dedupe: replace the row whose blockTime matches.
+		const next = rows.slice();
+		next[lo] = tick;
 		return next;
 	}
-	return [...rows, tick];
+	// Insert at `lo`.
+	return [...rows.slice(0, lo), tick, ...rows.slice(lo)];
 }
 
 function clearStalePoll(): void {
