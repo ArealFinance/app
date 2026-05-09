@@ -47,11 +47,17 @@
 	});
 
 	/**
-	 * Auto-close + route to wallet panel ONLY after the full handshake
-	 * (connect + sign-in) is complete. Closing on `wallet.status === 'connected'`
-	 * alone (the prior behavior) yanked the modal away while `auth.signIn()`
-	 * was still mid-flight — leaving the user staring at a "Sign in" button
-	 * in the header with no context.
+	 * Auto-close after the full handshake (connect + sign-in) completes.
+	 *
+	 * Earlier we routed straight into the wallet panel here — but landing
+	 * the user inside a modal they didn't ask to see right after a successful
+	 * connect reads as noisy. Just close: the address chip in the header is
+	 * already enough confirmation, and the panel is one click away (chip
+	 * onclick → `walletDialog.open('panel')`).
+	 *
+	 * Closing here while still in `connect` mode is safe — the auto-chain
+	 * `runSignIn()` from a user-initiated connect must have completed for
+	 * `isSignedInForCurrentWallet` to flip true; we never close mid-flow.
 	 */
 	$effect(() => {
 		if (
@@ -59,7 +65,7 @@
 			wallet.isConnected &&
 			auth.isSignedInForCurrentWallet
 		) {
-			walletDialog.open('panel');
+			walletDialog.close();
 		}
 	});
 

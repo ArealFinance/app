@@ -145,21 +145,40 @@
 
 		<h2 id="wallet-panel-title" class="wallet-panel-title">Transactions</h2>
 
-		<div class="wallet-panel-list">
-			{#each grouped as group (group.date)}
-				<span class="wallet-panel-date">{group.date}</span>
-				<div class="wallet-panel-rows">
-					{#each group.items as tx, i (tx.id + i)}
-						<TransactionRow {tx} />
-					{/each}
-				</div>
-			{/each}
-		</div>
+		{#if grouped.length === 0}
+			<!-- Figma macet — empty state when the connected wallet has no on-chain
+			     activity yet. Stacked-cards icon (filled "completed" + outlined
+			     "pending") on top, brief reassurance copy below. -->
+			<div class="wallet-panel-empty">
+				<img
+					class="wallet-panel-empty-icon"
+					src="/images/wallet/empty-transactions.svg"
+					alt=""
+					aria-hidden="true"
+					loading="lazy"
+				/>
+				<p class="wallet-panel-empty-title">No Transactions</p>
+				<p class="wallet-panel-empty-sub">
+					This is where your future transactions will appear
+				</p>
+			</div>
+		{:else}
+			<div class="wallet-panel-list">
+				{#each grouped as group (group.date)}
+					<span class="wallet-panel-date">{group.date}</span>
+					<div class="wallet-panel-rows">
+						{#each group.items as tx, i (tx.id + i)}
+							<TransactionRow {tx} />
+						{/each}
+					</div>
+				{/each}
+			</div>
 
-		{#if wallet.hasMore}
-			<button type="button" class="wallet-panel-loadmore" onclick={() => wallet.loadMore()}>
-				Load more
-			</button>
+			{#if wallet.hasMore}
+				<button type="button" class="wallet-panel-loadmore" onclick={() => wallet.loadMore()}>
+					Load more
+				</button>
+			{/if}
 		{/if}
 	</div>
 </Modal>
@@ -452,6 +471,48 @@
 		display: flex;
 		flex-direction: column;
 		gap: 4px;
+	}
+
+	/* Empty state — when the wallet has no on-chain activity yet. Centered
+	 * stacked-cards icon, "No Transactions" + reassurance copy. Sits inside
+	 * the same vertical flex flow that .wallet-panel-list would occupy when
+	 * non-empty (`flex: 1` so the panel keeps its 589px Figma height). */
+	.wallet-panel-empty {
+		flex: 1;
+		min-height: 0;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: flex-start;
+		gap: var(--space-2);
+		/* Figma: icon top at y=131 from panel top; bar+title above absorb ~99px,
+		 * so ~32px from where the empty container starts. */
+		padding-top: 32px;
+	}
+	.wallet-panel-empty-icon {
+		width: 81px;
+		height: 60px;
+		margin-bottom: var(--space-4);
+	}
+	.wallet-panel-empty-title {
+		margin: 0;
+		font-family: var(--font-body);
+		font-size: var(--text-base); /* 14 */
+		font-weight: var(--font-weight-bold);
+		letter-spacing: var(--tracking-tight);
+		text-align: center;
+		color: var(--color-text);
+	}
+	.wallet-panel-empty-sub {
+		margin: 0;
+		max-width: 290px;
+		font-family: var(--font-body);
+		font-size: var(--text-sm); /* 13 */
+		font-weight: var(--font-weight-medium);
+		line-height: var(--leading-normal);
+		letter-spacing: -0.4px;
+		text-align: center;
+		color: var(--color-text-muted); /* #717390 */
 	}
 
 	.wallet-panel-loadmore {
