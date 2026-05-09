@@ -48,6 +48,7 @@ import { network } from '$lib/network/network.svelte';
 import { getPhantomProvider, getSolflareProvider } from '$lib/wallet';
 
 import { buildLoginMessage } from './messages';
+import { REFRESH_THRESHOLD_MS } from './constants';
 
 /**
  * Browser-side flag — `sessionStorage` is the canonical sniff for "is this
@@ -67,13 +68,6 @@ export type AuthStatus =
 
 /** sessionStorage key. Keep the version suffix — bump if the blob shape changes. */
 const STORAGE_KEY = 'app:auth:v1';
-
-/**
- * Refresh threshold — refresh preemptively when fewer than this many ms
- * remain before `expiresAt`. Architect-locked at 60_000 (api-fetch and the
- * boot-time rehydrate share this constant — moving it would split them).
- */
-const REFRESH_THRESHOLD_MS = 60_000;
 
 /** Persisted blob shape. Atomic write/read. */
 interface PersistedAuth {

@@ -21,15 +21,7 @@
  * implementation, so concurrent api-fetch calls share one refresh round
  * trip (matches the architect's F1/F2 invariants).
  */
-import { auth } from '$lib/auth';
-
-/**
- * Window before `expiresAt` in which we refresh preemptively. MUST equal
- * the auth store's REFRESH_THRESHOLD_MS — they describe the same notion
- * of "about to expire" from two different consumers (boot rehydrate vs.
- * inflight requests).
- */
-const REFRESH_THRESHOLD_MS = 60_000;
+import { auth, REFRESH_THRESHOLD_MS } from '$lib/auth';
 
 export interface AuthedFetchOptions extends RequestInit {
 	/**
