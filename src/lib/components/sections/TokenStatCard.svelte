@@ -145,13 +145,20 @@
 		outline-offset: -2px;
 	}
 
-	/* External-link disk */
+	/* External-link disk — Figma macet `Property 1=Variant2`: 44×44 disk in
+	 * the top-right corner with 4px inset, bg --color-surface-inset (#181A29),
+	 * fully rounded, 16×16 arrow-up-right icon inside.
+	 *
+	 * Default (Property 1=Default) state hides the button; hover/focus on
+	 * the card surfaces it. Stays in the DOM with `pointer-events: none`
+	 * (so it doesn't intercept clicks) and `opacity: 0` for an accessible
+	 * fade in/out. Keyboard focus on the link itself reveals it. */
 	.card-go {
 		position: absolute;
-		top: 8px;
-		right: 8px;
-		width: 32px;
-		height: 32px;
+		top: 4px;
+		right: 4px;
+		width: 44px;
+		height: 44px;
 		display: inline-flex;
 		align-items: center;
 		justify-content: center;
@@ -160,14 +167,24 @@
 		color: var(--color-text);
 		text-decoration: none;
 		z-index: 3;
-		transition: background-color var(--motion-base) var(--ease-out);
+		opacity: 0;
+		pointer-events: none;
+		transition:
+			opacity var(--motion-base) var(--ease-out),
+			background-color var(--motion-base) var(--ease-out);
+	}
+	.card:hover .card-go,
+	.card:focus-within .card-go,
+	.card-go:focus-visible {
+		opacity: 1;
+		pointer-events: auto;
 	}
 	.card-go:hover {
 		background-color: var(--color-dark-600);
 	}
 	.card-go img {
-		width: 14px;
-		height: 14px;
+		width: 16px;
+		height: 16px;
 	}
 
 	/* Top row */
