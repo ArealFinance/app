@@ -1,6 +1,20 @@
 import { sveltekit } from '@sveltejs/kit/vite';
 import { defineConfig } from 'vite';
 import { nodePolyfills } from 'vite-plugin-node-polyfills';
+import { HttpsProxyAgent } from 'https-proxy-agent';
+
+/*
+ * Optional outbound HTTPS proxy for the Vite dev proxy. Honoured only when
+ * `HTTPS_PROXY` (or `https_proxy`) is set in the developer's shell — required
+ * on machines that route outbound traffic through Clash / Sing-Box / similar
+ * (Node's built-in https module ignores `HTTPS_PROXY` by default, unlike
+ * curl, which is why `npm run dev` previously hung with "Client network
+ * socket disconnected before secure TLS connection" while curl to the same
+ * host worked fine). Falls back to `undefined` when no proxy is configured,
+ * which means the Vite proxy makes a direct connection — same as before.
+ */
+const httpsProxyEnv = process.env.HTTPS_PROXY ?? process.env.https_proxy ?? null;
+const httpsProxyAgent = httpsProxyEnv ? new HttpsProxyAgent(httpsProxyEnv) : undefined;
 
 export default defineConfig({
 	plugins: [
@@ -60,28 +74,42 @@ export default defineConfig({
 	 * dev origin in `import.meta.env.DEV`, so app code fetches to the dev
 	 * server, which proxies upstream as the same origin (CORS off the
 	 * picture entirely). `ws: true` enables Socket.IO WebSocket upgrade.
+	 *
+	 * `/markets` and `/portfolio` collide with SvelteKit page routes (the
+	 * pages live at /markets and /portfolio). The `bypass` function returns
+	 * the original URL untouched when the browser is navigating (Accept:
+	 * text/html), so SvelteKit serves the page; fetch/XHR requests (which
+	 * carry Accept: application/json) fall through to the proxy.
 	 */
 	server: {
 		proxy: {
 			'/auth': {
 				target: 'https://api.areal.finance',
 				changeOrigin: true,
-				secure: true
+				secure: true,
+				agent: httpsProxyAgent
 			},
 			'/portfolio': {
 				target: 'https://api.areal.finance',
 				changeOrigin: true,
-				secure: true
+				secure: true,
+				agent: httpsProxyAgent,
+				bypass: (req) =>
+					req.headers.accept?.includes('text/html') ? (req.url ?? false) : undefined
 			},
 			'/markets': {
 				target: 'https://api.areal.finance',
 				changeOrigin: true,
-				secure: true
+				secure: true,
+				agent: httpsProxyAgent,
+				bypass: (req) =>
+					req.headers.accept?.includes('text/html') ? (req.url ?? false) : undefined
 			},
 			'/socket.io': {
 				target: 'https://api.areal.finance',
 				changeOrigin: true,
 				secure: true,
+				agent: httpsProxyAgent,
 				ws: true
 			}
 		}
