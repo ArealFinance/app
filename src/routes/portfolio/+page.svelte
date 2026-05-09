@@ -574,36 +574,14 @@
 
 						<div class="section-body" class:section-body-split={isConnected}>
 							{#if !isConnected}
-								<svg
+								<img
 									class="empty-illu"
-									width="100"
-									height="76"
-									viewBox="0 0 100 76"
-									fill="none"
+									src="/images/portfolio/lp-empty.svg"
+									alt=""
+									width="96"
+									height="69"
 									aria-hidden="true"
-								>
-									<defs>
-										<linearGradient id="bar-grad" x1="0" y1="0" x2="0" y2="1">
-											<stop offset="0" stop-color="#3C415F" />
-											<stop offset="1" stop-color="#111322" />
-										</linearGradient>
-									</defs>
-									<line x1="0" y1="64" x2="100" y2="64" stroke="#2A2E37" stroke-width="1" />
-									<rect x="2" y="36" width="14" height="28" rx="3" fill="url(#bar-grad)" />
-									<rect x="22" y="20" width="14" height="44" rx="3" fill="url(#bar-grad)" />
-									<rect x="42" y="6" width="14" height="58" rx="3" fill="#73FF83" opacity="0.85" />
-									<rect x="62" y="28" width="14" height="36" rx="3" fill="url(#bar-grad)" />
-									<rect x="82" y="44" width="14" height="20" rx="3" fill="url(#bar-grad)" />
-									<polyline
-										points="9,30 29,18 49,4 69,26 89,42"
-										stroke="#73FF83"
-										stroke-width="1.5"
-										fill="none"
-										stroke-linecap="round"
-										stroke-linejoin="round"
-										opacity="0.6"
-									/>
-								</svg>
+								/>
 								<p class="empty-title">You do not currently hold any tokens</p>
 								<p class="empty-sub">Start adding tokens</p>
 							{:else}
