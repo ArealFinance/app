@@ -34,7 +34,6 @@ import {
 	type SnapshotRow,
 	type DailyAggregateRow
 } from '@areal/sdk/markets-rest';
-import { BACKEND_API_BASE_URLS } from '@areal/sdk/network';
 import { env as publicEnv } from '$env/dynamic/public';
 
 import { network } from '$lib/network/network.svelte';
@@ -103,7 +102,10 @@ function resolveBaseUrl(): string | null {
 		}
 		return override;
 	}
-	const fromCluster = BACKEND_API_BASE_URLS[network.current];
+	// Resolve via the local NetworkEndpoint instead of the SDK's stale
+	// `BACKEND_API_BASE_URLS` map (its `localnet` slot points at
+	// `http://localhost:3010`, wrong for our public Testnet build).
+	const fromCluster = network.endpoint.backendApiUrl;
 	if (fromCluster && fromCluster.length > 0) return fromCluster;
 	return null;
 }

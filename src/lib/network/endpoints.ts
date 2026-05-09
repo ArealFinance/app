@@ -16,6 +16,10 @@ import { PROGRAM_IDS, USDC_MINTS } from '@areal/sdk/network';
 
 /** Public RPC URL for the Areal-hosted test-validator. */
 const TESTNET_RPC_URL = 'https://rpc.areal.finance';
+/** Public REST API URL of the Areal backend (Phase 12.1+ on Fornex). */
+const AREAL_BACKEND_URL = 'https://api.areal.finance';
+/** Public realtime gateway WebSocket URL (`/realtime` is the Socket.IO namespace). */
+const AREAL_REALTIME_WS_URL = 'wss://api.areal.finance/realtime';
 
 export type NetworkId = 'localnet' | 'devnet' | 'mainnet';
 
@@ -31,6 +35,10 @@ export interface NetworkEndpoint {
 	id: NetworkId;
 	label: string;
 	rpcUrl: string;
+	/** Public REST API base URL (auth, history, markets snapshots). */
+	backendApiUrl: string;
+	/** Realtime gateway WebSocket URL (Socket.IO `/realtime` namespace). */
+	realtimeWsUrl: string;
 	programIds: NetworkProgramIds;
 	usdcMint: PublicKey;
 }
@@ -56,6 +64,8 @@ export const ENDPOINTS: Record<NetworkId, NetworkEndpoint> = {
 		id: 'localnet',
 		label: 'Testnet',
 		rpcUrl: TESTNET_RPC_URL,
+		backendApiUrl: AREAL_BACKEND_URL,
+		realtimeWsUrl: AREAL_REALTIME_WS_URL,
 		programIds: PROGRAM_IDS,
 		usdcMint: USDC_MINTS.localnet
 	},
@@ -63,6 +73,8 @@ export const ENDPOINTS: Record<NetworkId, NetworkEndpoint> = {
 		id: 'devnet',
 		label: 'Devnet',
 		rpcUrl: 'https://api.devnet.solana.com',
+		backendApiUrl: AREAL_BACKEND_URL,
+		realtimeWsUrl: AREAL_REALTIME_WS_URL,
 		programIds: PROGRAM_IDS,
 		usdcMint: USDC_MINTS.devnet
 	},
@@ -70,6 +82,11 @@ export const ENDPOINTS: Record<NetworkId, NetworkEndpoint> = {
 		id: 'mainnet',
 		label: 'Mainnet',
 		rpcUrl: 'https://api.mainnet-beta.solana.com',
+		// Until a separate mainnet backend deployment exists, all clusters
+		// share the same Areal backend host. Swap when the mainnet stack
+		// goes live.
+		backendApiUrl: AREAL_BACKEND_URL,
+		realtimeWsUrl: AREAL_REALTIME_WS_URL,
 		programIds: PROGRAM_IDS,
 		usdcMint: USDC_MINTS.mainnet
 	}

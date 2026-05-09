@@ -47,7 +47,6 @@
  * out of the layout's static import graph (and out of any chunk that lands
  * on cold route loads).
  */
-import { BACKEND_API_BASE_URLS } from '@areal/sdk/network';
 import { env as publicEnv } from '$env/dynamic/public';
 
 import { wallet } from '$lib/stores/wallet.svelte';
@@ -200,13 +199,16 @@ function persistCurrentTokens(): void {
  *
  * Order:
  *   1. PUBLIC_AUTH_API_URL env override (deploy-time tweak)
- *   2. BACKEND_API_BASE_URLS[network.current] (same backend deployment as
- *      `@areal/sdk/markets-rest` and `@areal/sdk/history`)
+ *   2. `network.endpoint.backendApiUrl` — the per-cluster public REST
+ *      base, owned by `lib/network/endpoints.ts`. We don't import the
+ *      SDK's `BACKEND_API_BASE_URLS` map any more because its `localnet`
+ *      slot points at `http://localhost:3010` (a developer's own Nest
+ *      instance) — wrong for our public Testnet build.
  */
 function resolveAuthBaseUrl(): string | null {
 	const override = publicEnv.PUBLIC_AUTH_API_URL;
 	if (override && override.length > 0) return override;
-	const fromCluster = BACKEND_API_BASE_URLS[network.current];
+	const fromCluster = network.endpoint.backendApiUrl;
 	if (fromCluster && fromCluster.length > 0) return fromCluster;
 	return null;
 }

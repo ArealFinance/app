@@ -28,7 +28,6 @@ import type {
 	Room
 } from '@areal/sdk/realtime';
 import { connect } from '@areal/sdk/realtime';
-import { REALTIME_WS_URLS } from '@areal/sdk/network';
 import { env as publicEnv } from '$env/dynamic/public';
 
 import { network } from '$lib/network/network.svelte';
@@ -120,7 +119,10 @@ function resolveBaseUrl(): string | null {
 		}
 		return override;
 	}
-	const fromCluster = REALTIME_WS_URLS[network.current];
+	// Resolve via the local NetworkEndpoint instead of the SDK's stale
+	// `REALTIME_WS_URLS` map (its `localnet` slot points at
+	// `ws://localhost:3010/realtime`, wrong for our public Testnet build).
+	const fromCluster = network.endpoint.realtimeWsUrl;
 	if (fromCluster && fromCluster.length > 0) return fromCluster;
 	return null;
 }

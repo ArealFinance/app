@@ -49,7 +49,6 @@ import {
 	type HistoryKind,
 	type TransactionRow
 } from '@areal/sdk/history';
-import { HISTORY_API_BASE_URLS } from '@areal/sdk/network';
 import { env as publicEnv } from '$env/dynamic/public';
 
 import { wallet } from '$lib/stores/wallet.svelte';
@@ -96,7 +95,10 @@ let refCount: number = 0;
  *
  * Order:
  *   1. PUBLIC_HISTORY_API_URL env override (deploy-time tweak)
- *   2. HISTORY_API_BASE_URLS[network.current] from the SDK
+ *   2. `network.endpoint.backendApiUrl` — the per-cluster public REST
+ *      base, owned by `lib/network/endpoints.ts`. Replaces the old
+ *      `HISTORY_API_BASE_URLS` SDK import whose `localnet` slot pointed
+ *      at `http://localhost:3010`.
  *
  * Returns `null` when neither produces a non-empty string — caller surfaces
  * "Unknown cluster" so the user gets an actionable error instead of a raw
@@ -123,7 +125,7 @@ function resolveBaseUrl(): string | null {
 		}
 		return override;
 	}
-	const fromCluster = HISTORY_API_BASE_URLS[network.current];
+	const fromCluster = network.endpoint.backendApiUrl;
 	if (fromCluster && fromCluster.length > 0) return fromCluster;
 	return null;
 }
