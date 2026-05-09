@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { ENDPOINTS, NETWORK_IDS, network, type NetworkId } from '$lib/network';
+	import { ENDPOINTS, SELECTABLE_NETWORK_IDS, network, type NetworkId } from '$lib/network';
 
 	type Props = {
 		/** Visual variant — `chip` for header, `row` for the mobile wallet panel. */
@@ -21,7 +21,7 @@
 	<span class="visually-hidden">Network</span>
 	<span class="network-dot" aria-hidden="true"></span>
 	<select class="network-select" aria-label="Active network" value={current} onchange={handleChange}>
-		{#each NETWORK_IDS as id}
+		{#each SELECTABLE_NETWORK_IDS as id}
 			<option value={id}>{ENDPOINTS[id].label}</option>
 		{/each}
 	</select>

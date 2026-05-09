@@ -38,6 +38,15 @@ export interface NetworkEndpoint {
 export const NETWORK_IDS: NetworkId[] = ['localnet', 'devnet', 'mainnet'];
 
 /**
+ * Subset of {@link NETWORK_IDS} shown in the user-facing network switcher.
+ * Mainnet is hidden until we ship the actual mainnet release — keeping it in
+ * the type/endpoints map preserves cluster-specific code paths
+ * (e.g. mint placeholder guards, swap pool catalogue) without exposing an
+ * un-deployed cluster to end users.
+ */
+export const SELECTABLE_NETWORK_IDS: NetworkId[] = ['localnet', 'devnet'];
+
+/**
  * `PROGRAM_IDS` from the SDK is a single map (program IDs are network-agnostic
  * because the same deployer publishes the same address on every cluster).
  * `USDC_MINTS` does vary per network — devnet/localnet share the devnet mint.
