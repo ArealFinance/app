@@ -366,7 +366,7 @@
 		<div class="pool-tokens">
 			<span class="pool-logo" style:background={pool.pairA.iconSrc ? 'transparent' : pool.pairA.bg}>
 				{#if pool.pairA.iconSrc}
-					<img src={pool.pairA.iconSrc} alt="" />
+					<img src={pool.pairA.iconSrc} alt="" loading="lazy" />
 				{:else}
 					<span class="pool-letter">{pool.pairA.iconLetter ?? pool.pairA.symbol[0]}</span>
 				{/if}
@@ -374,7 +374,7 @@
 			<span class="pool-sym">{pool.pairA.symbol}</span>
 			<span class="pool-logo" style:background={pool.pairB.iconSrc ? 'transparent' : pool.pairB.bg}>
 				{#if pool.pairB.iconSrc}
-					<img src={pool.pairB.iconSrc} alt="" />
+					<img src={pool.pairB.iconSrc} alt="" loading="lazy" />
 				{:else}
 					<span class="pool-letter">{pool.pairB.iconLetter ?? pool.pairB.symbol[0]}</span>
 				{/if}
@@ -710,7 +710,7 @@
 						>
 							<span class="currency-logo" style:background={pool.pairB.iconSrc ? 'transparent' : pool.pairB.bg}>
 								{#if pool.pairB.iconSrc}
-									<img src={pool.pairB.iconSrc} alt="" />
+									<img src={pool.pairB.iconSrc} alt="" loading="lazy" />
 								{:else}
 									<span class="pool-letter">
 										{pool.pairB.iconLetter ?? pool.pairB.symbol[0]}
@@ -727,7 +727,7 @@
 						>
 							<span class="currency-logo" style:background={pool.pairA.iconSrc ? 'transparent' : pool.pairA.bg}>
 								{#if pool.pairA.iconSrc}
-									<img src={pool.pairA.iconSrc} alt="" />
+									<img src={pool.pairA.iconSrc} alt="" loading="lazy" />
 								{:else}
 									<span class="pool-letter">
 										{pool.pairA.iconLetter ?? pool.pairA.symbol[0]}
@@ -884,7 +884,7 @@
 							<div class="wd-receive-row">
 								<span class="wd-receive-logo" style:background={pool.pairB.iconSrc ? 'transparent' : pool.pairB.bg}>
 									{#if pool.pairB.iconSrc}
-										<img src={pool.pairB.iconSrc} alt="" />
+										<img src={pool.pairB.iconSrc} alt="" loading="lazy" />
 									{:else}
 										<span class="pool-letter">
 											{pool.pairB.iconLetter ?? pool.pairB.symbol[0]}
@@ -899,7 +899,7 @@
 							<div class="wd-receive-row">
 								<span class="wd-receive-logo" style:background={pool.pairA.iconSrc ? 'transparent' : pool.pairA.bg}>
 									{#if pool.pairA.iconSrc}
-										<img src={pool.pairA.iconSrc} alt="" />
+										<img src={pool.pairA.iconSrc} alt="" loading="lazy" />
 									{:else}
 										<span class="pool-letter">
 											{pool.pairA.iconLetter ?? pool.pairA.symbol[0]}

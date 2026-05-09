@@ -41,10 +41,10 @@
 		<div class="tx-label">{cfg.label}</div>
 		<div class="tx-pair">
 			<span class="tx-pair-logo tx-pair-logo-from" aria-hidden="true">
-				<img src="/images/tokens/usdt-t.svg" alt="" />
+				<img src="/images/tokens/usdt-t.svg" alt="" loading="lazy" />
 			</span>
 			<span class="tx-pair-logo tx-pair-logo-to" aria-hidden="true">
-				<img src="/images/tokens/rwt-mark.svg" alt="" />
+				<img src="/images/tokens/rwt-mark.svg" alt="" loading="lazy" />
 			</span>
 			<span class="tx-pair-text">{tx.pair[0]} / {tx.pair[1]}</span>
 		</div>

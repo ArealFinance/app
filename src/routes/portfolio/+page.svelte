@@ -273,6 +273,7 @@
 										src="/images/tokens/rwt-mark.svg"
 										alt=""
 										aria-hidden="true"
+										loading="lazy"
 									/>
 									<span class="rewards-amount">
 										{claimableUnknown ? '—' : unclaimedDisplay}
@@ -415,6 +416,7 @@
 							src="/images/hero/crystal-glow.png"
 							alt=""
 							aria-hidden="true"
+							loading="lazy"
 						/>
 					</div>
 				{/if}
@@ -509,7 +511,7 @@
 											<div class="tt-cell tt-cell-asset">
 												<span class="token-logo">
 													{#if t.logoSrc}
-														<img src={t.logoSrc} alt="" aria-hidden="true" />
+														<img src={t.logoSrc} alt="" aria-hidden="true" loading="lazy" />
 													{:else}
 														<span class="token-letter">{t.logoLetter}</span>
 													{/if}
@@ -627,10 +629,10 @@
 										>
 											<span class="lp-logos">
 												<span class="lp-logo" style:background-color="#009393">
-													<img src="/images/tokens/usdt-t.svg" alt="" aria-hidden="true" />
+													<img src="/images/tokens/usdt-t.svg" alt="" aria-hidden="true" loading="lazy" />
 												</span>
 												<span class="lp-logo lp-logo-overlap" style:background-color="#9E60F6">
-													<img src="/images/tokens/rwt-mark.svg" alt="" aria-hidden="true" />
+													<img src="/images/tokens/rwt-mark.svg" alt="" aria-hidden="true" loading="lazy" />
 												</span>
 											</span>
 											<span class="lp-pair">{p.pair[0]} / {p.pair[1]}</span>

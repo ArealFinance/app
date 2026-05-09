@@ -567,7 +567,7 @@
 									<article class="nft-card">
 										<div class="nft-cover" aria-hidden="true">
 											{#if nft.image}
-												<img src={nft.image} alt="" />
+												<img src={nft.image} alt="" loading="lazy" />
 											{/if}
 										</div>
 										<div class="nft-body">

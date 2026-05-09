@@ -54,17 +54,17 @@
 			<Xmark size={20} />
 		</button>
 
-		<img class="wallet-dialog-mark" src="/images/wallet/areal-mark.svg" alt="" aria-hidden="true" />
+		<img class="wallet-dialog-mark" src="/images/wallet/areal-mark.svg" alt="" aria-hidden="true" loading="lazy" />
 
 		<h2 id="wallet-dialog-title" class="wallet-dialog-title">Connect your wallet</h2>
 
 		<p class="wallet-dialog-help">
 			<span>No supported wallets detected. Install</span>
 			<span class="wallet-dialog-help-line">
-				<img src="/images/wallet/phantom.svg" alt="" aria-hidden="true" />
+				<img src="/images/wallet/phantom.svg" alt="" aria-hidden="true" loading="lazy" />
 				<strong>Phantom</strong>
 				<span>or</span>
-				<img src="/images/wallet/solflare.svg" alt="" aria-hidden="true" />
+				<img src="/images/wallet/solflare.svg" alt="" aria-hidden="true" loading="lazy" />
 				<strong>Solflare</strong>
 			</span>
 		</p>
@@ -77,7 +77,7 @@
 				disabled={isAwaiting || !phantomAvailable}
 				title={phantomAvailable ? undefined : 'Phantom is not installed'}
 			>
-				<img src="/images/wallet/phantom.svg" alt="" aria-hidden="true" />
+				<img src="/images/wallet/phantom.svg" alt="" aria-hidden="true" loading="lazy" />
 				<span>Connect Phantom</span>
 			</button>
 			<button
@@ -87,7 +87,7 @@
 				disabled={isAwaiting || !solflareAvailable}
 				title={solflareAvailable ? undefined : 'Solflare is not installed'}
 			>
-				<img src="/images/wallet/solflare.svg" alt="" aria-hidden="true" />
+				<img src="/images/wallet/solflare.svg" alt="" aria-hidden="true" loading="lazy" />
 				<span>Connect Solflare</span>
 			</button>
 		</div>

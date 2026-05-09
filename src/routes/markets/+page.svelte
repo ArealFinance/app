@@ -165,7 +165,15 @@
 		</div>
 
 		<div class="hero-art" aria-hidden="true">
-			<img src="/images/hero/crystal-composite.png" alt="" class="hero-crystal" />
+			<img
+				src="/images/hero/crystal-composite.png"
+				alt=""
+				class="hero-crystal"
+				width="790"
+				height="748"
+				fetchpriority="high"
+				loading="eager"
+			/>
 		</div>
 	</section>
 
