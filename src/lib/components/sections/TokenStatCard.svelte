@@ -57,7 +57,7 @@
 			target={external ? '_blank' : undefined}
 			rel={external ? 'noopener' : undefined}
 		>
-			<img src="/images/cards/arrow-up-right.svg" alt="" />
+			<img src="/images/cards/go-button.svg" alt="" width="44" height="44" />
 		</a>
 	{/if}
 
@@ -132,11 +132,10 @@
 
 	.card-linkable {
 		cursor: pointer;
-		transition: background-color var(--motion-base) var(--ease-out);
 	}
-	.card-linkable:hover {
-		background-color: var(--color-surface-inset);
-	}
+	/* No background-color shift on hover — the corner go-button disk is the
+	 * hover affordance per Figma macet. Changing the card surface here would
+	 * clash with the disk's own --color-surface-inset bg. */
 
 	/* Stretched-link overlay — invisible <a> covering the whole card so any
 	 * click on the surface navigates. Sits above .card-price (z=1) and
@@ -152,33 +151,26 @@
 		outline-offset: -2px;
 	}
 
-	/* External-link disk — Figma macet `Property 1=Variant2`: 44×44 disk in
-	 * the top-right corner with 4px inset, bg --color-surface-inset (#181A29),
-	 * fully rounded, 16×16 arrow-up-right icon inside.
+	/* External-link disk — Figma macet `Property 1=Variant2`: 44×44 in the
+	 * top-right corner with 4px inset. Disk bg + arrow-up-right icon are
+	 * baked into the canonical SVG (#181A29 disk, #FBF2FF arrow), so this
+	 * rule only handles positioning + hover-fade.
 	 *
-	 * Default (Property 1=Default) state hides the button; hover/focus on
-	 * the card surfaces it. Stays in the DOM with `pointer-events: none`
-	 * (so it doesn't intercept clicks) and `opacity: 0` for an accessible
-	 * fade in/out. Keyboard focus on the link itself reveals it. */
+	 * Default state hides the button; hover/focus on the card surfaces it.
+	 * Stays in the DOM with `pointer-events: none` + `opacity: 0` for an
+	 * accessible fade-in. */
 	.card-go {
 		position: absolute;
 		top: 4px;
 		right: 4px;
 		width: 44px;
 		height: 44px;
-		display: inline-flex;
-		align-items: center;
-		justify-content: center;
-		background-color: var(--color-surface-inset);
-		border-radius: var(--radius-full);
-		color: var(--color-text);
+		display: block;
 		text-decoration: none;
 		z-index: 3;
 		opacity: 0;
 		pointer-events: none;
-		transition:
-			opacity var(--motion-base) var(--ease-out),
-			background-color var(--motion-base) var(--ease-out);
+		transition: opacity var(--motion-base) var(--ease-out);
 	}
 	.card:hover .card-go,
 	.card:focus-within .card-go,
@@ -186,12 +178,10 @@
 		opacity: 1;
 		pointer-events: auto;
 	}
-	.card-go:hover {
-		background-color: var(--color-dark-600);
-	}
 	.card-go img {
-		width: 16px;
-		height: 16px;
+		display: block;
+		width: 100%;
+		height: 100%;
 	}
 
 	/* Top row */
