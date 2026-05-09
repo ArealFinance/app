@@ -1,7 +1,7 @@
 <script lang="ts" module>
 	import type { PublicKey } from '@solana/web3.js';
 	import type { Period, SnapshotsStore } from '$lib/markets/snapshots.svelte';
-	import type { SnapshotRow } from '@areal/sdk/markets-rest';
+	import type { SnapshotRow, DailyAggregateRow } from '@areal/sdk/markets-rest';
 
 	export type PoolHistoryChartProps = {
 		/** Pool to track. `null` means the parent page is still resolving. */
@@ -24,16 +24,19 @@
 	 * `/markets/[symbol]/+page.svelte`) and binds to the singleton
 	 * `snapshotsStore` for the data series.
 	 *
-	 * Series mapping (Phase 12.3.3 limitation):
-	 *   - Preferred: `tvlUsd / lpSupply * 10**lpDecimals` as a USD-per-LP-share
-	 *     proxy. The REST wire shape does NOT carry per-token USD prices today,
-	 *     so this is the closest signed-USD value we can render.
-	 *   - Fallback: ratio `Number(reserveB) / Number(reserveA)` — token
+	 * Series mapping:
+	 *   - 24H (live snapshots): `tvlUsd / lpSupply * 10**lpDecimals` as a
+	 *     USD-per-LP-share proxy. The snapshot wire shape still doesn't
+	 *     surface per-token USD prices, so this proxy is the closest
+	 *     signed-USD value we can render at sub-day granularity.
+	 *     Fallback: ratio `Number(reserveB) / Number(reserveA)` — token
 	 *     denomination, useful when `tvlUsd` is null on a freshly-priced pool.
-	 *
-	 * If UX ever requires true $/token, escalate to Phase 12.3.4 — that needs
-	 * the backend to surface `priceAUsdc`/`priceBUsdc` (already persisted in
-	 * migration 0006 but not exposed by the snapshots mapper).
+	 *   - 7D / 1M / 3M / 6M / 1Y / ALL (daily aggregate): real per-token
+	 *     USDC price for token A from `priceAUsdc` on each `DailyAggregateRow`.
+	 *     Backend (Phase 12.3.3-I) hydrates this from the latest snapshot at
+	 *     or before each day's UTC end. Rows without a price (pre-12.3.3.1
+	 *     historical aggregates, unpriceable tokens) are skipped — the chart
+	 *     drops the point rather than crashing.
 	 */
 	import { onMount, onDestroy } from 'svelte';
 	import { snapshotsStore as defaultStore } from '$lib/markets/snapshots.svelte';
@@ -66,6 +69,18 @@
 		return null;
 	}
 
+	function priceFromAggregate(row: DailyAggregateRow): number | null {
+		// Phase 12.3.3 R-I: backend now surfaces latest-snapshot prices on
+		// each daily aggregate row. Pick token A's USD price as the canonical
+		// y-axis (matches what most users want — the priced side of a stable
+		// /quote pair). When unavailable (pre-12.3.3.1 historical rows or
+		// unpriceable token) return null → consumer drops the point.
+		if (typeof row.priceAUsdc === 'number' && Number.isFinite(row.priceAUsdc)) {
+			return row.priceAUsdc;
+		}
+		return null;
+	}
+
 	const chartData = $derived<PricePoint[]>(
 		(() => {
 			// 24H period uses live snapshot rows (sorted ASC).
@@ -79,28 +94,39 @@
 				}
 				return points;
 			}
-			// 7D / 1M / 3M / 6M / 1Y / ALL — daily aggregate rows.
-			// Phase 12.3.3 limitation: aggregate rows carry only volume + APY,
-			// NOT a USD-denominated per-token / per-LP price series. Plotting
-			// APY on the same y-axis as 24H's USD-per-LP would mix unrelated
-			// units and mislead users. Until backend wire-shape exposes a
-			// historical price series for non-24H periods (escalation to
-			// Phase 12.3.4 wire-shape extension), return EMPTY → component
-			// renders empty-state "Daily price data unavailable in 12.3.3 —
-			// switch to 24H for live snapshots".
+			// 7D / 1M / 3M / 6M / 1Y / ALL — use real priceAUsdc from latest
+			// snapshot at each day boundary (Phase 12.3.3 R-I — backend
+			// DailyAggregateRow.priceAUsdc surfaces it via `MarketsService`
+			// 2-step lookup).
+			//
+			// `store.aggregate` arrives newest-first from REST; reverse so
+			// the chart x-axis runs ASC (oldest → newest, left → right).
+			// Use the running array index for `x` (LayerCake just needs a
+			// monotonic numeric domain); per-day labels are rendered via
+			// `chartXLabels` from `row.day`.
+			if (period !== '24H' && store.aggregate.length > 0) {
+				const sorted = [...store.aggregate].reverse();
+				const points: PricePoint[] = [];
+				for (let i = 0; i < sorted.length; i++) {
+					const y = priceFromAggregate(sorted[i]!);
+					if (y === null) continue;
+					points.push({ x: i, y });
+				}
+				return points;
+			}
 			return [];
 		})()
 	);
 
 
-	function formatTimestamp(blockTime: number, p: Period): string {
+	function formatTimestamp(blockTime: number): string {
+		// 24H labels render as `HH:MM` (clock time). Non-24H periods get
+		// per-day labels from `formatDayLabel(row.day)` instead, so this
+		// helper is intentionally clock-only after Phase 12.3.3-I.
 		const d = new Date(blockTime * 1000);
-		const dd = String(d.getDate()).padStart(2, '0');
-		const mm = String(d.getMonth() + 1).padStart(2, '0');
 		const HH = String(d.getHours()).padStart(2, '0');
 		const MM = String(d.getMinutes()).padStart(2, '0');
-		if (p === '24H') return `${HH}:${MM}`;
-		return `${dd}.${mm}`;
+		return `${HH}:${MM}`;
 	}
 
 	function formatDayLabel(day: string): string {
@@ -118,7 +144,7 @@
 				for (let i = 0; i < TICK_COUNT; i++) {
 					const idx = Math.round((i / (TICK_COUNT - 1)) * (len - 1));
 					const r = store.rows[idx]!;
-					labels.push(formatTimestamp(r.blockTime, period));
+					labels.push(formatTimestamp(r.blockTime));
 				}
 				return labels;
 			}
@@ -195,14 +221,10 @@
 					Retry
 				</button>
 			</div>
-		{:else if chartData.length === 0 && period !== '24H'}
-			<div class="state state-empty">
-				<p class="state-title">Daily price data unavailable in 12.3.3</p>
-				<p class="state-sub">Switch to 24H for live on-chain snapshots.</p>
-			</div>
 		{:else if chartData.length === 0}
 			<div class="state state-empty">
-				<p class="state-title">No data for {period}</p>
+				<p class="state-title">No price data for {period}</p>
+				<p class="state-sub">Backend has no recorded snapshots for this period yet.</p>
 			</div>
 		{:else}
 			<PriceChart data={chartData} {currentPrice} xLabels={chartXLabels} />
