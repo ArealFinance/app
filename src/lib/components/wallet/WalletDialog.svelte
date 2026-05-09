@@ -10,21 +10,55 @@
 	const status = $derived(wallet.status);
 	const isAwaiting = $derived(status === 'awaiting-signature');
 
+	/**
+	 * Dialog phases:
+	 *
+	 *   A: pick — wallet not connected; show provider CTAs.
+	 *   B: signing — wallet connected, auth is mid-handshake; show spinner.
+	 *   C: needs-sign — wallet connected, auth not signed-in (user dismissed
+	 *      the signature popup, or sessionStorage rehydrate left us cold);
+	 *      show explanation + "Sign message" retry CTA + "Skip for now".
+	 *
+	 * Phase D (done) isn't a render state — when `auth` settles to `signed-in`
+	 * we auto-close the dialog and route the user to the wallet panel.
+	 */
+	const phase = $derived.by<'pick' | 'signing' | 'needs-sign'>(() => {
+		if (!wallet.isConnected) return 'pick';
+		if (auth.status === 'signing' || auth.status === 'authenticating') return 'signing';
+		// Wallet connected + auth not in-flight + not signed-in → user needs to
+		// finish the second step (sign the login message). Covers post-dismiss
+		// (`auth.status === 'error'`) and the rare cold-rehydrate-failure case
+		// (`auth.status === 'signed-out' | 'expired'`).
+		if (!auth.isSignedInForCurrentWallet) return 'needs-sign';
+		// auth.isSignedInForCurrentWallet — Phase D handled by the auto-close
+		// effect below.
+		return 'pick';
+	});
+
 	// Re-check provider availability whenever the dialog opens — the wallet
 	// extension may have been installed in another tab while this app was idle.
 	let phantomAvailable = $state(false);
 	let solflareAvailable = $state(false);
 	$effect(() => {
-		if (open) {
+		if (open && phase === 'pick') {
 			phantomAvailable = isPhantomInstalled();
 			solflareAvailable = isSolflareInstalled();
 		}
 	});
 
-	// Auto-close once the mock connection settles, and route the user to the
-	// transaction panel so they see what happened.
+	/**
+	 * Auto-close + route to wallet panel ONLY after the full handshake
+	 * (connect + sign-in) is complete. Closing on `wallet.status === 'connected'`
+	 * alone (the prior behavior) yanked the modal away while `auth.signIn()`
+	 * was still mid-flight — leaving the user staring at a "Sign in" button
+	 * in the header with no context.
+	 */
 	$effect(() => {
-		if (status === 'connected' && walletDialog.mode === 'connect') {
+		if (
+			walletDialog.mode === 'connect' &&
+			wallet.isConnected &&
+			auth.isSignedInForCurrentWallet
+		) {
 			walletDialog.open('panel');
 		}
 	});
@@ -35,42 +69,46 @@
 	 * Without this, the flow lands the user in "wallet connected but auth
 	 * signed-out" state, which renders an extra "Sign in" button in the header
 	 * — non-technical users read that as a bug ("I just connected, why do I
-	 * have to sign in?"). Fire-and-forget the signIn handshake immediately so
-	 * the wallet's two popups (connection approve + login signature) appear
-	 * back-to-back as one continuous flow.
+	 * have to sign in?"). Fire the signIn handshake immediately so the wallet's
+	 * two popups (connection approve + login signature) appear back-to-back.
 	 *
 	 * Guards:
-	 *   - only fire on user-initiated connect (this handler), NOT on the
-	 *     auto-reconnect path that runs on page load. Page-refresh rehydrates
-	 *     auth from sessionStorage; if there's a valid token, status is
-	 *     already `signed-in` and the header is clean.
-	 *   - skip if auth is already settled for this wallet (defensive — should
-	 *     not happen here since the wallet just changed, but keeps idempotent).
-	 *   - if the user dismisses the signature in the wallet, auth lands in
-	 *     `error` state and the header's "Sign in" button reappears as a
-	 *     recovery affordance — that's intentional, not a regression.
+	 *   - only fires on user-initiated connect (this handler) and on Phase C
+	 *     retry. NOT on the auto-reconnect path that runs on page load —
+	 *     sessionStorage rehydrate already lands `signed-in` if a valid token
+	 *     exists, and the auth store does not auto-sign on cold boot.
+	 *   - skips if `auth.isSignedInForCurrentWallet` (defensive idempotence).
+	 *   - if the user dismisses the signature, auth lands in `error` and the
+	 *     dialog stays open in Phase C with a clear retry path.
 	 */
-	async function chainSignInAfterConnect() {
+	async function runSignIn() {
 		if (!wallet.isConnected) return;
 		if (auth.isSignedInForCurrentWallet) return;
 		try {
 			await auth.signIn();
 		} catch {
-			// Errors are surfaced via `auth.status === 'error'` + `auth.error`;
-			// no need to re-throw or render a toast here.
+			// Surfaced via `auth.status === 'error'` + `auth.error`. The dialog
+			// stays in Phase C so the user has an obvious retry button.
 		}
 	}
 
 	async function handleConnectPhantom() {
 		if (isAwaiting) return;
 		await wallet.connect('phantom');
-		await chainSignInAfterConnect();
+		await runSignIn();
 	}
 
 	async function handleConnectSolflare() {
 		if (isAwaiting) return;
 		await wallet.connect('solflare');
-		await chainSignInAfterConnect();
+		await runSignIn();
+	}
+
+	function handleSkipSignIn() {
+		// Close the dialog without finishing sign-in. The header keeps a
+		// "Sign in" pill as a last-resort recovery affordance for the user
+		// who explicitly opted out here.
+		walletDialog.close();
 	}
 </script>
 
@@ -78,7 +116,9 @@
 	<div class="wallet-dialog">
 		<div class="wallet-dialog-aurora" aria-hidden="true"></div>
 
-		<div class="wallet-dialog-caption">Connected via Phantom</div>
+		<div class="wallet-dialog-caption">
+			{#if phase === 'pick'}Connect wallet{:else}Sign in{/if}
+		</div>
 
 		<button
 			type="button"
@@ -91,44 +131,90 @@
 
 		<img class="wallet-dialog-mark" src="/images/wallet/areal-mark.svg" alt="" aria-hidden="true" loading="lazy" />
 
-		<h2 id="wallet-dialog-title" class="wallet-dialog-title">Connect your wallet</h2>
+		{#if phase === 'pick'}
+			<h2 id="wallet-dialog-title" class="wallet-dialog-title">Connect your wallet</h2>
 
-		<p class="wallet-dialog-help">
-			<span>No supported wallets detected. Install</span>
-			<span class="wallet-dialog-help-line">
-				<img src="/images/wallet/phantom.svg" alt="" aria-hidden="true" loading="lazy" />
-				<strong>Phantom</strong>
-				<span>or</span>
-				<img src="/images/wallet/solflare.svg" alt="" aria-hidden="true" loading="lazy" />
-				<strong>Solflare</strong>
-			</span>
-		</p>
+			<p class="wallet-dialog-help">
+				<span>No supported wallets detected. Install</span>
+				<span class="wallet-dialog-help-line">
+					<img src="/images/wallet/phantom.svg" alt="" aria-hidden="true" loading="lazy" />
+					<strong>Phantom</strong>
+					<span>or</span>
+					<img src="/images/wallet/solflare.svg" alt="" aria-hidden="true" loading="lazy" />
+					<strong>Solflare</strong>
+				</span>
+			</p>
 
-		<div class="wallet-dialog-actions">
-			<button
-				type="button"
-				class="wallet-dialog-cta"
-				onclick={handleConnectPhantom}
-				disabled={isAwaiting || !phantomAvailable}
-				title={phantomAvailable ? undefined : 'Phantom is not installed'}
-			>
-				<img src="/images/wallet/phantom.svg" alt="" aria-hidden="true" loading="lazy" />
-				<span>Connect Phantom</span>
-			</button>
-			<button
-				type="button"
-				class="wallet-dialog-cta wallet-dialog-cta--secondary"
-				onclick={handleConnectSolflare}
-				disabled={isAwaiting || !solflareAvailable}
-				title={solflareAvailable ? undefined : 'Solflare is not installed'}
-			>
-				<img src="/images/wallet/solflare.svg" alt="" aria-hidden="true" loading="lazy" />
-				<span>Connect Solflare</span>
-			</button>
-		</div>
+			<div class="wallet-dialog-actions">
+				<button
+					type="button"
+					class="wallet-dialog-cta"
+					onclick={handleConnectPhantom}
+					disabled={isAwaiting || !phantomAvailable}
+					title={phantomAvailable ? undefined : 'Phantom is not installed'}
+				>
+					<img src="/images/wallet/phantom.svg" alt="" aria-hidden="true" loading="lazy" />
+					<span>Connect Phantom</span>
+				</button>
+				<button
+					type="button"
+					class="wallet-dialog-cta wallet-dialog-cta--secondary"
+					onclick={handleConnectSolflare}
+					disabled={isAwaiting || !solflareAvailable}
+					title={solflareAvailable ? undefined : 'Solflare is not installed'}
+				>
+					<img src="/images/wallet/solflare.svg" alt="" aria-hidden="true" loading="lazy" />
+					<span>Connect Solflare</span>
+				</button>
+			</div>
 
-		{#if isAwaiting}
-			<div class="wallet-dialog-status" role="status">Waiting for signature</div>
+			{#if isAwaiting}
+				<div class="wallet-dialog-status" role="status">Waiting for signature</div>
+			{/if}
+		{:else if phase === 'signing'}
+			<h2 id="wallet-dialog-title" class="wallet-dialog-title">Signing you in</h2>
+
+			<p class="wallet-dialog-help">
+				<span>Approve the login message in your wallet to access your portfolio.</span>
+				<span>This won't cost any gas — it's just a signature for the session.</span>
+			</p>
+
+			<div class="wallet-dialog-spinner-wrap" role="status" aria-live="polite">
+				<span class="wallet-dialog-spinner" aria-hidden="true"></span>
+				<span class="wallet-dialog-spinner-label">Waiting for signature…</span>
+			</div>
+		{:else}
+			<!-- phase === 'needs-sign' -->
+			<h2 id="wallet-dialog-title" class="wallet-dialog-title">One more step</h2>
+
+			<p class="wallet-dialog-help">
+				<span>Your wallet is connected. Sign a one-time login message to access your portfolio and on-chain history.</span>
+				<span>This won't cost any gas — it's only a signature.</span>
+			</p>
+
+			{#if auth.status === 'error' && auth.error}
+				<div class="wallet-dialog-banner" role="alert">
+					{auth.error}
+				</div>
+			{/if}
+
+			<div class="wallet-dialog-actions">
+				<button
+					type="button"
+					class="wallet-dialog-cta"
+					onclick={runSignIn}
+					disabled={auth.status === 'signing' || auth.status === 'authenticating'}
+				>
+					<span>Sign message</span>
+				</button>
+				<button
+					type="button"
+					class="wallet-dialog-cta wallet-dialog-cta--secondary"
+					onclick={handleSkipSignIn}
+				>
+					<span>Skip for now</span>
+				</button>
+			</div>
 		{/if}
 	</div>
 </Modal>
@@ -327,6 +413,54 @@
 		text-transform: uppercase;
 		color: var(--color-purple-200);
 		text-align: center;
+	}
+
+	/* Phase B (signing) — large spinner + label, occupies the same vertical
+	 * space the CTAs would in Phase A so the dialog doesn't jump between
+	 * phases. */
+	.wallet-dialog-spinner-wrap {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		gap: var(--space-3);
+		min-height: 108px; /* matches the two stacked CTAs (48 + 48 + 12 gap). */
+	}
+	.wallet-dialog-spinner {
+		width: 32px;
+		height: 32px;
+		border-radius: 50%;
+		border: 2.5px solid rgba(255, 255, 255, 0.18);
+		border-top-color: var(--color-purple-300, #c2a3ff);
+		animation: wallet-dialog-spin 0.8s linear infinite;
+	}
+	.wallet-dialog-spinner-label {
+		font-family: var(--font-body);
+		font-size: var(--text-xs);
+		font-weight: var(--font-weight-semibold);
+		letter-spacing: 1px;
+		text-transform: uppercase;
+		color: var(--color-purple-200);
+	}
+	@keyframes wallet-dialog-spin {
+		to {
+			transform: rotate(360deg);
+		}
+	}
+
+	/* Phase C (needs-sign) — soft warning banner that surfaces the auth.error
+	 * message (e.g. "User rejected the request"). Sits between help copy and
+	 * the Sign / Skip CTAs. */
+	.wallet-dialog-banner {
+		margin-bottom: var(--space-4);
+		padding: var(--space-3) var(--space-4);
+		background-color: rgba(239, 68, 68, 0.12);
+		border: 1px solid rgba(239, 68, 68, 0.32);
+		border-radius: var(--radius-md);
+		font-family: var(--font-body);
+		font-size: var(--text-sm);
+		line-height: var(--leading-normal);
+		color: var(--color-text);
 	}
 
 	@media (max-width: 480px) {
