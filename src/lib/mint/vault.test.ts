@@ -100,11 +100,29 @@ describe('vaultStore', () => {
 		// fetch promise, the user navigates away (deactivate fires), and
 		// only afterwards does the cluster push a vault update through the
 		// already-registered listener.
-		let resolveFetch: ((info: { data: Uint8Array; executable: false; lamports: 0; owner: PublicKey }) => void) | null = null;
+		// Hold the resolve callback so the test can drain the orphaned fetch
+		// after the deactivate. Plain non-nullable function — TS flow analysis
+		// across the Promise constructor closure boundary loses track of an
+		// `(... | null)` assignment, which then narrows downstream `?.()`
+		// invocation to `never`. We keep nullability via `assigned` flag.
+		type ResolveFetch = (info: {
+			data: Uint8Array;
+			executable: false;
+			lamports: 0;
+			owner: PublicKey;
+		}) => void;
+		let resolveFetch: ResolveFetch = () => {};
+		let resolveFetchAssigned = false;
 		mocks.getAccountInfo.mockImplementation(
 			() =>
-				new Promise((resolve) => {
-					resolveFetch = resolve as typeof resolveFetch;
+				new Promise<{
+					data: Uint8Array;
+					executable: false;
+					lamports: 0;
+					owner: PublicKey;
+				}>((resolve) => {
+					resolveFetch = resolve;
+					resolveFetchAssigned = true;
 				})
 		);
 
@@ -146,12 +164,14 @@ describe('vaultStore', () => {
 
 		// Drain the (now-orphaned) fetch so the test runner's afterAll
 		// teardown isn't holding a dangling promise.
-		resolveFetch?.({
-			data: new Uint8Array([1]),
-			executable: false,
-			lamports: 0,
-			owner: PROGRAM_ID
-		});
+		if (resolveFetchAssigned) {
+			resolveFetch({
+				data: new Uint8Array([1]),
+				executable: false,
+				lamports: 0,
+				owner: PROGRAM_ID
+			});
+		}
 		await activatePromise;
 		await settle();
 
