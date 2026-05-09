@@ -37,6 +37,17 @@ export interface SolflareProvider {
 	signAndSendTransaction<T extends Transaction | VersionedTransaction>(
 		tx: T
 	): Promise<{ signature: string }>;
+	/*
+	 * Sign an arbitrary byte payload — used for the wallet-signature auth
+	 * handshake. Solflare exposes the same shape as Phantom (`{ signature,
+	 * publicKey? }`), so the call site can reuse the same code path. The
+	 * `display` hint is best-effort: Solflare honours `'utf8'` to render the
+	 * payload as plain text in the approval prompt (matches Phantom's UX).
+	 */
+	signMessage(
+		message: Uint8Array,
+		display?: 'utf8' | 'hex'
+	): Promise<{ signature: Uint8Array; publicKey?: PublicKey }>;
 	on(event: 'connect', handler: SolflareConnectHandler): void;
 	on(event: 'disconnect', handler: SolflareDisconnectHandler): void;
 	on(event: 'accountChanged', handler: SolflareAccountChangedHandler): void;

@@ -21,6 +21,7 @@ function makeMockProvider(overrides: Partial<SolflareProvider> = {}): SolflarePr
 		disconnect: vi.fn().mockResolvedValue(undefined),
 		signTransaction: vi.fn(),
 		signAndSendTransaction: vi.fn(),
+		signMessage: vi.fn(),
 		on: vi.fn(),
 		off: vi.fn(),
 		...overrides
