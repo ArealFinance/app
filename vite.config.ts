@@ -48,6 +48,44 @@ export default defineConfig({
 	resolve: {
 		dedupe: ['@solana/web3.js', 'buffer']
 	},
+	/*
+	 * Dev proxy — forwards Areal backend paths from `localhost:5173` to the
+	 * production API at `api.areal.finance`. Without this, `/auth/login` and
+	 * friends hit the absolute https URL and are blocked by the Cloudflare
+	 * Transform Rule that pins `Access-Control-Allow-Origin` to the deployed
+	 * hostnames (`app.areal.finance`, `panel.areal.finance`, etc.) — local
+	 * dev origins are never in that allowlist, so the browser CORS-blocks.
+	 *
+	 * `endpoints.ts` flips `backendApiUrl` / `realtimeWsUrl` to the current
+	 * dev origin in `import.meta.env.DEV`, so app code fetches to the dev
+	 * server, which proxies upstream as the same origin (CORS off the
+	 * picture entirely). `ws: true` enables Socket.IO WebSocket upgrade.
+	 */
+	server: {
+		proxy: {
+			'/auth': {
+				target: 'https://api.areal.finance',
+				changeOrigin: true,
+				secure: true
+			},
+			'/portfolio': {
+				target: 'https://api.areal.finance',
+				changeOrigin: true,
+				secure: true
+			},
+			'/markets': {
+				target: 'https://api.areal.finance',
+				changeOrigin: true,
+				secure: true
+			},
+			'/socket.io': {
+				target: 'https://api.areal.finance',
+				changeOrigin: true,
+				secure: true,
+				ws: true
+			}
+		}
+	},
 	// @solana/web3.js ships raw TypeScript that some bundler paths can't
 	// transpile cleanly. The SDK and arlex-client both rely on the
 	// node-polyfill Buffer being injected at the call site — we keep them

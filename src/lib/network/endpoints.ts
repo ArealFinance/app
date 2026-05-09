@@ -16,10 +16,31 @@ import { PROGRAM_IDS, USDC_MINTS } from '@areal/sdk/network';
 
 /** Public RPC URL for the Areal-hosted test-validator. */
 const TESTNET_RPC_URL = 'https://rpc.areal.finance';
+
+/*
+ * In `npm run dev`, point backend + realtime URLs at the Vite dev server's
+ * own origin (e.g. `http://localhost:5173`). Vite proxies `/auth`,
+ * `/portfolio`, `/markets`, and `/socket.io` upstream to api.areal.finance
+ * — see the `server.proxy` block in `vite.config.ts`. Same-origin in the
+ * browser means no CORS preflight, which is what we want because the CF
+ * Transform Rule that gates Access-Control-Allow-Origin only allows the
+ * deployed hostnames (`app.areal.finance`, `panel.areal.finance`, etc.),
+ * never `http://localhost:5173`.
+ *
+ * The `isBrowser` guard is for SvelteKit's prerender pass (build-time SSR)
+ * where `window` is undefined — we fall back to the production URLs there
+ * because the prerender path never actually issues these network calls,
+ * but the constants still need a string value.
+ */
+const isDev = import.meta.env.DEV;
+const isBrowser = typeof window !== 'undefined';
+const devOrigin = isDev && isBrowser ? window.location.origin : null;
 /** Public REST API URL of the Areal backend (Phase 12.1+ on Fornex). */
-const AREAL_BACKEND_URL = 'https://api.areal.finance';
-/** Public realtime gateway WebSocket URL (`/realtime` is the Socket.IO namespace). */
-const AREAL_REALTIME_WS_URL = 'wss://api.areal.finance/realtime';
+const AREAL_BACKEND_URL = devOrigin ?? 'https://api.areal.finance';
+/** Realtime gateway WebSocket URL (`/realtime` is the Socket.IO namespace). */
+const AREAL_REALTIME_WS_URL = devOrigin
+	? `${devOrigin.replace(/^http/, 'ws')}/realtime`
+	: 'wss://api.areal.finance/realtime';
 
 export type NetworkId = 'localnet' | 'devnet' | 'mainnet';
 
