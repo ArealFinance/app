@@ -333,6 +333,8 @@ async function doRefresh(): Promise<boolean> {
 
 		if (!res.ok) {
 			// 401 (rotation revoked the row) → expired terminal state.
+			// Bump before commit so concurrent observers compare against the new token.
+			authToken++;
 			status = 'expired';
 			lastError = res.status === 401 ? 'Session expired' : `HTTP ${res.status}`;
 			accessToken = null;
@@ -340,30 +342,31 @@ async function doRefresh(): Promise<boolean> {
 			expiresAt = null;
 			clearPersisted();
 			// Wallet pubkey retained — banner needs it for the re-sign hint.
-			authToken++;
 			return false;
 		}
 
 		const body = (await res.json()) as LoginResponse;
 		if (tokenAtCall !== authToken) return false;
 
+		// Bump before commit so concurrent observers compare against the new token.
+		authToken++;
 		accessToken = body.accessToken;
 		refreshToken = body.refreshToken;
 		expiresAt = parseExpiresAt(body, Date.now());
 		status = 'signed-in';
 		lastError = null;
 		persistCurrentTokens();
-		authToken++;
 		return true;
 	} catch (err) {
 		if (tokenAtCall !== authToken) return false;
+		// Bump before commit so concurrent observers compare against the new token.
+		authToken++;
 		status = 'expired';
 		lastError = err instanceof Error ? err.message : String(err);
 		accessToken = null;
 		refreshToken = null;
 		expiresAt = null;
 		clearPersisted();
-		authToken++;
 		return false;
 	}
 }
