@@ -104,15 +104,41 @@
 		await runSignIn();
 	}
 
-	function handleSkipSignIn() {
-		// Close the dialog without finishing sign-in. The header keeps a
-		// "Sign in" pill as a last-resort recovery affordance for the user
-		// who explicitly opted out here.
+	async function handleSkipSignIn() {
+		// "Skip for now" disconnects the wallet too — a half-connected state
+		// (wallet OK, auth not signed-in) shows nothing in the header, so
+		// keeping it around would just be a hidden pubkey the user can't
+		// see. Disconnecting returns the app to a clean "Connect Wallet"
+		// state; if they want to retry, the same CTA reopens this dialog
+		// from Phase A.
 		walletDialog.close();
+		try {
+			await wallet.disconnect();
+		} catch {
+			// Best-effort — extension may already be detached.
+		}
+	}
+
+	/**
+	 * Closing the dialog from Phase B/C (X button or backdrop click) follows
+	 * the same "abandon ship" semantics as Skip for now: disconnect the
+	 * wallet so we don't leave a hidden half-state. From Phase A there's
+	 * nothing to disconnect, so just close.
+	 */
+	async function handleClose() {
+		const wasMidFlow = phase !== 'pick';
+		walletDialog.close();
+		if (wasMidFlow) {
+			try {
+				await wallet.disconnect();
+			} catch {
+				// Best-effort.
+			}
+		}
 	}
 </script>
 
-<Modal {open} onclose={() => walletDialog.close()} aria-labelledby="wallet-dialog-title">
+<Modal {open} onclose={handleClose} aria-labelledby="wallet-dialog-title">
 	<div class="wallet-dialog">
 		<div class="wallet-dialog-aurora" aria-hidden="true"></div>
 
@@ -124,7 +150,7 @@
 			type="button"
 			class="wallet-dialog-close"
 			aria-label="Close"
-			onclick={() => walletDialog.close()}
+			onclick={handleClose}
 		>
 			<Xmark size={20} />
 		</button>

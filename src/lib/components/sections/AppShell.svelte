@@ -46,24 +46,22 @@
 	}: Props = $props();
 
 	// Default wiring: prop overrides win (stories), otherwise pull from store.
-	const liveAddress = $derived(walletAddress ?? wallet.address ?? undefined);
+	//
+	// `liveAddress` / `liveStatus` reflect the FULL handshake (wallet + auth),
+	// not just `wallet.isConnected`. Until the user has signed the login
+	// message, the app pretends the wallet isn't connected at all — header
+	// keeps its "Connect Wallet" CTA, the wallet panel doesn't auto-open,
+	// no half-state chip in the corner. The intermediate connect-but-not-
+	// signed state is owned exclusively by the WalletDialog (Phase B/C).
+	const liveAddress = $derived(
+		walletAddress ?? (auth.isSignedInForCurrentWallet ? (wallet.address ?? undefined) : undefined)
+	);
 	const liveStatus = $derived(
-		walletStatus ?? (wallet.isConnected ? 'connected' : 'disconnected')
+		walletStatus ??
+			(wallet.isConnected && auth.isSignedInForCurrentWallet ? 'connected' : 'disconnected')
 	);
 	const liveOnConnect = $derived(onConnect ?? (() => walletDialog.open('connect')));
 	const liveOnWalletClick = $derived(onWalletClick ?? (() => walletDialog.open('panel')));
-	const liveAuthStatus = $derived(auth.status);
-	const liveIsSignedInForCurrentWallet = $derived(auth.isSignedInForCurrentWallet);
-	// Route the header "Sign in" pill through the WalletDialog instead of
-	// kicking off `auth.signIn()` directly. The dialog renders Phase C
-	// (needs-sign) which gives the user explanatory copy and a clear retry
-	// loop if they dismiss the wallet popup again. Calling `signIn()` blindly
-	// from the header opens a wallet popup with no surrounding context — and
-	// if the user dismisses it, they're back to a bare "Sign in" pill with
-	// no feedback about what just happened.
-	const liveOnSignIn = $derived(() => {
-		walletDialog.open('connect');
-	});
 </script>
 
 <div class="shell">
@@ -76,9 +74,6 @@
 			{nav}
 			onConnect={liveOnConnect}
 			onWalletClick={liveOnWalletClick}
-			authStatus={liveAuthStatus}
-			isSignedInForCurrentWallet={liveIsSignedInForCurrentWallet}
-			onSignIn={liveOnSignIn}
 		/>
 	{/if}
 

@@ -40,42 +40,13 @@
 </Story>
 
 <!--
-	Phase 12.3.4 — auth-store states. Mirrors the live runes-backed AppShell
-	props so designers / reviewers can see every state without booting the
-	full app.
+	The Header itself only renders two terminal states: signed-in (chip) or
+	disconnected (Connect Wallet CTA). Intermediate auth states (signing,
+	error, expired) are owned by the WalletDialog now — see its Phase B/C
+	stories in `WalletDialog.stories.svelte`. AppShell does the wiring:
+	when `auth.isSignedInForCurrentWallet` is true it forwards the address
+	to Header; otherwise the address is undefined and the CTA is shown.
 -->
-<Story name="WalletConnectedNotSignedIn">
-	<Header
-		currentPath="/portfolio"
-		walletAddress={DEMO_WALLET_ADDRESS}
-		authStatus="signed-out"
-		isSignedInForCurrentWallet={false}
-	/>
-</Story>
-
-<Story name="Authenticating">
-	<Header
-		currentPath="/portfolio"
-		walletAddress={DEMO_WALLET_ADDRESS}
-		authStatus="authenticating"
-		isSignedInForCurrentWallet={false}
-	/>
-</Story>
-
 <Story name="SignedIn">
-	<Header
-		currentPath="/portfolio"
-		walletAddress={DEMO_WALLET_ADDRESS}
-		authStatus="signed-in"
-		isSignedInForCurrentWallet={true}
-	/>
-</Story>
-
-<Story name="Expired">
-	<Header
-		currentPath="/portfolio"
-		walletAddress={DEMO_WALLET_ADDRESS}
-		authStatus="expired"
-		isSignedInForCurrentWallet={false}
-	/>
+	<Header currentPath="/portfolio" walletAddress={DEMO_WALLET_ADDRESS} />
 </Story>

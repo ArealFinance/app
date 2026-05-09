@@ -29,20 +29,19 @@
 
 	type Props = {
 		currentPath?: string;
+		/**
+		 * Wallet address shown in the header chip. The caller (AppShell) only
+		 * passes a non-empty value when both the wallet is connected AND auth
+		 * is signed-in for that wallet — until then the header keeps its
+		 * "Connect Wallet" CTA. The intermediate connect-but-not-signed state
+		 * is owned exclusively by the WalletDialog (Phase B/C).
+		 */
 		walletAddress?: string;
 		walletStatus?: 'connected' | 'disconnected';
 		showDemoBanner?: boolean;
 		nav?: NavItem[];
 		onConnect?: () => void;
 		onWalletClick?: () => void;
-		/*
-		 * Phase 12.3.4 — auth-store wiring. Optional so the live AppShell
-		 * can pass the runes-backed values without each Storybook story
-		 * having to remember them. Stories use the explicit overrides.
-		 */
-		authStatus?: 'signed-out' | 'signing' | 'authenticating' | 'signed-in' | 'expired' | 'error';
-		isSignedInForCurrentWallet?: boolean;
-		onSignIn?: () => void;
 	};
 
 	const defaultNav: NavItem[] = [
@@ -59,31 +58,8 @@
 		showDemoBanner = true,
 		nav = defaultNav,
 		onConnect,
-		onWalletClick,
-		authStatus = 'signed-out',
-		isSignedInForCurrentWallet = false,
-		onSignIn
+		onWalletClick
 	}: Props = $props();
-
-	/*
-	 * Show the explicit "Sign in" button only when:
-	 *   - the wallet is connected (walletAddress present), AND
-	 *   - we don't already have a valid session for that wallet, AND
-	 *   - we're not mid-handshake (a spinner shows up instead).
-	 *
-	 * Auth is wallet-scoped — connecting a wallet is necessary but NOT
-	 * sufficient to receive the per-wallet realtime room. The two-step
-	 * UX makes the distinction explicit.
-	 */
-	const showSignInButton = $derived(
-		!!walletAddress &&
-			!isSignedInForCurrentWallet &&
-			authStatus !== 'signing' &&
-			authStatus !== 'authenticating'
-	);
-	const showAuthSpinner = $derived(
-		!!walletAddress && (authStatus === 'signing' || authStatus === 'authenticating')
-	);
 
 	function isActive(item: NavItem): boolean {
 		const raw = item.matchPrefix ?? item.href;
@@ -133,14 +109,6 @@
 				<NetworkSwitcher variant="chip" />
 			</div>
 			{#if walletAddress}
-				{#if showSignInButton}
-					<button class="signin-btn" type="button" onclick={onSignIn}>Sign in</button>
-				{:else if showAuthSpinner}
-					<span class="auth-chip" aria-live="polite">
-						<span class="auth-spinner" aria-hidden="true"></span>
-						<span>Signing in…</span>
-					</span>
-				{/if}
 				<WalletAddressChip
 					address={walletAddress}
 					status={walletStatus}
@@ -245,65 +213,6 @@
 	 * the wallet panel instead — saves horizontal space at 375px. */
 	.header-network-desktop {
 		display: inline-flex;
-	}
-
-	/*
-	 * Sign-in button — distinct from connect (connect flips the wallet
-	 * flow; this triggers the signature handshake). Uses the same primary
-	 * accent so users recognise it as the next CTA in the flow.
-	 */
-	.signin-btn {
-		display: inline-flex;
-		align-items: center;
-		justify-content: center;
-		height: var(--control-height-sm);
-		padding: 0 var(--space-3);
-		font-family: var(--font-sans);
-		font-size: var(--text-sm);
-		font-weight: var(--font-weight-bold);
-		letter-spacing: var(--tracking-tight);
-		color: var(--color-white-900);
-		background-color: var(--color-primary);
-		border: 0;
-		border-radius: var(--radius-lg);
-		text-transform: uppercase;
-		cursor: pointer;
-		white-space: nowrap;
-	}
-	.signin-btn:hover {
-		background-color: var(--color-purple-700);
-	}
-
-	.auth-chip {
-		display: inline-flex;
-		align-items: center;
-		gap: var(--space-2);
-		height: var(--control-height-sm);
-		padding: 0 var(--space-3);
-		font-family: var(--font-sans);
-		font-size: var(--text-sm);
-		font-weight: var(--font-weight-bold);
-		letter-spacing: var(--tracking-tight);
-		color: var(--color-text-muted);
-		background-color: transparent;
-		border: 1px solid var(--color-border);
-		border-radius: var(--radius-lg);
-		text-transform: uppercase;
-		white-space: nowrap;
-	}
-	.auth-spinner {
-		width: 12px;
-		height: 12px;
-		border: 2px solid currentColor;
-		border-top-color: transparent;
-		border-radius: 50%;
-		display: inline-block;
-		animation: header-auth-spin 0.7s linear infinite;
-	}
-	@keyframes header-auth-spin {
-		to {
-			transform: rotate(360deg);
-		}
 	}
 
 	@media (max-width: 768px) {
