@@ -120,6 +120,17 @@
 		name="description"
 		content="Build your wealth engine via ownership tokens backed by real-world assets."
 	/>
+	<!-- Hero crystal LCP preload. AVIF only — browsers without AVIF support
+	     will fall back to WebP/PNG via the <picture> tag below. Modern
+	     browsers fetch ~158 KB on the cold path instead of waiting for the
+	     image discovery pass after CSSOM. -->
+	<link
+		rel="preload"
+		as="image"
+		href="/images/hero/crystal-composite.avif"
+		type="image/avif"
+		fetchpriority="high"
+	/>
 </svelte:head>
 
 <AppShell
