@@ -21,8 +21,8 @@
 </script>
 
 <script lang="ts">
-	import { ChartPie, ArrowUpDownSimple, Chart, Plus } from '$lib/icons';
-	import { WalletAddressChip } from '$lib/components/ui';
+	import { ChartPie, ArrowUpDownSimple, Chart, Plus, WalletSimple } from '$lib/icons';
+	import { Button, WalletAddressChip } from '$lib/components/ui';
 	import NetworkSwitcher from '$lib/components/debug/NetworkSwitcher.svelte';
 	import DemoBanner from './DemoBanner.svelte';
 	import Logo from './Logo.svelte';
@@ -113,7 +113,7 @@
 							<ActiveIcon
 								size={16}
 								variant="duotone"
-								color={active ? 'var(--color-purple-100)' : 'var(--color-purple-400)'}
+								color={active ? 'var(--color-text-inverse)' : 'var(--color-purple-400)'}
 							/>
 						{/if}
 						<span>{item.label}</span>
@@ -148,7 +148,12 @@
 					onclick={onWalletClick}
 				/>
 			{:else}
-				<button class="connect-btn" type="button" onclick={onConnect}>Connect wallet</button>
+				<Button variant="accent" size="lg" onclick={onConnect}>
+					{#snippet iconLeft()}
+						<WalletSimple size={18} variant="duotone" color="currentColor" />
+					{/snippet}
+					Connect Wallet
+				</Button>
 			{/if}
 		</div>
 	</div>
@@ -210,7 +215,7 @@
 			color var(--motion-base) var(--ease-out);
 	}
 	.nav-link:hover {
-		background-color: var(--color-gray-900-20);
+		background-color: rgba(0, 0, 0, 0.3);
 	}
 	.nav-link.active {
 		background-color: var(--color-white-900);
@@ -242,32 +247,10 @@
 		display: inline-flex;
 	}
 
-	.connect-btn {
-		display: inline-flex;
-		align-items: center;
-		justify-content: center;
-		height: var(--control-height-sm);
-		padding: 0 var(--space-4);
-		font-family: var(--font-sans);
-		font-size: var(--text-sm);
-		font-weight: var(--font-weight-bold);
-		letter-spacing: var(--tracking-tight);
-		color: var(--color-white-900);
-		background-color: var(--color-primary);
-		border: 0;
-		border-radius: var(--radius-lg);
-		text-transform: uppercase;
-		cursor: pointer;
-		white-space: nowrap;
-	}
-	.connect-btn:hover {
-		background-color: var(--color-purple-700);
-	}
-
 	/*
-	 * Sign-in button — distinct from connect-btn (connect-btn flips the
-	 * wallet flow; this triggers the signature handshake). Uses the same
-	 * primary accent so users recognise it as the next CTA in the flow.
+	 * Sign-in button — distinct from connect (connect flips the wallet
+	 * flow; this triggers the signature handshake). Uses the same primary
+	 * accent so users recognise it as the next CTA in the flow.
 	 */
 	.signin-btn {
 		display: inline-flex;
@@ -325,8 +308,7 @@
 
 	@media (max-width: 768px) {
 		.header-inner {
-			grid-template-columns: auto auto;
-			grid-template-rows: auto auto;
+			grid-template-columns: auto 1fr auto;
 			height: auto;
 			padding: var(--space-3);
 			border-radius: var(--radius-xl);
@@ -334,13 +316,10 @@
 		.header-left {
 			gap: var(--space-3);
 		}
+		/* Mobile: top nav is replaced by the bottom-fixed `<MobileNav>` per
+		 * Figma `MENU` (2002:8177). Hidden here to avoid duplicate items. */
 		.header-nav {
-			grid-column: 1 / -1;
-			grid-row: 2;
-			justify-content: center;
-			width: 100%;
-			padding-top: var(--space-2);
-			border-top: 1px solid var(--color-border);
+			display: none;
 		}
 		.header-center {
 			display: none;
