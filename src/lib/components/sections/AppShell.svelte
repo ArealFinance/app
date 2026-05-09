@@ -2,6 +2,7 @@
 	import type { Snippet } from 'svelte';
 	import Header from './Header.svelte';
 	import Footer from './Footer.svelte';
+	import MobileNav from './MobileNav.svelte';
 	import type { NavItem } from './Header.svelte';
 	import type { FooterColumn, FooterLink } from './Footer.svelte';
 	import { WalletDialog, WalletPanel } from '$lib/components/wallet';
@@ -88,6 +89,9 @@
 	{/if}
 </div>
 
+<!-- Mobile bottom-fixed pill nav. Self-hides above 768px. -->
+<MobileNav {currentPath} {nav} />
+
 <WalletDialog />
 <WalletPanel />
 
@@ -113,7 +117,11 @@
 
 	@media (max-width: 768px) {
 		.shell-main {
-			padding: var(--space-4) var(--space-3);
+			/* Bottom padding clears the fixed `<MobileNav>` (56px capsule + 12px
+			 * bottom inset + 16px breathing room ≈ 84px). Includes safe-area
+			 * for iOS home indicator. */
+			padding: var(--space-4) var(--space-3)
+				calc(84px + env(safe-area-inset-bottom, 0px));
 		}
 	}
 </style>
