@@ -68,6 +68,32 @@ let hasMore: boolean = $state(false);
 
 let errorRevertTimeout: ReturnType<typeof setTimeout> | null = null;
 
+/*
+ * Persist the provider hint across page reloads so we can do a silent
+ * `connect({ onlyIfTrusted: true })` on next boot — without it the user has
+ * to click "Connect Wallet" every time they refresh, which makes the auth
+ * sessionStorage rehydrate (which works fine on its own) feel useless.
+ *
+ * NOTE: this is a HINT, not a credential. It only stores the provider name
+ * (`'phantom'` or `'solflare'`) so we know which wallet API to silently
+ * probe; the wallet itself decides whether to grant the connection (via
+ * its own per-origin trust list).
+ */
+const PROVIDER_STORAGE_KEY = 'app:wallet:provider:v1';
+
+function persistProvider(p: WalletProvider | null): void {
+	if (typeof localStorage === 'undefined') return;
+	if (p === null) localStorage.removeItem(PROVIDER_STORAGE_KEY);
+	else localStorage.setItem(PROVIDER_STORAGE_KEY, p);
+}
+
+function readPersistedProvider(): WalletProvider | null {
+	if (typeof localStorage === 'undefined') return null;
+	const raw = localStorage.getItem(PROVIDER_STORAGE_KEY);
+	if (raw === 'phantom' || raw === 'solflare') return raw;
+	return null;
+}
+
 function clearErrorRevert() {
 	if (errorRevertTimeout) {
 		clearTimeout(errorRevertTimeout);
@@ -104,6 +130,10 @@ async function connect(providerName: WalletProvider = 'phantom'): Promise<void> 
 		publicKey = pk;
 		address = pk.toBase58();
 		status = 'connected';
+		// Persist the provider hint so a page reload can silently reconnect
+		// via `onlyIfTrusted: true` (see `silentReconnect` below). Cleared on
+		// explicit disconnect.
+		persistProvider(providerName);
 		// Don't fabricate transactions — Phase 6+ will populate from the backend.
 		transactions = [];
 		hasMore = false;
@@ -136,6 +166,58 @@ async function disconnect(): Promise<void> {
 	transactions = [];
 	hasMore = false;
 	status = 'disconnected';
+	// Drop the silent-reconnect hint so a future page load lands on a
+	// clean "Connect Wallet" CTA instead of trying to re-trust the same
+	// provider the user just walked away from.
+	persistProvider(null);
+}
+
+/*
+ * Silent auto-reconnect on module load.
+ *
+ * Wallet extensions remember per-origin trust — if the user already approved
+ * `app.areal.finance` in a previous session, calling `connect({ onlyIfTrusted:
+ * true })` resolves WITHOUT prompting. Without this, every page reload wipes
+ * `wallet.isConnected` to `false`, the header drops back to "Connect Wallet",
+ * and the auth-token rehydrate from sessionStorage is invisible to the user.
+ *
+ * Strictly best-effort: any failure (extension uninstalled, user revoked
+ * trust, racing with an already-fired explicit connect) silently falls back
+ * to the disconnected state. We don't surface an error toast.
+ */
+async function silentReconnect(): Promise<void> {
+	const persisted = readPersistedProvider();
+	if (!persisted) return;
+	if (status !== 'disconnected') return; // user already clicked Connect — don't double-fire
+	try {
+		let pk: PublicKey;
+		if (persisted === 'phantom') {
+			if (!getPhantomProvider()) return;
+			const { connectPhantom } = await import('$lib/wallet/phantom-provider');
+			pk = await connectPhantom({ onlyIfTrusted: true });
+		} else {
+			if (!getSolflareProvider()) return;
+			const { connectSolflare } = await import('$lib/wallet/solflare-provider');
+			pk = await connectSolflare({ onlyIfTrusted: true });
+		}
+		// Race guard: a parallel user-initiated `connect()` may have already
+		// flipped the store; in that case the explicit connect wins.
+		if (status !== 'disconnected') return;
+		publicKey = pk;
+		address = pk.toBase58();
+		provider = persisted;
+		status = 'connected';
+		transactions = [];
+		hasMore = false;
+	} catch {
+		// Wallet not trusted, extension uninstalled, or other silent failure.
+		// Drop the stale hint so we don't keep re-attempting on every reload.
+		persistProvider(null);
+	}
+}
+
+if (typeof window !== 'undefined') {
+	void silentReconnect();
 }
 
 async function copyAddress(): Promise<boolean> {
