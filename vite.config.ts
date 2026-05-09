@@ -43,5 +43,52 @@ export default defineConfig({
 	// transpile cleanly. The SDK and arlex-client both rely on the
 	// node-polyfill Buffer being injected at the call site — we keep them
 	// non-externalized so the polyfill transform can rewrite them.
-	ssr: { noExternal: ['@solana/web3.js', '@areal/sdk', '@arlex/client'] }
+	ssr: { noExternal: ['@solana/web3.js', '@areal/sdk', '@arlex/client'] },
+
+	build: {
+		rollupOptions: {
+			output: {
+				/*
+				 * Pin the Solana stack into a stable `vendor-solana` chunk so:
+				 *   1. Phase 25 deploys don't bust ~600 KB of cached vendor JS
+				 *      every time an app source file changes.
+				 *   2. Routes that don't transactively touch wallet/SDK code
+				 *      (notably `/markets` cold load) don't preload it via
+				 *      `<link rel="modulepreload">` from the layout chunk.
+				 *
+				 * The matcher targets `node_modules` paths AND the resolved
+				 * `file:../sdk` workspace package (which lands as either
+				 * `node_modules/@areal/sdk` or as a direct `/sdk/dist/` path
+				 * after Rollup resolution). The `@arlex/client` tarball
+				 * resolves to `node_modules/@arlex/client` regardless.
+				 */
+				manualChunks(id: string) {
+					// Normalise to forward slashes for cross-platform matching.
+					const norm = id.replace(/\\/g, '/');
+
+					if (
+						norm.includes('/node_modules/@solana/web3.js/') ||
+						norm.includes('/node_modules/@areal/sdk/') ||
+						norm.includes('/node_modules/@arlex/client/') ||
+						// `file:../sdk` workspace dep — Rollup may resolve to the
+						// source tree directly under `/sdk/dist/` or `/sdk/src/`.
+						norm.includes('/sdk/dist/') ||
+						norm.includes('/sdk/src/') ||
+						norm.includes('/node_modules/tweetnacl/') ||
+						norm.includes('/node_modules/bs58/') ||
+						norm.includes('/node_modules/base-x/') ||
+						norm.includes('/node_modules/bn.js/') ||
+						norm.includes('/node_modules/elliptic/') ||
+						norm.includes('/node_modules/secp256k1/') ||
+						norm.includes('/node_modules/crypto-browserify/') ||
+						norm.includes('/node_modules/buffer/') ||
+						norm.includes('/node_modules/stream-browserify/')
+					) {
+						return 'vendor-solana';
+					}
+					return undefined;
+				}
+			}
+		}
+	}
 });
