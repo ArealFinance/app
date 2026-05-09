@@ -147,12 +147,13 @@
 
 		{#if grouped.length === 0}
 			<!-- Figma macet — empty state when the connected wallet has no on-chain
-			     activity yet. Stacked-cards icon (filled "completed" + outlined
-			     "pending") on top, brief reassurance copy below. -->
+			     activity yet. Reuses the canonical stacked-cards SVG from the
+			     Portfolio "Ownership tokens" empty state (same Figma node, same
+			     visual language for "no items here yet"). -->
 			<div class="wallet-panel-empty">
 				<img
 					class="wallet-panel-empty-icon"
-					src="/images/wallet/empty-transactions.svg"
+					src="/images/portfolio/ownership-tokens-empty.svg"
 					alt=""
 					aria-hidden="true"
 					loading="lazy"
