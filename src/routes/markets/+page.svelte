@@ -423,11 +423,18 @@
 		overflow: hidden;
 	}
 
+	/* Per Figma `Group 2087330722` (289:3674): the sparkline graph asset is
+	 * 200×110 with the curve drawn near the bottom edge — designed to be
+	 * rotated 180° + masked to fit the 100×51 pill. We replicate the
+	 * rotation here so the curve sits at the top half of the pill with
+	 * the gradient fill fading downward. */
 	.hero-pill-spark {
 		position: absolute;
 		inset: 0;
 		width: 100%;
 		height: 100%;
+		object-fit: cover;
+		transform: rotate(180deg);
 		pointer-events: none;
 	}
 
