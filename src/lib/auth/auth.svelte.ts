@@ -39,7 +39,14 @@
  *      disconnects. The wallet pubkey is RETAINED in the expired state so
  *      the re-sign banner has the context it needs to greet the user.
  */
-import bs58 from 'bs58';
+/*
+ * `bs58` ships ~10 KB of base-58 encode/decode plus pulls a chunk of the
+ * `base-x` polyfill graph. Only the sign-in path needs to encode the
+ * signature, and sign-in is a one-shot flow gated by an explicit user click
+ * on "Connect Wallet" → "Sign". Lazy-importing it inside `signIn()` keeps it
+ * out of the layout's static import graph (and out of any chunk that lands
+ * on cold route loads).
+ */
 import { BACKEND_API_BASE_URLS } from '@areal/sdk/network';
 import { env as publicEnv } from '$env/dynamic/public';
 
@@ -272,6 +279,7 @@ async function signIn(): Promise<void> {
 		const result = await provider.signMessage(encoded, 'utf8');
 		if (tokenAtCall !== authToken) return; // wallet swap mid-sign — drop.
 		if (!result?.signature) throw new Error('Wallet returned no signature');
+		const { default: bs58 } = await import('bs58');
 		signatureBase58 = bs58.encode(result.signature);
 
 		status = 'authenticating';

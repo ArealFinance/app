@@ -22,14 +22,20 @@ import type {
 	VersionedTransaction
 } from '@solana/web3.js';
 
-import {
-	connectPhantom,
-	disconnectPhantom,
-	getPhantomProvider,
-	connectSolflare,
-	disconnectSolflare,
-	getSolflareProvider
-} from '$lib/wallet';
+/*
+ * `getPhantomProvider` / `getSolflareProvider` are static synchronous probes
+ * over `window.{phantom,solflare}` — kilobytes, no Solana runtime. They stay
+ * as static imports so the pre-flight "is wallet installed" branch can run
+ * before the UI flips to `awaiting-signature`.
+ *
+ * `connectPhantom`, `disconnectPhantom`, `connectSolflare`, `disconnectSolflare`
+ * are loaded via dynamic `import()` inside the connect/disconnect flows. The
+ * provider modules themselves only carry type-only `@solana/web3.js` imports
+ * (which erase at compile), but moving the runtime entry behind dynamic
+ * imports keeps the wallet store off the static path to anything that ends up
+ * grouped into the `vendor-solana` chunk by Rollup.
+ */
+import { getPhantomProvider, getSolflareProvider } from '$lib/wallet';
 import { showError } from '$lib/errors';
 import { truncateAddress } from '$lib/utils/address';
 
@@ -87,8 +93,14 @@ async function connect(providerName: WalletProvider = 'phantom'): Promise<void> 
 	status = 'awaiting-signature';
 	provider = providerName;
 	try {
-		const pk =
-			providerName === 'phantom' ? await connectPhantom() : await connectSolflare();
+		let pk: PublicKey;
+		if (providerName === 'phantom') {
+			const { connectPhantom } = await import('$lib/wallet/phantom-provider');
+			pk = await connectPhantom();
+		} else {
+			const { connectSolflare } = await import('$lib/wallet/solflare-provider');
+			pk = await connectSolflare();
+		}
 		publicKey = pk;
 		address = pk.toBase58();
 		status = 'connected';
@@ -111,9 +123,11 @@ async function connect(providerName: WalletProvider = 'phantom'): Promise<void> 
 async function disconnect(): Promise<void> {
 	clearErrorRevert();
 	if (provider === 'solflare') {
+		const { disconnectSolflare } = await import('$lib/wallet/solflare-provider');
 		await disconnectSolflare();
 	} else {
 		// Default to Phantom for legacy / null provider — best-effort cleanup.
+		const { disconnectPhantom } = await import('$lib/wallet/phantom-provider');
 		await disconnectPhantom();
 	}
 	publicKey = null;

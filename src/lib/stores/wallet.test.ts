@@ -36,16 +36,29 @@ const solflareProvider = {
 
 // `connectPhantom` / `connectSolflare` are mocked to control the connect
 // flow without touching the (unrelated) deeplink/global detection logic.
+//
+// The wallet store imports `getPhantomProvider`/`getSolflareProvider` from
+// the `$lib/wallet` barrel statically (sync probes), and lazy-imports the
+// `connect*`/`disconnect*` flows directly from the provider modules. Mock
+// both surfaces so either import path returns the test doubles.
 vi.mock('$lib/wallet', async () => {
 	return {
-		connectPhantom: vi.fn(async () => ({ toBase58: () => 'PhantomKey' })),
-		disconnectPhantom: vi.fn(async () => undefined),
 		getPhantomProvider: () => phantomProvider,
-		connectSolflare: vi.fn(async () => ({ toBase58: () => 'SolflareKey' })),
-		disconnectSolflare: vi.fn(async () => undefined),
 		getSolflareProvider: () => solflareProvider
 	};
 });
+
+vi.mock('$lib/wallet/phantom-provider', async () => ({
+	connectPhantom: vi.fn(async () => ({ toBase58: () => 'PhantomKey' })),
+	disconnectPhantom: vi.fn(async () => undefined),
+	getPhantomProvider: () => phantomProvider
+}));
+
+vi.mock('$lib/wallet/solflare-provider', async () => ({
+	connectSolflare: vi.fn(async () => ({ toBase58: () => 'SolflareKey' })),
+	disconnectSolflare: vi.fn(async () => undefined),
+	getSolflareProvider: () => solflareProvider
+}));
 
 vi.mock('$lib/errors', () => ({
 	showError: vi.fn()
