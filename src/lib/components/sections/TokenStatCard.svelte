@@ -36,10 +36,11 @@
 	}: Props = $props();
 
 	const isComingSoon = $derived(state === 'coming-soon');
-	// External cards get the corner arrow indicator; internal links don't,
-	// but the whole card is still clickable via the stretched-link overlay.
+	// Any clickable card (internal or external) gets the corner arrow on
+	// hover. External-only `target="_blank"` keeps the new-tab semantic
+	// distinct from internal SPA navigation.
 	const hasLink = $derived(href !== undefined && !isComingSoon);
-	const showCornerArrow = $derived(external && hasLink);
+	const showCornerArrow = $derived(hasLink);
 </script>
 
 <article class="card" class:coming-soon={isComingSoon} class:card-linkable={hasLink}>
@@ -49,7 +50,13 @@
 		<a class="card-link-overlay" {href} aria-label="Open {name}"></a>
 	{/if}
 	{#if showCornerArrow}
-		<a class="card-go" {href} aria-label="Open {name}" target="_blank" rel="noopener">
+		<a
+			class="card-go"
+			{href}
+			aria-label="Open {name}"
+			target={external ? '_blank' : undefined}
+			rel={external ? 'noopener' : undefined}
+		>
 			<img src="/images/cards/arrow-up-right.svg" alt="" />
 		</a>
 	{/if}
