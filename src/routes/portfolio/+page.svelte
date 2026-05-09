@@ -450,20 +450,14 @@
 							class:section-body-table={isConnected && portfolio.isReady && tokens.length > 0}
 						>
 							{#if !isConnected}
-								<svg
+								<img
 									class="empty-illu"
-									width="86"
-									height="64"
-									viewBox="0 0 86 64"
-									fill="none"
+									src="/images/portfolio/ownership-tokens-empty.svg"
+									alt=""
+									width="81"
+									height="60"
 									aria-hidden="true"
-								>
-									<rect x="0" y="0" width="86" height="22" rx="6" fill="#3C415F" opacity="0.7" />
-									<rect x="0" y="26" width="86" height="22" rx="6" fill="#3C415F" opacity="0.45" />
-									<rect x="0" y="52" width="64" height="12" rx="4" fill="#717390" opacity="0.3" />
-									<circle cx="12" cy="11" r="4" fill="#73FF83" />
-									<circle cx="12" cy="37" r="4" fill="#717390" opacity="0.6" />
-								</svg>
+								/>
 								<p class="empty-title">You do not currently hold any tokens</p>
 								<p class="empty-sub">Start adding tokens</p>
 							{:else if portfolio.isLoading && !portfolio.snapshot}
@@ -478,20 +472,14 @@
 									onclick={() => portfolio.refresh()}>Retry</button
 								>
 							{:else if tokens.length === 0}
-								<svg
+								<img
 									class="empty-illu"
-									width="86"
-									height="64"
-									viewBox="0 0 86 64"
-									fill="none"
+									src="/images/portfolio/ownership-tokens-empty.svg"
+									alt=""
+									width="81"
+									height="60"
 									aria-hidden="true"
-								>
-									<rect x="0" y="0" width="86" height="22" rx="6" fill="#3C415F" opacity="0.7" />
-									<rect x="0" y="26" width="86" height="22" rx="6" fill="#3C415F" opacity="0.45" />
-									<rect x="0" y="52" width="64" height="12" rx="4" fill="#717390" opacity="0.3" />
-									<circle cx="12" cy="11" r="4" fill="#73FF83" />
-									<circle cx="12" cy="37" r="4" fill="#717390" opacity="0.6" />
-								</svg>
+								/>
 								<p class="empty-title">You do not currently hold any tokens</p>
 								<p class="empty-sub">Start adding tokens</p>
 							{:else}
