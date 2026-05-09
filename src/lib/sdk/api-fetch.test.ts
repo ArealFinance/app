@@ -15,7 +15,8 @@ const auth = {
 vi.mock('$lib/auth', () => ({
 	get auth() {
 		return auth;
-	}
+	},
+	REFRESH_THRESHOLD_MS: 60_000
 }));
 
 import { apiFetch } from './api-fetch';

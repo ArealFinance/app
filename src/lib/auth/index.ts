@@ -6,3 +6,4 @@
 export { auth, type AuthStatus, type AuthStore } from './auth.svelte';
 export { buildLoginMessage, AUTH_LOGIN_MESSAGE_FORMAT_VERSION } from './messages';
 export type { BuiltLoginMessage } from './messages';
+export { REFRESH_THRESHOLD_MS } from './constants';

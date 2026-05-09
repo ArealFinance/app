@@ -17,7 +17,7 @@
 	import { historyStore } from '$lib/portfolio/history.svelte';
 	import { ClaimConfirmModal, HistorySection } from '$lib/components/portfolio';
 	import type { PortfolioRow } from '@areal/sdk/portfolio';
-	import type { TransactionIndexedEvent } from '@areal/sdk/realtime';
+	import { createTxToastHandler } from '$lib/portfolio/tx-toast';
 
 	const isConnected = $derived(wallet.isConnected);
 
@@ -177,59 +177,11 @@
 	 * `auth.isSignedInForCurrentWallet` already, but we mirror the check
 	 * here so we don't even attach a listener while the session is invalid.
 	 *
-	 * Dedup window: 5 minutes — the indexer can rebroadcast on retry; we
-	 * don't want to ring the toast twice for one tx.
-	 *
-	 * Visibility gate: drop events while the tab is hidden (the user can't
-	 * see toasts that flicker in a background tab anyway).
+	 * The toast handler (validators, dedup, FIFO cap, visibility gate)
+	 * lives in `$lib/portfolio/tx-toast.ts` so it can be unit-tested in
+	 * isolation. See R-FU-5/6/7 for the rationale.
 	 */
-	const RECENT_SIG_TTL_MS = 5 * 60 * 1000;
-	const recentSigs = new Map<string, number>();
-
-	const KIND_COPY: Record<TransactionIndexedEvent['kind'], string> = {
-		claim: 'Rewards claimed',
-		swap: 'Swap confirmed',
-		add_lp: 'Liquidity added',
-		remove_lp: 'Liquidity removed',
-		zap_lp: 'Zap confirmed',
-		mint_rwt: 'RWT minted'
-	};
-
-	function explorerHost(): string {
-		// devnet/localnet → solscan with explicit cluster suffix.
-		const cluster = network.current;
-		return cluster === 'mainnet' ? '' : `?cluster=${cluster}`;
-	}
-
-	function shortenSig(sig: string): string {
-		if (sig.length <= 12) return sig;
-		return `${sig.slice(0, 6)}…${sig.slice(-4)}`;
-	}
-
-	function handleTxIndexed(payload: TransactionIndexedEvent) {
-		// Drop events for a different wallet (defence in depth — the room
-		// gate should already do this).
-		const expected = wallet.publicKey?.toBase58();
-		if (!expected || payload.wallet !== expected) return;
-
-		// Visibility gate.
-		if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return;
-
-		const now = Date.now();
-		// Dedup + GC.
-		if (recentSigs.has(payload.signature)) return;
-		recentSigs.set(payload.signature, now);
-		for (const [sig, ts] of recentSigs) {
-			if (now - ts > RECENT_SIG_TTL_MS) recentSigs.delete(sig);
-		}
-
-		const headline = KIND_COPY[payload.kind] ?? `${payload.kind} confirmed`;
-		// Toast API has no clickable link; embed the shortened signature in
-		// the body text so the user can correlate with their explorer
-		// search. The full URL is included for screen readers / copy.
-		const body = `${shortenSig(payload.signature)} · ${`https://solscan.io/tx/${payload.signature}${explorerHost()}`}`;
-		toast.success(body, { title: headline });
-	}
+	const txToast = createTxToastHandler({ toast, network });
 
 	$effect(() => {
 		if (!wallet.isConnected) return;
@@ -238,7 +190,7 @@
 		if (!pk) return;
 
 		const handle = realtimeClient.useRoom(Rooms.wallet(pk.toBase58()));
-		const off = realtimeClient.on('transaction_indexed', handleTxIndexed);
+		const off = realtimeClient.on('transaction_indexed', txToast.handle);
 		return () => {
 			off();
 			handle.off();

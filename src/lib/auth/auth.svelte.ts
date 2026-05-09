@@ -48,6 +48,7 @@ import { network } from '$lib/network/network.svelte';
 import { getPhantomProvider, getSolflareProvider } from '$lib/wallet';
 
 import { buildLoginMessage } from './messages';
+import { REFRESH_THRESHOLD_MS } from './constants';
 
 /**
  * Browser-side flag — `sessionStorage` is the canonical sniff for "is this
@@ -67,13 +68,6 @@ export type AuthStatus =
 
 /** sessionStorage key. Keep the version suffix — bump if the blob shape changes. */
 const STORAGE_KEY = 'app:auth:v1';
-
-/**
- * Refresh threshold — refresh preemptively when fewer than this many ms
- * remain before `expiresAt`. Architect-locked at 60_000 (api-fetch and the
- * boot-time rehydrate share this constant — moving it would split them).
- */
-const REFRESH_THRESHOLD_MS = 60_000;
 
 /** Persisted blob shape. Atomic write/read. */
 interface PersistedAuth {
@@ -120,7 +114,11 @@ function readPersisted(): PersistedAuth | null {
 	if (!raw) return null;
 	try {
 		const parsed = JSON.parse(raw) as unknown;
-		if (!parsed || typeof parsed !== 'object') return null;
+		if (!parsed || typeof parsed !== 'object') {
+			// Corrupt / non-object blob — drop it so it doesn't linger across reloads.
+			clearPersisted();
+			return null;
+		}
 		const p = parsed as Partial<PersistedAuth>;
 		if (
 			typeof p.accessToken !== 'string' ||
@@ -131,11 +129,15 @@ function readPersisted(): PersistedAuth | null {
 			p.refreshToken.length === 0 ||
 			p.wallet.length === 0
 		) {
+			clearPersisted();
 			return null;
 		}
 		// Validate the timestamp parses; reject otherwise.
 		const ts = Date.parse(p.expiresAt);
-		if (!Number.isFinite(ts)) return null;
+		if (!Number.isFinite(ts)) {
+			clearPersisted();
+			return null;
+		}
 		return {
 			accessToken: p.accessToken,
 			refreshToken: p.refreshToken,
@@ -143,6 +145,8 @@ function readPersisted(): PersistedAuth | null {
 			wallet: p.wallet
 		};
 	} catch {
+		// JSON.parse threw on malformed input — drop the blob.
+		clearPersisted();
 		return null;
 	}
 }
@@ -339,6 +343,8 @@ async function doRefresh(): Promise<boolean> {
 
 		if (!res.ok) {
 			// 401 (rotation revoked the row) → expired terminal state.
+			// Bump before commit so concurrent observers compare against the new token.
+			authToken++;
 			status = 'expired';
 			lastError = res.status === 401 ? 'Session expired' : `HTTP ${res.status}`;
 			accessToken = null;
@@ -346,30 +352,31 @@ async function doRefresh(): Promise<boolean> {
 			expiresAt = null;
 			clearPersisted();
 			// Wallet pubkey retained — banner needs it for the re-sign hint.
-			authToken++;
 			return false;
 		}
 
 		const body = (await res.json()) as LoginResponse;
 		if (tokenAtCall !== authToken) return false;
 
+		// Bump before commit so concurrent observers compare against the new token.
+		authToken++;
 		accessToken = body.accessToken;
 		refreshToken = body.refreshToken;
 		expiresAt = parseExpiresAt(body, Date.now());
 		status = 'signed-in';
 		lastError = null;
 		persistCurrentTokens();
-		authToken++;
 		return true;
 	} catch (err) {
 		if (tokenAtCall !== authToken) return false;
+		// Bump before commit so concurrent observers compare against the new token.
+		authToken++;
 		status = 'expired';
 		lastError = err instanceof Error ? err.message : String(err);
 		accessToken = null;
 		refreshToken = null;
 		expiresAt = null;
 		clearPersisted();
-		authToken++;
 		return false;
 	}
 }
