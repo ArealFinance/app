@@ -86,6 +86,34 @@ export default defineConfig({
 					) {
 						return 'vendor-solana';
 					}
+
+					/*
+					 * Stable `vendor-svelte` chunk for runtime + Kit. These are
+					 * present on every route and rarely change between deploys —
+					 * pinning them isolates them from app-source churn so
+					 * returning visitors keep cache hits across Phase 25 deploys.
+					 */
+					if (
+						norm.includes('/node_modules/svelte/') ||
+						norm.includes('/node_modules/@sveltejs/kit/')
+					) {
+						return 'vendor-svelte';
+					}
+
+					/*
+					 * `vendor-d3` — d3 modules + layercake. Charts (PriceChart,
+					 * VaultBubbleChart, AssetsDistributionChart, TickWheel) live
+					 * on `/markets/[symbol]` and `/portfolio` only. Pinning these
+					 * keeps `/markets` cold path free of chart code AND gives the
+					 * detail pages a stable cached vendor chunk.
+					 */
+					if (
+						norm.includes('/node_modules/d3-') ||
+						norm.includes('/node_modules/layercake/')
+					) {
+						return 'vendor-d3';
+					}
+
 					return undefined;
 				}
 			}
