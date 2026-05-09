@@ -382,12 +382,26 @@
 		left: 4px;
 		right: 4px;
 		bottom: 4px;
-		top: 35%;
+		/* top:30% — rect starts higher than the period/delta chip row so
+		 * the chips sit comfortably INSIDE the rect with breathing room
+		 * (chip bottom ≈ y=115 from card top, rect top at 30% × 230 ≈ y=69
+		 * → chips have ~46px clearance inside the rect from its top edge).
+		 * Figma macet draws the rect at 35.22% but the hover-state
+		 * #121725 highlight made any chip-edge overlap read as a
+		 * collision, so we let the rect breathe upwards instead. */
+		top: 30%;
 		pointer-events: none;
 		z-index: 0;
 		overflow: hidden;
 		border-radius: calc(var(--radius-lg) - 4px);
 		background: linear-gradient(180deg, var(--color-dark-900) 0%, #2e2e2e 100%);
+		transition: background var(--motion-base) var(--ease-out);
+	}
+	/* Hover: graph rect top stop shifts from #080A0F → #121725 (bluish dark)
+	 * per Figma Variant2 macet — a subtle highlight that pairs with the
+	 * corner go-button fade-in. Bottom stop #2E2E2E unchanged. */
+	.card-linkable:hover .card-spark {
+		background: linear-gradient(180deg, #121725 0%, #2e2e2e 100%);
 	}
 	.card-spark.dim {
 		opacity: 0.4;
