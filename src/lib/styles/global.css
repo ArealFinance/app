@@ -32,9 +32,22 @@ body {
 	 *   • footer-bg.png — bottom-left bloom, sits behind the footer.
 	 * Solid base colour (#070C1C / --color-bg) fills the middle. */
 	background-color: var(--color-bg);
+	/* PNG fallback for browsers without image-set() support. */
 	background-image:
 		url('/images/aurora/hero-bg.png'),
 		url('/images/aurora/footer-bg.png');
+	/* Modern browsers pick AVIF/WebP via image-set type negotiation. */
+	background-image:
+		image-set(
+			url('/images/aurora/hero-bg.avif') type('image/avif'),
+			url('/images/aurora/hero-bg.webp') type('image/webp'),
+			url('/images/aurora/hero-bg.png') type('image/png')
+		),
+		image-set(
+			url('/images/aurora/footer-bg.avif') type('image/avif'),
+			url('/images/aurora/footer-bg.webp') type('image/webp'),
+			url('/images/aurora/footer-bg.png') type('image/png')
+		);
 	background-position:
 		top center,
 		bottom center;
@@ -54,6 +67,11 @@ body > * {
 /* 404 / error pages only show the top aurora — Figma macet has no bottom bloom. */
 body.route-error {
 	background-image: url('/images/aurora/hero-bg.png');
+	background-image: image-set(
+		url('/images/aurora/hero-bg.avif') type('image/avif'),
+		url('/images/aurora/hero-bg.webp') type('image/webp'),
+		url('/images/aurora/hero-bg.png') type('image/png')
+	);
 }
 
 a {
