@@ -34,6 +34,15 @@ export default defineConfig({
 	optimizeDeps: {
 		include: ['@solana/web3.js', 'bs58', 'buffer', '@areal/sdk', '@arlex/client']
 	},
+	// Static text replacement for bare `global` references inside pre-bundled
+	// CommonJS deps (crypto-browserify, base-x, etc.) reachable via
+	// @arlex/client/codegen-runtime. The `nodePolyfills` plugin keeps
+	// `globals.global: false` (engine.io-client conflict — see plugin block),
+	// so we substitute at bundle-time instead. `globalThis` is universal in
+	// every browser since 2020, so the replacement is safe.
+	define: {
+		global: 'globalThis'
+	},
 	// Dedupe so the app, @areal/sdk, and any transitively-installed copies all
 	// share one PublicKey identity (and one Buffer class).
 	resolve: {
