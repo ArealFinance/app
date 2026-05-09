@@ -7,7 +7,7 @@
 		MarketsLoadingShimmer,
 		MarketsEmptyState
 	} from '$lib/components/sections';
-	import { WalletAddressChip, Picture, toast } from '$lib/components/ui';
+	import { Button, WalletAddressChip, toast } from '$lib/components/ui';
 	import { wallet } from '$lib/stores/wallet.svelte';
 	import { walletDialog } from '$lib/stores/walletDialog.svelte';
 	import { network } from '$lib/network/network.svelte';
@@ -126,10 +126,9 @@
 	     image discovery pass after CSSOM. -->
 	<link
 		rel="preload"
-		as="image"
-		href="/images/hero/crystal-composite.avif"
-		type="image/avif"
-		fetchpriority="high"
+		as="video"
+		href="/images/hero/crystal.webm"
+		type="video/webm"
 	/>
 </svelte:head>
 
@@ -166,25 +165,54 @@
 			</p>
 			<div class="hero-cta">
 				{#if wallet.isConnected && wallet.address}
-					<WalletAddressChip address={wallet.address} size="md" class="hero-chip" />
+					<WalletAddressChip
+						address={wallet.address}
+						size="md"
+						hideIcon
+						class="hero-chip"
+					/>
 				{:else}
-					<button type="button" class="hero-connect" onclick={() => walletDialog.open('connect')}>
+					<Button
+						variant="inverse"
+						class="hero-connect"
+						onclick={() => walletDialog.open('connect')}
+					>
 						Connect Wallet
-					</button>
+					</Button>
 				{/if}
 			</div>
 		</div>
 
 		<div class="hero-art" aria-hidden="true">
-			<Picture
-				src="/images/hero/crystal-composite.png"
-				alt=""
-				class="hero-crystal"
-				width={790}
-				height={748}
-				fetchpriority="high"
-				loading="eager"
-			/>
+			<!-- Static blurred glow halo behind the animated crystal.
+			     Per Figma `Crystal - Purple 1` (blur(50px) baked into the
+			     asset). Cheaper than running a second <video> decoder. -->
+			<picture>
+				<source srcset="/images/hero/crystal-bg-blur.avif" type="image/avif" />
+				<source srcset="/images/hero/crystal-bg-blur.webp" type="image/webp" />
+				<img
+					class="hero-crystal hero-crystal-glow"
+					src="/images/hero/crystal-bg-blur.png"
+					alt=""
+					width={1440}
+					height={1440}
+					loading="eager"
+					fetchpriority="high"
+				/>
+			</picture>
+			<!-- Animated crystal hero. Per Figma `Crystal - Purple 2`. -->
+			<video
+				class="hero-crystal hero-crystal-sharp"
+				src="/images/hero/crystal.webm"
+				poster="/images/hero/crystal-composite.avif"
+				width={1440}
+				height={1440}
+				autoplay
+				loop
+				muted
+				playsinline
+				preload="auto"
+			></video>
 		</div>
 	</section>
 
@@ -454,29 +482,11 @@
 		justify-content: center;
 	}
 
-	/* Connect-wallet variant — same width as the chip so layout doesn't jump
-	 * when the user disconnects/reconnects. */
-	.hero-connect {
-		display: inline-flex;
-		align-items: center;
-		justify-content: center;
+	/* Hero connect-wallet button — uses Button primitive (`<Button variant="inverse">`).
+	 * Width-matched to the WalletAddressChip (245px) so layout doesn't jump
+	 * when the user disconnects/reconnects. Per Figma `btn` (307:4849). */
+	.hero-cta :global(.hero-connect) {
 		width: 245px;
-		height: 48px;
-		padding: 0 24px;
-		background-color: var(--color-text);
-		color: var(--color-surface);
-		border: 0;
-		border-radius: var(--radius-button);
-		font-family: 'Halvar Breit', var(--font-sans);
-		font-weight: 700;
-		font-size: 14px;
-		letter-spacing: -0.6px;
-		text-transform: uppercase;
-		cursor: pointer;
-		transition: opacity var(--motion-base) var(--ease-out);
-	}
-	.hero-connect:hover {
-		opacity: 0.9;
 	}
 
 	.hero-art {
@@ -484,19 +494,39 @@
 		overflow: visible;
 	}
 
-	/* Hero crystal — pre-composited PNG (Group2087330734) baked from the two Figma
-	 * crystal compositions (370:3763 + 370:3764) with blur halos already applied.
-	 * The PNG has empty transparent padding around the crystal — render it big and
-	 * absolutely position so it overlaps the surrounding area like in Figma. */
+	/* Hero crystal — animated WebM composite (crystal + blur halos baked).
+	 * Per Figma 1440 macet (CSS dump 2026-05-09): the halo container is
+	 * 545.71×545.71 at left:812 / top:-32 within a 1550×738 hero header.
+	 * We preserve the 1:1 aspect of the source video (1440×1440) and pin it
+	 * to the right column with `right: -55px` so the halo edge lines up
+	 * with the page padding on a ~1280-container viewport. */
 	.hero-art :global(.hero-crystal) {
 		position: absolute;
-		top: -220px;
-		right: -110px;
-		width: 790px;
-		max-width: 930px;
+		top: -120px;
+		right: 60px;
+		width: 546px;
+		max-width: 100%;
 		height: auto;
+		aspect-ratio: 1 / 1;
 		display: block;
 		pointer-events: none;
+		transform: rotate(34deg);
+	}
+
+	/* Glow halo — pre-blurred PNG (Figma `Crystal - Purple 1`, blur(50px)
+	 * baked into the asset). Larger and offset so the halo extends past
+	 * the sharp crystal silhouette; no rotation per design tweak. */
+	.hero-art :global(.hero-crystal-glow) {
+		z-index: 0;
+		top: -190px;
+		right: -90px;
+		width: 675px;
+		transform: rotate(0deg);
+	}
+
+	/* Sharp crystal — front layer. Per Figma `Crystal - Purple 2`. */
+	.hero-art :global(.hero-crystal-sharp) {
+		z-index: 1;
 	}
 
 	/* Header — absolute inside Tab area, top:14, left:22 (Figma container coords).
