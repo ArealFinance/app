@@ -38,7 +38,27 @@ vi.mock('$lib/network/network.svelte', async () => {
 	};
 });
 
-import { mockNetworkState, resetMockState } from './test-helpers.svelte';
+// Auth mock — reactive surface so the auth-watch effect picks up changes
+// when tests mutate `mockAuthState`. Uses the same reactive-helper pattern
+// as the network mock above.
+vi.mock('$lib/auth', async () => {
+	const helpers = await import('./test-helpers.svelte');
+	return {
+		auth: {
+			get accessToken() {
+				return helpers.mockAuthState.accessToken;
+			},
+			get wallet() {
+				return helpers.mockAuthState.wallet;
+			},
+			get isSignedIn() {
+				return helpers.mockAuthState.accessToken !== null;
+			}
+		}
+	};
+});
+
+import { mockNetworkState, mockAuthState, resetMockState } from './test-helpers.svelte';
 
 const VALID_POOL_A = '6YRfYtkZmqWgz8N3MDeqJRc4vSiJ5VGgiMv4ihYzJyY4';
 const VALID_POOL_B = 'DYw8jCTfwHNRJhhmFcbXvVDTqWMEVFBX6ZKUmG5CNSKK';
@@ -323,6 +343,92 @@ describe('realtimeClient', () => {
 		});
 		await settle();
 		expect(realtimeClient.staleRooms.has(room)).toBe(false);
+	});
+
+	// ── Phase 12.3.4 — auth-token rotation + wallet-room gating ────────
+
+	it('token rotation: auth.accessToken change → teardown + reconnect with new token', async () => {
+		const { factory, sockets } = makeFactory();
+		__setIoFactoryForTests(factory);
+
+		// Start with a token attached to the socket.
+		mockAuthState.accessToken = 'token-A';
+		mockAuthState.wallet = VALID_POOL_A;
+		realtimeClient.useRoom('protocol');
+		flushSync();
+		await settle();
+		expect(sockets.length).toBe(1);
+		const old = sockets[0]!;
+		// SDK forwards the token via `auth.token` / `extraHeaders`. We don't
+		// inspect socket.io's internal io options shape here — instead we
+		// verify the lifecycle: reconnect happens when the token rotates.
+		expect(old.disconnected).toBe(false);
+
+		// Rotate token.
+		mockAuthState.accessToken = 'token-B';
+		flushSync();
+		await settle();
+
+		expect(old.disconnected).toBe(true);
+		expect(sockets.length).toBe(2);
+		const fresh = sockets[1]!;
+		// Re-subscribe replayed in insertion order on the fresh socket.
+		expect(fresh.subscribeEmits().map((e) => e.payload)).toEqual([
+			{ room: 'protocol' }
+		]);
+	});
+
+	it('wallet-room gating: useRoom("wallet:X") without auth → no subscribe', async () => {
+		const { factory, sockets } = makeFactory();
+		__setIoFactoryForTests(factory);
+
+		// No auth — wallet-room subscribe should NOT emit.
+		const handle = realtimeClient.useRoom(`wallet:${VALID_POOL_A}`);
+		flushSync();
+		await settle();
+
+		// Socket is never created (no other rooms either) since the wallet
+		// room was rejected before reaching ensureClient.
+		expect(sockets.length).toBe(0);
+
+		handle.off();
+	});
+
+	it('wallet-room gating: useRoom("wallet:X") with non-matching auth → no subscribe', async () => {
+		const { factory, sockets } = makeFactory();
+		__setIoFactoryForTests(factory);
+
+		mockAuthState.accessToken = 'token-A';
+		mockAuthState.wallet = VALID_POOL_B; // signed in for B, requesting A.
+
+		const handle = realtimeClient.useRoom(`wallet:${VALID_POOL_A}`);
+		flushSync();
+		await settle();
+
+		// No socket built — gating short-circuits before ensureClient.
+		expect(sockets.length).toBe(0);
+		handle.off();
+	});
+
+	it('wallet-room gating: useRoom("wallet:X") with matching auth → subscribe emitted', async () => {
+		const { factory, sockets } = makeFactory();
+		__setIoFactoryForTests(factory);
+
+		mockAuthState.accessToken = 'token-A';
+		mockAuthState.wallet = VALID_POOL_A;
+
+		const handle = realtimeClient.useRoom(`wallet:${VALID_POOL_A}`);
+		flushSync();
+		await settle();
+
+		expect(sockets.length).toBe(1);
+		const sock = sockets[0]!;
+		expect(sock.subscribeEmits()).toHaveLength(1);
+		expect(sock.subscribeEmits()[0]!.payload).toEqual({
+			room: `wallet:${VALID_POOL_A}`
+		});
+
+		handle.off();
 	});
 
 	it('disconnects underlying socket once refCount drains + grace expires', async () => {

@@ -32,6 +32,7 @@ import { REALTIME_WS_URLS } from '@areal/sdk/network';
 import { env as publicEnv } from '$env/dynamic/public';
 
 import { network } from '$lib/network/network.svelte';
+import { auth } from '$lib/auth';
 
 /** Stable global stale threshold — covers 30s `protocol` and 60s `pool:*`. */
 const STALE_AFTER_MS = 90_000;
@@ -152,11 +153,13 @@ function setupClient(): void {
 	}
 
 	const tokenAtConnect = ++connectionToken;
+	const accessToken = auth.accessToken;
 	let next: SdkRealtimeClient;
 	try {
 		next = connect({
 			baseUrl,
 			staleAfterMs: STALE_AFTER_MS,
+			...(accessToken ? { token: accessToken } : {}),
 			...(ioFactoryOverride !== null ? { ioFactory: ioFactoryOverride } : {})
 		});
 	} catch (e) {
@@ -226,6 +229,14 @@ function setupClient(): void {
  */
 let activeCluster: string | null = null;
 
+/**
+ * Access token of the currently-live socket. Per SDK 0.10.x contract there
+ * is no `setToken()` — rotation requires `disconnect()` + `connect()`. The
+ * auth-watch effect compares this against `auth.accessToken` and rebuilds
+ * the socket on a real change.
+ */
+let activeAccessToken: string | null = null;
+
 /** Cluster-switch effect body. Track `network.current` reactively. */
 function effectBody() {
 	const next = network.current;
@@ -235,6 +246,7 @@ function effectBody() {
 		if (countLiveRooms() > 0) {
 			setupClient();
 			activeCluster = next;
+			activeAccessToken = auth.accessToken;
 		}
 		return;
 	}
@@ -244,8 +256,35 @@ function effectBody() {
 	activeCluster = next;
 	if (countLiveRooms() > 0) {
 		setupClient();
+		activeAccessToken = auth.accessToken;
 	} else {
 		activeCluster = null;
+		activeAccessToken = null;
+	}
+}
+
+/**
+ * Auth-token-rotation effect body. The realtime SDK has no `setToken()`,
+ * so a token change requires a full disconnect+reconnect cycle. We do
+ * NOT rebuild when there are no live rooms — the token will be picked up
+ * by the next `useRoom` / `on` call as part of `setupClient`.
+ */
+function authEffectBody() {
+	const next = auth.accessToken;
+	if (next === activeAccessToken) return;
+	if (client === null) {
+		// No live socket; nothing to rotate. Refresh the recorded value so
+		// future no-op effect runs don't trigger spurious teardowns.
+		activeAccessToken = next;
+		return;
+	}
+	teardownClient();
+	activeAccessToken = next;
+	if (countLiveRooms() > 0) {
+		setupClient();
+	} else {
+		activeCluster = null;
+		activeAccessToken = null;
 	}
 }
 
@@ -255,6 +294,9 @@ function ensureEffectRoot(): void {
 		$effect(() => {
 			effectBody();
 		});
+		$effect(() => {
+			authEffectBody();
+		});
 	});
 }
 
@@ -262,6 +304,7 @@ function ensureClient(): void {
 	if (client !== null) return;
 	setupClient();
 	activeCluster = network.current;
+	activeAccessToken = auth.accessToken;
 }
 
 function performUnsubscribe(room: Room): void {
@@ -281,6 +324,19 @@ function performUnsubscribe(room: Room): void {
 
 function useRoom(room: Room): RealtimeHandle {
 	ensureEffectRoot();
+
+	// Wallet-room gating. `wallet:<base58>` rooms require an authenticated
+	// socket where `jwt.sub === <base58>`. If we have no signed-in session
+	// (or the session is for a different wallet) we DO NOT emit subscribe —
+	// the server would reject with `auth_required`/`auth_mismatch` anyway,
+	// and emitting the doomed subscribe would just spam the connect-error
+	// channel. Returning a no-op handle keeps the call site uniform.
+	if (room.startsWith('wallet:')) {
+		const expected = room.slice('wallet:'.length);
+		if (auth.wallet !== expected || !auth.isSignedIn) {
+			return { off() {} };
+		}
+	}
 
 	// Cancel any pending unsubscribe — we're back in the active set.
 	const pending = pendingUnsubscribes.get(room);
@@ -390,6 +446,7 @@ export function __resetRealtimeForTests(): void {
 	teardownClient();
 	activeRooms.clear();
 	activeCluster = null;
+	activeAccessToken = null;
 	if (stopEffect) {
 		stopEffect();
 		stopEffect = null;
