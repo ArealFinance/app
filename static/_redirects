@@ -1,0 +1,16 @@
+# Cloudflare Pages edge-redirect rules (https://developers.cloudflare.com/pages/configuration/redirects/)
+#
+# `/` → `/markets` is the canonical landing for the bare domain. Today this
+# redirect is implemented client-side in `src/routes/+page.ts` (307), which
+# pays a full SPA boot before navigation. When the deploy target migrates to
+# Cloudflare Pages this file activates and short-circuits the redirect at the
+# edge (~50 ms vs ~300–600 ms SPA hop).
+#
+# Current deploy target is VPS-nginx behind Cloudflare proxy; nginx does not
+# read `_redirects`, so this file is inert in production for now. Keeping it
+# here so the migration is one config change away. The SPA-runtime fallback
+# in `+page.ts` remains the source of truth until then.
+#
+# Status code: 307 (temporary) so we can flip back if /markets ever stops
+# being the canonical landing.
+/  /markets  307
