@@ -318,7 +318,7 @@
 		font-weight: var(--font-weight-semibold);
 		letter-spacing: var(--tracking-snug);
 		border-radius: var(--radius-md); /* 12 */
-		height: 24px;
+		height: 28px; /* Figma macet — period/delta chips are taller than ticker/TVL chips */
 	}
 	.chip-delta-success {
 		background-color: rgba(117, 227, 140, 0.1);
@@ -329,8 +329,8 @@
 		color: var(--color-red-900);
 	}
 	.caret {
-		width: 8px;
-		height: 8px;
+		width: 14px; /* Figma caret bounding-box; the SVG arrow itself sits inside with padding */
+		height: 14px;
 	}
 	.chip-delta-danger .caret {
 		transform: rotate(180deg);
@@ -340,7 +340,7 @@
 		background-color: rgba(255, 255, 255, 0.1);
 		color: var(--color-text);
 		border-radius: var(--radius-md);
-		height: 24px;
+		height: 28px; /* Figma macet — period chip pairs with delta chip at 28px */
 		font-family: var(--font-body);
 		font-weight: var(--font-weight-semibold);
 		font-size: var(--text-sm); /* 13 — Figma Inter SemiBold 13 */
@@ -360,8 +360,13 @@
 		width: 36px;
 	}
 
-	/* Sparkline — bleeds to card edges (4px inset L/R/B). Per Figma:
-	 * top inset ≈ 35.22% (81/230), height ≈ 145px native; price text overlays it. */
+	/* Graph rect — Figma macet `Rectangle 40175` + `Rectangle 40176`:
+	 *   - 4px inset on all sides (1.37% × card width)
+	 *   - top: 35.22% × card height (≈81px from card top)
+	 *   - all 4 corners rounded 20px (16px after subtracting the 4px inset)
+	 *   - bg: linear-gradient(180deg, #080A0F 0%, #2E2E2E 100%) — dark top
+	 *     fading to slightly-lighter dark at the bottom. The price label/
+	 *     value/chips above (z-index 1) overlap the rect's upper portion. */
 	.card-spark {
 		position: absolute;
 		left: 4px;
@@ -371,11 +376,8 @@
 		pointer-events: none;
 		z-index: 0;
 		overflow: hidden;
-		border-radius: 0 0 calc(var(--radius-lg) - 4px) calc(var(--radius-lg) - 4px);
-		/* Top stop is transparent so the card's own background-color shows
-		 * through — this lets hover-state colour changes carry into the
-		 * sparkline area instead of leaving it stuck at the default surface. */
-		background: linear-gradient(to bottom, transparent, var(--color-dark-600));
+		border-radius: calc(var(--radius-lg) - 4px);
+		background: linear-gradient(180deg, var(--color-dark-900) 0%, #2e2e2e 100%);
 	}
 	.card-spark.dim {
 		opacity: 0.4;
@@ -386,6 +388,5 @@
 		height: 100%;
 		object-fit: cover;
 		object-position: bottom;
-		mix-blend-mode: screen;
 	}
 </style>
