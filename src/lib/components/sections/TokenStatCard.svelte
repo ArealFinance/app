@@ -375,7 +375,8 @@
 	 *   - all 4 corners rounded 20px (16px after subtracting the 4px inset)
 	 *   - bg: linear-gradient(180deg, #080A0F 0%, #2E2E2E 100%) — dark top
 	 *     fading to slightly-lighter dark at the bottom. The price label/
-	 *     value/chips above (z-index 1) overlap the rect's upper portion. */
+	 *     value/chips above (z-index 1) overlap the rect's upper portion.
+	 */
 	.card-spark {
 		position: absolute;
 		left: 4px;
