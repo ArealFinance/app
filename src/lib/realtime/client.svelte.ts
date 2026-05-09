@@ -331,6 +331,22 @@ function useRoom(room: Room): RealtimeHandle {
 	// the server would reject with `auth_required`/`auth_mismatch` anyway,
 	// and emitting the doomed subscribe would just spam the connect-error
 	// channel. Returning a no-op handle keeps the call site uniform.
+	//
+	/**
+	 * Wallet-room subscriptions are NOT reactive to `auth` state.
+	 *
+	 * Calling `useRoom('wallet:X')` while signed-out (or signed-in for a
+	 * different wallet) returns a no-op handle that NEVER reanimates if
+	 * auth state flips. Consumers must re-call `useRoom` from a `$effect`
+	 * watching `auth.isSignedInForCurrentWallet`. See `routes/portfolio/
+	 * +page.svelte` for the canonical pattern.
+	 *
+	 * Why this design (and not auto-resubscribe inside the client):
+	 *   - 0→1 ref-count semantics drive subscribe-emit; auto-flip would
+	 *     break the invariant "subscribe only on cold-start of a room".
+	 *   - Auth-driven resubscribe lifetime belongs to the consumer's
+	 *     mount/unmount window, not to a global client.
+	 */
 	if (room.startsWith('wallet:')) {
 		const expected = room.slice('wallet:'.length);
 		if (auth.wallet !== expected || !auth.isSignedIn) {
