@@ -462,11 +462,9 @@ describe('auth store', () => {
 		const a = mod.auth;
 
 		expect(a.status).toBe('signed-out');
-		// readPersisted returns null for parse fail; module-load
-		// rehydrate is a no-op so the bad blob STAYS until the user's
-		// next signIn. That's by design — clearing on a parse fail is a
-		// nice-to-have (verified separately below via the rehydrate path
-		// in E4).
+		// readPersisted now drops the bad blob immediately so it can't
+		// linger across reloads.
+		expect(sessionStorage.getItem(STORAGE_KEY)).toBeNull();
 		a.__resetForTests?.();
 	});
 
@@ -486,6 +484,26 @@ describe('auth store', () => {
 
 		expect(a.status).toBe('signed-out');
 		expect(a.accessToken).toBeNull();
+		a.__resetForTests?.();
+	});
+
+	it('E5: schema-mismatched blob is cleared from sessionStorage', async () => {
+		sessionStorage.setItem(
+			STORAGE_KEY,
+			JSON.stringify({
+				accessToken: 123, // wrong type — schema mismatch
+				refreshToken: 'r',
+				expiresAt: 'now',
+				wallet: WALLET_A_BASE58
+			})
+		);
+		vi.resetModules();
+		const mod = await import('./auth.svelte');
+		const a = mod.auth;
+
+		expect(a.status).toBe('signed-out');
+		// Schema-mismatched blob must NOT linger in storage.
+		expect(sessionStorage.getItem(STORAGE_KEY)).toBeNull();
 		a.__resetForTests?.();
 	});
 

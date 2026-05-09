@@ -114,7 +114,11 @@ function readPersisted(): PersistedAuth | null {
 	if (!raw) return null;
 	try {
 		const parsed = JSON.parse(raw) as unknown;
-		if (!parsed || typeof parsed !== 'object') return null;
+		if (!parsed || typeof parsed !== 'object') {
+			// Corrupt / non-object blob — drop it so it doesn't linger across reloads.
+			clearPersisted();
+			return null;
+		}
 		const p = parsed as Partial<PersistedAuth>;
 		if (
 			typeof p.accessToken !== 'string' ||
@@ -125,11 +129,15 @@ function readPersisted(): PersistedAuth | null {
 			p.refreshToken.length === 0 ||
 			p.wallet.length === 0
 		) {
+			clearPersisted();
 			return null;
 		}
 		// Validate the timestamp parses; reject otherwise.
 		const ts = Date.parse(p.expiresAt);
-		if (!Number.isFinite(ts)) return null;
+		if (!Number.isFinite(ts)) {
+			clearPersisted();
+			return null;
+		}
 		return {
 			accessToken: p.accessToken,
 			refreshToken: p.refreshToken,
@@ -137,6 +145,8 @@ function readPersisted(): PersistedAuth | null {
 			wallet: p.wallet
 		};
 	} catch {
+		// JSON.parse threw on malformed input — drop the blob.
+		clearPersisted();
 		return null;
 	}
 }
