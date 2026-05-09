@@ -4,6 +4,7 @@
 	import { wallet } from '$lib/stores/wallet.svelte';
 	import { walletDialog } from '$lib/stores/walletDialog.svelte';
 	import { isPhantomInstalled, isSolflareInstalled } from '$lib/wallet';
+	import { auth } from '$lib/auth';
 
 	const open = $derived(walletDialog.mode === 'connect');
 	const status = $derived(wallet.status);
@@ -28,14 +29,48 @@
 		}
 	});
 
-	function handleConnectPhantom() {
-		if (isAwaiting) return;
-		wallet.connect('phantom');
+	/**
+	 * Auto-chain `auth.signIn()` after a USER-INITIATED connect.
+	 *
+	 * Without this, the flow lands the user in "wallet connected but auth
+	 * signed-out" state, which renders an extra "Sign in" button in the header
+	 * — non-technical users read that as a bug ("I just connected, why do I
+	 * have to sign in?"). Fire-and-forget the signIn handshake immediately so
+	 * the wallet's two popups (connection approve + login signature) appear
+	 * back-to-back as one continuous flow.
+	 *
+	 * Guards:
+	 *   - only fire on user-initiated connect (this handler), NOT on the
+	 *     auto-reconnect path that runs on page load. Page-refresh rehydrates
+	 *     auth from sessionStorage; if there's a valid token, status is
+	 *     already `signed-in` and the header is clean.
+	 *   - skip if auth is already settled for this wallet (defensive — should
+	 *     not happen here since the wallet just changed, but keeps idempotent).
+	 *   - if the user dismisses the signature in the wallet, auth lands in
+	 *     `error` state and the header's "Sign in" button reappears as a
+	 *     recovery affordance — that's intentional, not a regression.
+	 */
+	async function chainSignInAfterConnect() {
+		if (!wallet.isConnected) return;
+		if (auth.isSignedInForCurrentWallet) return;
+		try {
+			await auth.signIn();
+		} catch {
+			// Errors are surfaced via `auth.status === 'error'` + `auth.error`;
+			// no need to re-throw or render a toast here.
+		}
 	}
 
-	function handleConnectSolflare() {
+	async function handleConnectPhantom() {
 		if (isAwaiting) return;
-		wallet.connect('solflare');
+		await wallet.connect('phantom');
+		await chainSignInAfterConnect();
+	}
+
+	async function handleConnectSolflare() {
+		if (isAwaiting) return;
+		await wallet.connect('solflare');
+		await chainSignInAfterConnect();
 	}
 </script>
 
