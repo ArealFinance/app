@@ -18,9 +18,9 @@ describe('network (svelte.ts store)', () => {
 	});
 
 	describe('initialization', () => {
-		it('should default to devnet when localStorage is empty', async () => {
+		it('should default to localnet (Testnet) when localStorage is empty', async () => {
 			const { network: net } = await import('./network.svelte');
-			expect(net.current).toBe('devnet');
+			expect(net.current).toBe('localnet');
 		});
 
 		it('should restore from localStorage when available', async () => {
@@ -32,7 +32,7 @@ describe('network (svelte.ts store)', () => {
 		it('should fall back to default when localStorage has invalid value', async () => {
 			localStorage.setItem('app:network:v1', 'invalid-network');
 			const { network: net } = await import('./network.svelte');
-			expect(net.current).toBe('devnet');
+			expect(net.current).toBe('localnet');
 		});
 
 		it('should handle missing localStorage gracefully', async () => {
@@ -43,7 +43,7 @@ describe('network (svelte.ts store)', () => {
 			try {
 				const { network: net } = await import('./network.svelte');
 				// Should still work with the default
-				expect(net.current).toBe('devnet');
+				expect(net.current).toBe('localnet');
 			} finally {
 				(global as any).localStorage = original;
 			}
@@ -115,7 +115,7 @@ describe('network (svelte.ts store)', () => {
 
 			expect(typeof label).toBe('string');
 			expect(label.length).toBeGreaterThan(0);
-			expect(['Localnet', 'Devnet', 'Mainnet']).toContain(label);
+			expect(['Testnet', 'Devnet', 'Mainnet']).toContain(label);
 		});
 
 		it('should match endpoint.label', async () => {
@@ -159,6 +159,12 @@ describe('network (svelte.ts store)', () => {
 
 		it('should support all valid network ids', async () => {
 			const { network: net } = await import('./network.svelte');
+
+			// Start from a network distinct from the default so the first
+			// `setNetwork(NETWORK_IDS[0])` is a real transition and persists
+			// to localStorage (the early-return on `current === id` would
+			// otherwise skip persistence for the default-matching id).
+			net.setNetwork('mainnet');
 
 			for (const networkId of NETWORK_IDS) {
 				net.setNetwork(networkId);
@@ -265,14 +271,14 @@ describe('network (svelte.ts store)', () => {
 			localStorage.setItem('app:network:v1', '');
 			const { network: net } = await import('./network.svelte');
 
-			expect(net.current).toBe('devnet');
+			expect(net.current).toBe('localnet');
 		});
 
 		it('should handle malformed json in localStorage gracefully', async () => {
 			localStorage.setItem('app:network:v1', '{invalid json}');
 			const { network: net } = await import('./network.svelte');
 
-			expect(net.current).toBe('devnet');
+			expect(net.current).toBe('localnet');
 		});
 	});
 
@@ -330,7 +336,7 @@ describe('network (svelte.ts store)', () => {
 			}
 		});
 
-		it('devnet endpoint should be the default', () => {
+		it('devnet endpoint should exist', () => {
 			expect(ENDPOINTS.devnet).toBeDefined();
 			expect(ENDPOINTS.devnet.label).toBe('Devnet');
 		});
@@ -342,7 +348,11 @@ describe('network (svelte.ts store)', () => {
 
 		it('localnet endpoint should exist', () => {
 			expect(ENDPOINTS.localnet).toBeDefined();
-			expect(ENDPOINTS.localnet.label).toBe('Localnet');
+			// `localnet` slot is repurposed to point at the Areal-hosted test-validator
+			// exposed at https://rpc.areal.finance. Internal id stays `localnet` for
+			// backwards-compat across the codebase; user-facing label is "Testnet".
+			expect(ENDPOINTS.localnet.label).toBe('Testnet');
+			expect(ENDPOINTS.localnet.rpcUrl).toBe('https://rpc.areal.finance');
 		});
 	});
 });

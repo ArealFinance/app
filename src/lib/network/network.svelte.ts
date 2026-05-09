@@ -2,8 +2,12 @@
  * Active network store — runes-based singleton.
  *
  * Persisted to localStorage so the choice survives reloads. Default is
- * `devnet` (safest for public dev — localnet is invisible from outside the
- * dev's machine, mainnet is too production-y to default to).
+ * `localnet` (which now points at the Areal-hosted test-validator at
+ * `https://rpc.areal.finance` — see `endpoints.ts`). The old "localnet =
+ * 127.0.0.1:8899" interpretation is gone; the Areal contracts are deployed
+ * on the Areal test-validator and that's where the public app should land
+ * by default. Mainnet is too production-y to default to; real Solana devnet
+ * doesn't have our contracts deployed.
  *
  * Connections live here (not on the wallet store): a Connection is bound to
  * an RPC URL, which is a network-scoped concept. Reads need to work even
@@ -25,7 +29,7 @@ import { createConnection, createWsConnection } from '$lib/sdk/connection';
 import { ENDPOINTS, NETWORK_IDS, type NetworkEndpoint, type NetworkId } from './endpoints';
 
 const STORAGE_KEY = 'app:network:v1';
-const DEFAULT_NETWORK: NetworkId = 'devnet';
+const DEFAULT_NETWORK: NetworkId = 'localnet';
 
 function loadFromStorage(): NetworkId | null {
 	if (typeof localStorage === 'undefined') return null;
