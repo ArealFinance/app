@@ -218,7 +218,8 @@
 			<header class="markets-head">
 				<span class="markets-dot markets-dot-protocol" aria-hidden="true"></span>
 				<span class="markets-label">Protocol</span>
-				<span class="markets-count">{protocolTokens.length + 1}</span>
+				<!-- Was \ to count the hardcoded "Real World Token / coming-soon" placeholder card alongside live tokens. That placeholder is gone now (RWT is live), so the badge tracks the array length exactly. -->
+				<span class="markets-count">{protocolTokens.length}</span>
 			</header>
 			<div class="markets-grid">
 				{#if markets.isLoading}
