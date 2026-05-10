@@ -36,6 +36,7 @@ import type {
  * grouped into the `vendor-solana` chunk by Rollup.
  */
 import { getPhantomProvider, getSolflareProvider } from '$lib/wallet';
+import { network } from '$lib/network/network.svelte';
 import { showError } from '$lib/errors';
 import { truncateAddress } from '$lib/utils/address';
 
@@ -236,20 +237,34 @@ function loadMore(): void {
 }
 
 /**
- * Sign and send a transaction via the active wallet provider.
+ * Sign a transaction in the wallet, then broadcast it via OUR Solana
+ * `Connection` (`network.connection` — pinned to the active cluster's
+ * `rpcUrl`).
  *
- * The active provider's `signAndSendTransaction` does the work — we only
- * dispatch by the currently connected provider. Both Phantom and Solflare
- * expose the same `{ signature: string }` shape, so the call site doesn't
- * need to branch.
+ * Why split sign + send instead of letting the wallet do both:
+ *
+ *   The Phantom & Solflare extensions ship with their OWN RPC plumbing
+ *   that always points at Solana mainnet. `signAndSendTransaction()`
+ *   from those providers (a) simulates the tx against mainnet (where
+ *   the user has no SOL and our programs don't exist), surfacing a
+ *   misleading "У вас недостаточно SOL" warning to anyone with an empty
+ *   mainnet wallet, and (b) broadcasts to mainnet, where the tx
+ *   silently disappears because our cluster isn't there.
+ *
+ *   By calling `signTransaction(tx)` first we keep the wallet a pure
+ *   signer; then `network.connection.sendRawTransaction(...)` routes
+ *   the wire bytes to the correct cluster (Testnet / Devnet / Mainnet)
+ *   on the user's actual settings. The Phantom popup may still show
+ *   its mainnet-based simulation warning — the user clicks "Всё равно
+ *   подтвердить" and the actual tx lands on the right cluster.
  *
  * Throws:
- *   - `Wallet not connected` when there is no provider / no public key
- *     (status check is intentional — we won't dispatch into a stale
- *     `provider === null` setting from a half-finished disconnect).
- *   - Whatever the underlying provider throws (user rejection, RPC errors).
- *     User rejection messages are passed through unchanged so callers /
+ *   - `Wallet not connected` when there is no provider / no public key.
+ *   - Whatever the underlying provider throws (user rejection, etc.).
+ *     User-rejection messages pass through unchanged so callers /
  *     `mapError` can detect "User rejected" cleanly.
+ *   - `connection.sendRawTransaction` errors (RPC down, bad blockhash,
+ *     tx already processed) bubble verbatim.
  */
 async function signAndSendTransaction(
 	tx: SolanaTransaction | VersionedTransaction
@@ -258,16 +273,33 @@ async function signAndSendTransaction(
 		throw new Error('Wallet not connected');
 	}
 
+	let signed: SolanaTransaction | VersionedTransaction;
 	if (provider === 'phantom') {
 		const p = getPhantomProvider();
 		if (!p) throw new Error('Wallet not connected');
-		return p.signAndSendTransaction(tx);
+		signed = await p.signTransaction(tx);
+	} else {
+		const p = getSolflareProvider();
+		if (!p) throw new Error('Wallet not connected');
+		signed = await p.signTransaction(tx);
 	}
 
-	// provider === 'solflare'
-	const p = getSolflareProvider();
-	if (!p) throw new Error('Wallet not connected');
-	return p.signAndSendTransaction(tx);
+	const conn = network.connection;
+	const raw =
+		'serialize' in signed
+			? (signed as SolanaTransaction | VersionedTransaction).serialize()
+			: (() => {
+					throw new Error('Signed transaction has no serialize()');
+				})();
+	const signature = await conn.sendRawTransaction(raw, {
+		// Phantom already simulated against its own RPC; skipping the
+		// preflight here avoids a second mainnet simulation by our own
+		// cluster that has no value (we already trust the wallet's
+		// signature).
+		skipPreflight: false,
+		maxRetries: 3
+	});
+	return { signature };
 }
 
 export const wallet = {
