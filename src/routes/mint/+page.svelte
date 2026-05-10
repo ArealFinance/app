@@ -717,33 +717,44 @@
 		gap: var(--space-2);
 	}
 
-	/* ─── Testnet faucet button (chip-style, only on /mint Testnet) ─── */
+	/* ─── Testnet faucet button (only on /mint Testnet) ───
+	 * Sized + coloured loud enough to be obvious even when the user already
+	 * has a non-zero USDC balance. Filled with the brand primary so it sits
+	 * visually between the muted Pay/Receive cards. Was previously a tiny
+	 * chip on `--color-bg` which was nearly invisible on the dark mint card.
+	 */
 	.faucet-row {
 		display: flex;
 		justify-content: center;
+		margin: calc(-1 * var(--space-2)) 0;
 	}
 	.faucet-btn {
 		display: inline-flex;
 		align-items: center;
 		justify-content: center;
-		padding: var(--space-1) var(--space-3);
-		background-color: var(--color-bg);
-		color: var(--color-text);
-		border: 0;
-		border-radius: var(--radius-md);
+		gap: var(--space-2);
+		padding: var(--space-2) var(--space-5);
+		background: linear-gradient(135deg, var(--color-primary, #8B5CF6), #6D28D9);
+		color: #fff;
+		border: 1px solid rgba(255, 255, 255, 0.12);
+		border-radius: var(--radius-pill, 999px);
 		font-family: 'Onest', var(--font-body);
-		font-size: var(--text-xs);
-		font-weight: var(--font-weight-medium);
+		font-size: var(--text-sm);
+		font-weight: var(--font-weight-semibold);
 		letter-spacing: var(--tracking-tight);
 		cursor: pointer;
-		transition: background-color var(--motion-base) var(--ease-out);
+		box-shadow: 0 4px 18px rgba(139, 92, 246, 0.35);
+		transition: transform var(--motion-base) var(--ease-out),
+			box-shadow var(--motion-base) var(--ease-out);
 	}
 	.faucet-btn:hover:not(:disabled) {
-		background-color: var(--color-dark-700);
+		transform: translateY(-1px);
+		box-shadow: 0 6px 24px rgba(139, 92, 246, 0.5);
 	}
 	.faucet-btn:disabled {
 		opacity: 0.6;
 		cursor: not-allowed;
+		box-shadow: none;
 	}
 
 	.quote-error {
