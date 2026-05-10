@@ -13,17 +13,28 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const TOPLEVEL_BUFFER = path.resolve(__dirname, 'node_modules/buffer');
 
 /*
- * Optional outbound HTTPS proxy for the Vite dev proxy. Honoured only when
- * `HTTPS_PROXY` (or `https_proxy`) is set in the developer's shell — required
- * on machines that route outbound traffic through Clash / Sing-Box / similar
- * (Node's built-in https module ignores `HTTPS_PROXY` by default, unlike
- * curl, which is why `npm run dev` previously hung with "Client network
- * socket disconnected before secure TLS connection" while curl to the same
- * host worked fine). Falls back to `undefined` when no proxy is configured,
- * which means the Vite proxy makes a direct connection — same as before.
+ * Optional outbound HTTPS proxy for the Vite dev proxy.
+ *
+ * OPT-IN by `VITE_USE_HTTPS_PROXY=1`. We deliberately do NOT auto-pick up
+ * `HTTPS_PROXY` / `https_proxy` from the shell because:
+ *
+ *   1. Node's built-in `https` module ignores those vars (unlike curl), so
+ *      direct Vite-proxy → upstream connections work fine on machines where
+ *      `curl` happens to route through Clash / Sing-Box / similar.
+ *   2. Routing the dev proxy through a local Clash/Sing-Box endpoint
+ *      sporadically fails the TLS handshake to Cloudflare (observed
+ *      ~1-in-3 with `SSL_ERROR_SYSCALL` after 5s). Each failure surfaces
+ *      as a `502 Bad Gateway` in the browser even though the upstream is
+ *      healthy.
+ *
+ * Set `VITE_USE_HTTPS_PROXY=1` only on machines that genuinely require
+ * the local proxy for outbound TLS (corporate firewalls, etc.). The
+ * proxy URL is then read from `HTTPS_PROXY` / `https_proxy` as before.
  */
+const httpsProxyOptIn = process.env.VITE_USE_HTTPS_PROXY === '1';
 const httpsProxyEnv = process.env.HTTPS_PROXY ?? process.env.https_proxy ?? null;
-const httpsProxyAgent = httpsProxyEnv ? new HttpsProxyAgent(httpsProxyEnv) : undefined;
+const httpsProxyAgent =
+	httpsProxyOptIn && httpsProxyEnv ? new HttpsProxyAgent(httpsProxyEnv) : undefined;
 
 export default defineConfig({
 	plugins: [
