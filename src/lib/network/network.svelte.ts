@@ -68,6 +68,21 @@ export const network = {
 		const ep = ENDPOINTS[current];
 		return createWsConnection(ep.rpcUrl, ep.wsRpcUrl);
 	},
+	/**
+	 * Whether the active cluster exposes a Solana RPC WebSocket subscription
+	 * endpoint. `false` for clusters where the cloudflared tunnel only
+	 * proxies HTTP (notably Testnet) — callers MUST gate every
+	 * `wsConnection.onAccountChange / onLogs / onSlotChange` registration on
+	 * this flag, otherwise web3.js will queue `WebSocket('wss://…')`
+	 * connection attempts that fail every reconnect interval and spam the
+	 * console with `ws error: undefined`. The `wsEndpoint: false` trick
+	 * accepted by older web3.js builds is silently ignored in 1.98 — the
+	 * Connection still derives the WS URL from the HTTP endpoint and tries
+	 * to dial.
+	 */
+	get rpcSubscriptionsAvailable(): boolean {
+		return Boolean(ENDPOINTS[current].wsRpcUrl);
+	},
 	setNetwork(id: NetworkId) {
 		// Defensive guard: reject ids outside the known set. Callers cast at
 		// the boundary (e.g. URL params, user input) so a bogus value can

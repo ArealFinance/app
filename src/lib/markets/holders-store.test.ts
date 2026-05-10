@@ -157,6 +157,26 @@ describe('holdersStore', () => {
 		expect(holdersStore.status).toBe('ready');
 	});
 
+	it('404 marks mint unavailable, status stays ready, future refreshes skip it', async () => {
+		// Backend doesn't expose `/markets/tokens/<mint>/holders` for this
+		// mint yet — should be a soft no-op, not an error banner.
+		mocks.getTokenHolders.mockRejectedValueOnce(
+			new FakeMarketsFetchError('404', 404, 'http://example/markets/tokens/X/holders')
+		);
+		holdersStore.track(MINT_A);
+		await holdersStore.refresh();
+
+		// No row, but status is 'ready' (backend reachable, feature not deployed).
+		expect(holdersStore.countForMint(MINT_A)).toBeNull();
+		expect(holdersStore.status).toBe('ready');
+
+		// A subsequent refresh must NOT re-hit the 404'd endpoint — the mint
+		// is on the unavailable list now.
+		const callsBefore = mocks.getTokenHolders.mock.calls.length;
+		await holdersStore.refresh();
+		expect(mocks.getTokenHolders.mock.calls.length).toBe(callsBefore);
+	});
+
 	it('first-load failure with no rows flips status to error', async () => {
 		mocks.getTokenHolders.mockRejectedValue(
 			new FakeMarketsFetchError('503', 503, 'http://example/markets/tokens/X/holders')

@@ -41,7 +41,7 @@
  *      already has a value, we keep `status='ready'` and let the UI keep
  *      showing the last-good count.
  */
-import { getTokenHolders } from '@areal/sdk/markets-rest';
+import { getTokenHolders, MarketsFetchError } from '@areal/sdk/markets-rest';
 import type { PublicKey } from '@solana/web3.js';
 
 import { network } from '$lib/network/network.svelte';
@@ -74,6 +74,14 @@ let started = false;
 let refreshSeq = 0;
 /** mintBase58 → in-flight Promise, used for per-mint single-flight. */
 const inFlightByMint = new Map<string, Promise<void>>();
+/**
+ * Mints whose `/markets/tokens/<mint>/holders` endpoint returned 404 — backend
+ * hasn't shipped that surface for them yet. We skip these on every subsequent
+ * refresh and DON'T treat them as a failure (status stays 'ready' / 'idle')
+ * so the page UI doesn't flash an error banner for a feature that's just not
+ * deployed yet. Cleared on `stop()` so a fresh `start()` re-probes.
+ */
+const unavailable = new Set<string>();
 /** Bound listener reference — stored so `stop()` can detach the same fn. */
 let visibilityListener: (() => void) | null = null;
 
@@ -99,6 +107,17 @@ async function fetchOne(mint: string, baseUrl: string, seq: number): Promise<voi
 	} catch (err) {
 		// Late-response guard — silently drop if we're stale.
 		if (seq !== refreshSeq) return;
+		// 404 = backend doesn't expose `/markets/tokens/<mint>/holders` for
+		// this mint yet (e.g. on the Testnet validator where the indexer
+		// hasn't shipped the holders projection). Treat as "feature not
+		// available", mark the mint so we stop polling it, and DON'T bubble
+		// the error — that would flip `status='error'` and surface an empty
+		// banner for a perfectly healthy market that just lacks one optional
+		// data point. Last-good wins for any row already populated.
+		if (err instanceof MarketsFetchError && err.status === 404) {
+			unavailable.add(mint);
+			return;
+		}
 		// Bubble up so doRefresh() can decide whether to flip status. We
 		// keep the previous `rows` entry (last-good wins) — caller decides
 		// the surface.
@@ -112,8 +131,10 @@ async function doRefresh(mintFilter?: string): Promise<void> {
 	// Resolve which mints to fetch this tick. Single-mint refreshes (called
 	// from `track()` or an explicit `refresh(mint)` from the page) bypass
 	// the full set so we don't pay a fan-out for what's effectively a
-	// targeted top-up.
-	const mints: string[] = mintFilter ? [mintFilter] : Array.from(tracked);
+	// targeted top-up. Mints that already 404'd on a previous tick are
+	// skipped — that backend surface isn't deployed for them yet.
+	const candidates: string[] = mintFilter ? [mintFilter] : Array.from(tracked);
+	const mints = candidates.filter((m) => !unavailable.has(m));
 	if (mints.length === 0) {
 		// Don't downgrade state on first-load empty case — keep 'idle' so
 		// the UI shows the right surface.
@@ -211,6 +232,7 @@ function stop(): void {
 	refreshSeq++;
 	tracked.clear();
 	rows.clear();
+	unavailable.clear();
 	status = 'idle';
 }
 
