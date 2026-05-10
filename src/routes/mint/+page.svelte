@@ -134,15 +134,17 @@
 	const usdcBalance = $derived(userBalances.usdc);
 	const rwtBalance = $derived(userBalances.rwt);
 
-	// Testnet USDC faucet — show only when the connected wallet has a *known
-	// zero* USDC balance on the Areal-hosted Testnet validator (`localnet`).
-	// `usdcBalance === null` means the balance read hasn't returned yet —
-	// don't render the button until we know it's actually zero, otherwise it
-	// flickers on top of a (possibly non-zero) balance during the loading
-	// window. Hidden (not just disabled) on devnet/mainnet so the wallet
-	// auth header doesn't have to gate it.
+	// Testnet USDC faucet — visible to every connected wallet on the
+	// Areal-hosted Testnet validator (`localnet`). Originally we gated this
+	// on `usdcBalance === 0n` so existing holders wouldn't see the button,
+	// but in practice that hides the entry-point from the very people who
+	// need to onboard friends with already-funded wallets. Anti-abuse is
+	// already enforced by the backend's per-wallet 24h rate-limit (returns
+	// 429 on the second claim) — the button is just a UI affordance for a
+	// public faucet, so always-show is fine. Hidden on devnet/mainnet so
+	// production-side users don't get a misleading "Get test USDC" button.
 	const showFaucetButton = $derived(
-		wallet.isConnected && network.current === 'localnet' && usdcBalance === 0n
+		wallet.isConnected && network.current === 'localnet'
 	);
 	const faucetInFlight = $derived(faucet.state.inFlight);
 
@@ -395,11 +397,12 @@
 
 					{#if showFaucetButton}
 						<!--
-						 Testnet faucet entry-point — only rendered for connected
-						 wallets on the Areal-hosted Testnet validator with a known
-						 zero USDC balance. Disabled (not hidden) while a request
-						 is in flight so the user gets feedback that their click
-						 was registered.
+						 Testnet faucet entry-point — rendered for any connected
+						 wallet on the Areal-hosted Testnet validator. Backend
+						 enforces a 24h per-wallet rate-limit, so always-show is
+						 fine. Disabled (not hidden) while a request is in flight
+						 so the user gets feedback that their click was
+						 registered.
 						-->
 						<div class="faucet-row">
 							<button
