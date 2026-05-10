@@ -96,9 +96,15 @@ let refreshSeq = 0;
 /** poolAddressBase58 → in-flight Promise, used for per-pool single-flight. */
 const inFlightByPool = new Map<string, Promise<void>>();
 
-async function fetchOne(poolAddress: string, cluster: ClusterName, seq: number): Promise<void> {
+async function fetchOne(poolAddress: string, baseUrl: string, seq: number): Promise<void> {
 	try {
-		const { items } = await getPoolAggregate({ pool: poolAddress, days: 2, cluster });
+		// Pass `baseUrl` instead of `cluster` so the SDK's stale
+		// `BACKEND_API_BASE_URLS[cluster]` table (which pins
+		// `localnet → http://localhost:3010`) is bypassed. Same fix as
+		// holders-store. Without this, the dev server tries to reach the
+		// non-existent localhost:3010 and the deployed app would either
+		// hit the wrong host or be blocked by CORS.
+		const { items } = await getPoolAggregate({ pool: poolAddress, days: 2, baseUrl });
 
 		// Late-response guard. A newer refresh started — drop this result.
 		if (seq !== refreshSeq) return;
@@ -150,7 +156,7 @@ async function doRefresh(): Promise<void> {
 	}
 
 	status = status === 'idle' ? 'loading' : status;
-	const cluster = toCluster(network.current);
+	const baseUrl = network.endpoint.backendApiUrl;
 
 	const tasks: Promise<void>[] = [];
 	for (const pool of pools) {
@@ -162,7 +168,7 @@ async function doRefresh(): Promise<void> {
 			tasks.push(existing);
 			continue;
 		}
-		const p = fetchOne(key, cluster, seq).finally(() => {
+		const p = fetchOne(key, baseUrl, seq).finally(() => {
 			inFlightByPool.delete(key);
 		});
 		inFlightByPool.set(key, p);
