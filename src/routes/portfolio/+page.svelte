@@ -49,7 +49,15 @@
 	// is null. Tone is `success` when the value is ≥0 (or null — em-dash is
 	// neutral, tone is irrelevant), `danger` when <0.
 	const tokens = $derived<OwnershipToken[]>(
-		portfolio.rows.map((row) => {
+		portfolio.rows
+			// Hide rows with a zero balance. portfolio.rows enumerates every OT
+			// the holder has EVER had an associated token account for, so a
+			// previously-emptied position would still show up at qty=0 — and a
+			// brand-new OT discovered via the markets snapshot would show as
+			// qty=0 even when the holder has never touched it. Surface only
+			// what the user actually owns.
+			.filter((row) => row.balance > 0n)
+			.map((row) => {
 			const tokenMeta = markets.snapshot?.tokens.find((t) => t.mint.equals(row.otMint));
 			const priceUsdc = tokenMeta?.priceUsdc ?? null;
 			const apy = priceFeed.apyForMint(row.otMint);
