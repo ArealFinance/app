@@ -477,13 +477,16 @@
 				<aside class="token-aside">
 					<header class="token-head">
 						<div class="token-id">
-							{#if t.symbol === 'RWT'}
-								<!-- Canonical RWT mark from Figma. Same SVG used on /portfolio
-								     and TokenRow stories — keep them in sync via the static
-								     asset path below. -->
+							{#if t.symbol === 'RWT' || t.symbol === 'SPRK'}
+								<!-- Canonical token mark from Figma. SVG paints its own
+								     gradient + radius, so no flat background-color
+								     fallback. Same assets are used on /markets list,
+								     /portfolio, and TokenAvatar stories. -->
 								<img
 									class="token-logo token-logo-img"
-									src="/images/tokens/rwt-mark.svg"
+									src={t.symbol === 'RWT'
+										? '/images/tokens/rwt-mark.svg'
+										: '/images/tokens/sparkles.svg'}
 									alt=""
 									aria-hidden="true"
 									width="44"

@@ -91,14 +91,6 @@
 		markets.tokens.filter((t) => t.category === 'stock').map(toUiToken)
 	);
 
-	// Coming-soon static placeholder (UI parity with the original design).
-	const comingSoonCard: Token = {
-		symbol: 'RWT',
-		name: 'Real World Token',
-		state: 'coming-soon',
-		avatar: avatarComing
-	};
-
 	// Mainnet pre-launch banner — only render when:
 	//   - we are on mainnet AND
 	//   - the snapshot is ready AND
@@ -253,17 +245,6 @@
 							{/snippet}
 						</TokenStatCard>
 					{/each}
-					<TokenStatCard
-						symbol={comingSoonCard.symbol}
-						name={comingSoonCard.name}
-						state={comingSoonCard.state}
-					>
-						{#snippet icon()}
-							<span class="token-disk" style:background-color={comingSoonCard.avatar.bg ?? 'transparent'}>
-								<img src={comingSoonCard.avatar.src} alt="" />
-							</span>
-						{/snippet}
-					</TokenStatCard>
 				{/if}
 			</div>
 		</section>
