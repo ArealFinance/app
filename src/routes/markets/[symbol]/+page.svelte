@@ -31,6 +31,8 @@
 		formatFee
 	} from '$lib/markets';
 	import type { TokenRow, EnrichedPoolRow } from '$lib/markets';
+	import { priceFeed } from '$lib/portfolio';
+	import { formatPercent } from '$lib/portfolio/format';
 	import { wallet } from '$lib/stores/wallet.svelte';
 
 	const EM_DASH = '—';
@@ -43,6 +45,19 @@
 	);
 
 	const isVaultToken = $derived(tokenRow?.category === 'protocol');
+
+	/**
+	 * 24h price change for this token, sourced from the backend-polled
+	 * `priceFeed` store. Already in percent units (5.0 = 5%) at source —
+	 * pass straight through `formatPercent`. Null when no daily-aggregate
+	 * window is available yet (first poll, missing yesterday row).
+	 */
+	const change24h = $derived<number | null>(
+		tokenRow ? priceFeed.change24hForMint(tokenRow.mint) : null
+	);
+	const change24hTone = $derived<'success' | 'danger'>(
+		change24h !== null && change24h < 0 ? 'danger' : 'success'
+	);
 
 	/** Pools that touch this token on either side. */
 	const tokenPools = $derived<EnrichedPoolRow[]>(
@@ -405,10 +420,17 @@
 		}
 	];
 
-	onMount(() => markets.start());
+	onMount(() => {
+		markets.start();
+		// Backend-polled APY + 24h change feed. Drives the header pill +
+		// "24H change" stat cell. Idempotent — safe alongside other pages
+		// that also call `start()`.
+		priceFeed.start();
+	});
 	onDestroy(() => {
 		poolStore.deactivate();
 		markets.stop();
+		priceFeed.stop();
 	});
 </script>
 
@@ -444,7 +466,14 @@
 
 						<div class="token-price-block">
 							<span class="token-price">{formatPrice(t.priceUsdc)}</span>
-							<!-- 24h change pill omitted — no time-series indexer wired yet. -->
+							{#if change24h !== null}
+								<span class="apy-pill apy-pill-{change24hTone}">
+									<span class="caret-icon" class:caret-down={change24hTone === 'danger'}>
+										<ArrowUpSmall size={12} variant="filled" />
+									</span>
+									{formatPercent(change24h)}
+								</span>
+							{/if}
 						</div>
 					</header>
 
@@ -457,7 +486,16 @@
 						</div>
 						<div class="stat-cell">
 							<span class="stat-label">24H change</span>
-							<span class="stat-value">{EM_DASH}</span>
+							{#if change24h === null}
+								<span class="stat-value">{EM_DASH}</span>
+							{:else}
+								<span class="apy-pill apy-pill-{change24hTone} stat-pill">
+									<span class="caret-icon" class:caret-down={change24hTone === 'danger'}>
+										<ArrowUpSmall size={12} variant="filled" />
+									</span>
+									{formatPercent(change24h)}
+								</span>
+							{/if}
 						</div>
 						<div class="stat-cell">
 							<span class="stat-label">TVL</span>
@@ -881,6 +919,42 @@
 		font-weight: 500;
 		letter-spacing: -0.6px;
 		color: var(--color-text);
+	}
+
+	/* 24h-change pill — visual parity with `/portfolio` token-table pill
+	 * (`apy-pill apy-pill-{tone}`). Drives the header price-block badge AND
+	 * the "24H change" stat cell. */
+	.apy-pill {
+		display: inline-flex;
+		align-items: center;
+		gap: 2px;
+		padding: 4px 10px;
+		border-radius: 8px;
+		font-family: var(--font-body);
+		font-size: var(--text-base);
+		font-weight: var(--font-weight-semibold);
+		letter-spacing: var(--tracking-tight);
+	}
+	.apy-pill-success {
+		background-color: var(--color-success-bg-strong);
+		color: var(--color-green-900);
+	}
+	.apy-pill-danger {
+		background-color: rgba(255, 0, 136, 0.15);
+		color: #ff0088;
+	}
+	.caret-icon {
+		display: inline-flex;
+		align-items: center;
+	}
+	.caret-icon.caret-down {
+		transform: rotate(180deg);
+	}
+	/* Inside the stats grid, the pill should self-align like the other
+	 * single-value cells (no fill stretch) so the 18px stat row visual rhythm
+	 * is preserved. */
+	.stat-pill {
+		align-self: flex-start;
 	}
 
 	/* Chart card styles moved to <PoolHistoryChart> in 12.3.3. */
