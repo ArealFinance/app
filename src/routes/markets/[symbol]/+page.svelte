@@ -151,11 +151,41 @@
 			? {
 					id: tokenRow.symbol.toLowerCase(),
 					symbol: tokenRow.symbol,
-					bg: '#A56EFF',
-					iconLetter: tokenRow.symbol[0]
+					bg: bgForSymbol(tokenRow.symbol),
+					iconLetter: tokenRow.symbol[0],
+					iconSrc: iconSrcForSymbol(tokenRow.symbol)
 				}
 			: null
 	);
+
+	/**
+	 * Tokens available on the OTHER side of QuickSwap. Derived from the
+	 * tokens this page's pinned side is actually paired with on-chain
+	 * (every mint that appears on either side of any of `tokenPools`,
+	 * minus the pinned token itself). This replaces the static
+	 * `DEFAULT_TOKENS` list inside `QuickSwap.svelte` so the dropdown
+	 * never advertises a counter-token there's no pool for.
+	 */
+	const quickSwapCounterparts = $derived.by<SwapToken[]>(() => {
+		if (!tokenRow) return [];
+		const seen = new Map<string, SwapToken>();
+		for (const p of tokenPools) {
+			for (const m of [p.tokenAMint, p.tokenBMint]) {
+				if (m.equals(tokenRow.mint)) continue;
+				const key = m.toBase58();
+				if (seen.has(key)) continue;
+				const sym = symbolForMint(m);
+				seen.set(key, {
+					id: sym.toLowerCase() + '-' + key.slice(0, 4),
+					symbol: sym,
+					bg: bgForSymbol(sym),
+					iconLetter: sym[0],
+					iconSrc: iconSrcForSymbol(sym)
+				});
+			}
+		}
+		return Array.from(seen.values());
+	});
 
 	// Active chart period — bound through to <PoolHistoryChart>. The chart
 	// component owns the tabs UI + labels; we keep this state here so it
@@ -827,7 +857,11 @@
 
 				<!-- ========== RIGHT COLUMN: quick swap (current token pinned to From) ========== -->
 				{#if pinnedToken}
-					<QuickSwap pinnedToken={pinnedToken} pinnedSide="from" />
+					<QuickSwap
+						pinnedToken={pinnedToken}
+						pinnedSide="from"
+						tokens={quickSwapCounterparts}
+					/>
 				{/if}
 			</div>
 		{:else}
