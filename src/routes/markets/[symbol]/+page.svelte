@@ -477,9 +477,26 @@
 				<aside class="token-aside">
 					<header class="token-head">
 						<div class="token-id">
-							<div class="token-logo" style:background-color={isVaultToken ? '#A56EFF' : '#4265FF'}>
-								<span class="token-logo-letter">{t.symbol[0]}</span>
-							</div>
+							{#if t.symbol === 'RWT'}
+								<!-- Canonical RWT mark from Figma. Same SVG used on /portfolio
+								     and TokenRow stories — keep them in sync via the static
+								     asset path below. -->
+								<img
+									class="token-logo token-logo-img"
+									src="/images/tokens/rwt-mark.svg"
+									alt=""
+									aria-hidden="true"
+									width="44"
+									height="44"
+								/>
+							{:else}
+								<div
+									class="token-logo"
+									style:background-color={isVaultToken ? '#A56EFF' : '#4265FF'}
+								>
+									<span class="token-logo-letter">{t.symbol[0]}</span>
+								</div>
+							{/if}
 							<div class="token-name-block">
 								<div class="token-title">
 									<span class="token-name">{t.name}</span>
@@ -860,6 +877,12 @@
 		font-size: 22px;
 		color: #fff;
 		overflow: hidden;
+	}
+	/* SVG token mark variant — sized to fill the logo box, no background
+	 * (the SVG already paints its own purple gradient + radius). */
+	.token-logo-img {
+		object-fit: contain;
+		object-position: center;
 	}
 	.token-name-block {
 		display: flex;
