@@ -731,6 +731,11 @@
 	 * action.
 	 */
 	.faucet-card {
+		/* Match the mint-card / info-card column width so all three sit
+		 * flush in the centred page column. */
+		width: 100%;
+		max-width: 500px;
+		box-sizing: border-box;
 		display: flex;
 		flex-direction: column;
 		align-items: stretch;
