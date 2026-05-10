@@ -60,8 +60,10 @@
 	// the selection if the pinned token later collides with `other`.
 	let other = $state<SwapToken>(untrack(() => initialOther ?? otherCandidates[0]));
 	$effect(() => {
+		if (!pinnedToken || !other) return;
 		if (other.id === pinnedToken.id) {
-			other = otherCandidates[0];
+			const next = otherCandidates[0];
+			if (next) other = next;
 		}
 	});
 	let pinnedAmount = $state('');
