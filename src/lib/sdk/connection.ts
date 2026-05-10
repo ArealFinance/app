@@ -41,12 +41,55 @@ export function createConnection(rpcUrl: string): Connection {
  * When `wsEndpoint` is omitted (e.g. on the Areal-hosted Testnet, where the
  * Cloudflared tunnel only exposes HTTP for `rpc.areal.finance` and the
  * validator's WS port 8900 is firewalled from the public internet), we
- * pass `false` to disable web3.js's WS pump. Subscriptions registered on
- * such a Connection no-op silently — that matches the desired UX (no
- * realtime updates, but no console-spammy WS reconnect failures either).
- * Stores that depend on subscriptions (`vault.svelte.ts`) are responsible
- * for tolerating a no-op subscription gracefully.
+ * monkey-patch the subscription methods on the resulting Connection so they
+ * resolve to a synthetic `subscriptionId === -1` and never dial WS.
+ *
+ * Why monkey-patching instead of `wsEndpoint: false`: web3.js 1.98 ignores
+ * the `false` escape hatch — the Connection still derives `wss://…` from
+ * the http URL and queues a WebSocket dial as soon as anyone subscribes.
+ * Patching at the instance method level bypasses the WS pump entirely.
+ *
+ * Callers don't need to gate calls on a flag — `onAccountChange(...) →  -1`,
+ * `removeAccountChangeListener(-1) → noop`. The pattern matches what
+ * `createConnection` already does for the read-only path: a Connection
+ * that quietly does the right thing rather than a separate type.
  */
+const NOOP_SUBSCRIPTION_ID = -1 as number;
+
+function neuterSubscriptions(conn: Connection): Connection {
+	type SubMethods = {
+		onAccountChange: Connection['onAccountChange'];
+		onLogs: Connection['onLogs'];
+		onSlotChange: Connection['onSlotChange'];
+		onProgramAccountChange: Connection['onProgramAccountChange'];
+		onSignature: Connection['onSignature'];
+		onRootChange: Connection['onRootChange'];
+		removeAccountChangeListener: Connection['removeAccountChangeListener'];
+		removeOnLogsListener: Connection['removeOnLogsListener'];
+		removeSlotChangeListener: Connection['removeSlotChangeListener'];
+		removeProgramAccountChangeListener: Connection['removeProgramAccountChangeListener'];
+		removeSignatureListener: Connection['removeSignatureListener'];
+		removeRootChangeListener: Connection['removeRootChangeListener'];
+	};
+	const sub = conn as unknown as SubMethods;
+	const noopRegister = () => NOOP_SUBSCRIPTION_ID;
+	const noopRemove = async () => {};
+	sub.onAccountChange = noopRegister as SubMethods['onAccountChange'];
+	sub.onLogs = noopRegister as SubMethods['onLogs'];
+	sub.onSlotChange = noopRegister as SubMethods['onSlotChange'];
+	sub.onProgramAccountChange = noopRegister as SubMethods['onProgramAccountChange'];
+	sub.onSignature = noopRegister as SubMethods['onSignature'];
+	sub.onRootChange = noopRegister as SubMethods['onRootChange'];
+	sub.removeAccountChangeListener = noopRemove as SubMethods['removeAccountChangeListener'];
+	sub.removeOnLogsListener = noopRemove as SubMethods['removeOnLogsListener'];
+	sub.removeSlotChangeListener = noopRemove as SubMethods['removeSlotChangeListener'];
+	sub.removeProgramAccountChangeListener =
+		noopRemove as SubMethods['removeProgramAccountChangeListener'];
+	sub.removeSignatureListener = noopRemove as SubMethods['removeSignatureListener'];
+	sub.removeRootChangeListener = noopRemove as SubMethods['removeRootChangeListener'];
+	return conn;
+}
+
 export function createWsConnection(rpcUrl: string, wsEndpoint?: string): Connection {
 	if (wsEndpoint && wsEndpoint.length > 0) {
 		return new Connection(rpcUrl, {
@@ -55,10 +98,12 @@ export function createWsConnection(rpcUrl: string, wsEndpoint?: string): Connect
 			confirmTransactionInitialTimeout: 120_000
 		});
 	}
-	return new Connection(rpcUrl, {
+	// No WS endpoint configured for this cluster — return a Connection whose
+	// subscription methods are inert. Reads still work via the same HTTP
+	// endpoint (`rpcUrl`); the WS pump is the only thing we suppress.
+	const conn = new Connection(rpcUrl, {
 		commitment: 'confirmed',
-		// @ts-expect-error — see `createConnection` for the `false` rationale.
-		wsEndpoint: false,
 		confirmTransactionInitialTimeout: 120_000
 	});
+	return neuterSubscriptions(conn);
 }
