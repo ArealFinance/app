@@ -48,7 +48,6 @@
 	import { Bolt, Plus, Minus, Gear } from '$lib/icons';
 	import { wallet } from '$lib/stores/wallet.svelte';
 	import { walletDialog } from '$lib/stores/walletDialog.svelte';
-	import DepthChart from '$lib/components/charts/DepthChart.svelte';
 	import MasterPoolGuard from '$lib/components/markets/MasterPoolGuard.svelte';
 	import LpPositionDerived from '$lib/components/markets/LpPositionDerived.svelte';
 	import SwapSettings from '$lib/components/swap/SwapSettings.svelte';
@@ -552,19 +551,15 @@
 							</button>
 						</div>
 					</div>
-				{:else}
-					<!-- Standard pools: render the SDK-computed depth ladder. The
-					     chart's own empty state covers the case where depth has
-					     not been fetched yet. -->
-					<div class="depth-wrap">
-						<DepthChart
-							depth={pool.depth}
-							symbolA={pool.pairA.symbol}
-							symbolB={pool.pairB.symbol}
-							height={150}
-						/>
-					</div>
 				{/if}
+				<!--
+				 Standard pools used to render an SDK-computed bid/ask depth
+				 ladder here, but Figma macet 2.x for Standard pools doesn't
+				 include any chart in the Pool Statistics section — only the
+				 current-price block + the pool-details grid. Drop the
+				 {:else}<DepthChart … /> branch entirely. Concentrated pools
+				 keep the per-bin Liquidity Distribution above unchanged.
+				-->
 
 				<div class="pool-details">
 					<p class="pool-details-title">Pool Details</p>
@@ -1538,12 +1533,6 @@
 	}
 	.zoom-btn:first-child {
 		margin-right: -2px;
-	}
-
-	/* Wraps the SDK-driven DepthChart (Standard pools only) in the same
-	 * vertical rhythm as the concentrated mockup chart. */
-	.depth-wrap {
-		margin-bottom: 16px;
 	}
 
 	/* ─── My Position (empty) ────────────────────────────────────── */
