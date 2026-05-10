@@ -1,7 +1,16 @@
+// Node built-ins — `node:` prefix omitted because the project's
+// `tsconfig.json` doesn't include `@types/node` (Vite config runs in Node,
+// but the type-check pass treats `vite.config.ts` like a browser TS file).
+// The bare specifiers resolve fine at Vite's node runtime.
+import path from 'path';
+import { fileURLToPath } from 'url';
 import { sveltekit } from '@sveltejs/kit/vite';
 import { defineConfig } from 'vite';
 import { nodePolyfills } from 'vite-plugin-node-polyfills';
 import { HttpsProxyAgent } from 'https-proxy-agent';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const TOPLEVEL_BUFFER = path.resolve(__dirname, 'node_modules/buffer');
 
 /*
  * Optional outbound HTTPS proxy for the Vite dev proxy. Honoured only when
@@ -42,7 +51,19 @@ export default defineConfig({
 			// from inside `sdk/node_modules`. We don't actually need a `global`
 			// global anywhere in app code — `globalThis` is universal.
 			globals: { Buffer: false, global: false, process: false },
-			overrides: { fs: 'empty' }
+			/*
+			 * `buffer` override: pin imports of `buffer` to our top-level
+			 * `buffer@6.0.3` instead of the v5.7.1 nested copy that
+			 * `node-stdlib-browser` (this plugin's own transitive dep) ships.
+			 * v5 lacks `readBig{U,}Int64{LE,BE}` — anything deserialising u64 /
+			 * i64 fields (notably `@arlex/client/codegen-runtime`'s u64 reader)
+			 * crashes at runtime with "data.readBigUInt64LE is not a function".
+			 * The plugin's own `overrides` map runs ahead of its node-stdlib
+			 * defaults, so the override wins regardless of the resolution
+			 * order Vite picks. `fs: 'empty'` retained for the existing
+			 * @solana/web3.js node-only path.
+			 */
+			overrides: { buffer: TOPLEVEL_BUFFER, fs: 'empty' }
 		})
 	],
 	optimizeDeps: {
@@ -61,6 +82,8 @@ export default defineConfig({
 	// share one PublicKey identity (and one Buffer class).
 	resolve: {
 		dedupe: ['@solana/web3.js', 'buffer']
+		// `buffer` override is wired through `nodePolyfills.overrides` above —
+		// see comment there for the v5 → v6 BigInt-method gap.
 	},
 	/*
 	 * Dev proxy — forwards Areal backend paths from `localhost:5173` to the
