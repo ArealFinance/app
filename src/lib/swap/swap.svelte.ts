@@ -63,6 +63,7 @@
  *   4. 90s TIMEOUT on confirm — same ceiling as the claim FSM.
  */
 import { tick } from 'svelte';
+import { SvelteMap } from 'svelte/reactivity';
 import {
 	Connection,
 	PublicKey,
@@ -133,7 +134,7 @@ export interface SwapAttempt {
 const CONFIRM_TIMEOUT_MS = 90_000;
 const TERMINAL_CLEANUP_MS = 3_000;
 
-const attempts = $state(new Map<string, SwapAttempt>());
+const attempts = new SvelteMap<string, SwapAttempt>();
 
 /** Per-attempt cleanup timers, keyed by poolBase58. */
 const cleanupTimers = new Map<string, ReturnType<typeof setTimeout>>();

@@ -43,6 +43,7 @@
  */
 import { getTokenHolders, MarketsFetchError } from '@areal/sdk/markets-rest';
 import type { PublicKey } from '@solana/web3.js';
+import { SvelteMap } from 'svelte/reactivity';
 
 import { network } from '$lib/network/network.svelte';
 
@@ -59,7 +60,7 @@ const POLL_INTERVAL_MS = 60_000;
 
 let status: HoldersStatus = $state('idle');
 const tracked = $state(new Set<string>());
-const rows = $state(new Map<string, HoldersRow>());
+const rows = new SvelteMap<string, HoldersRow>();
 
 // Mutable bookkeeping (not reactive).
 let pendingRefresh: Promise<void> | null = null;

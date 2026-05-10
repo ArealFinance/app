@@ -54,6 +54,7 @@
  *      duplicate broadcast would be wasted gas — tell the user to wait.
  */
 import { tick } from 'svelte';
+import { SvelteMap } from 'svelte/reactivity';
 import { Connection, PublicKey, type Transaction } from '@solana/web3.js';
 
 import { buildClaimLpFeesTx } from '@areal/sdk/tx';
@@ -86,7 +87,7 @@ export interface LpClaimAttempt {
 const CONFIRM_TIMEOUT_MS = 90_000;
 const TERMINAL_CLEANUP_MS = 3_000;
 
-const attempts = $state(new Map<string, LpClaimAttempt>());
+const attempts = new SvelteMap<string, LpClaimAttempt>();
 
 /** Per-attempt cleanup timers, keyed by positionAddressBase58. */
 const cleanupTimers = new Map<string, ReturnType<typeof setTimeout>>();

@@ -65,6 +65,7 @@
  *   5. 90s TIMEOUT on confirm — same ceiling as the swap + claim FSMs.
  */
 import { tick } from 'svelte';
+import { SvelteMap } from 'svelte/reactivity';
 import {
 	Connection,
 	PublicKey,
@@ -163,7 +164,7 @@ export interface LpAttempt {
 const CONFIRM_TIMEOUT_MS = 90_000;
 const TERMINAL_CLEANUP_MS = 3_000;
 
-const attempts = $state(new Map<string, LpAttempt>());
+const attempts = new SvelteMap<string, LpAttempt>();
 const cleanupTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
 function isUserRejection(err: unknown): boolean {

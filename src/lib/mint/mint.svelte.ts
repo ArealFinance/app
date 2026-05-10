@@ -69,6 +69,7 @@
  *   5. 90s TIMEOUT on confirm — same ceiling as the claim and swap FSMs.
  */
 import { tick } from 'svelte';
+import { SvelteMap } from 'svelte/reactivity';
 import {
 	Connection,
 	PublicKey,
@@ -135,7 +136,22 @@ const MINT_KEY = 'mint';
 const CONFIRM_TIMEOUT_MS = 90_000;
 const TERMINAL_CLEANUP_MS = 3_000;
 
-const attempts = $state(new Map<string, MintAttempt>());
+/**
+ * Reactive store of in-flight + recently-finished mint attempts.
+ *
+ * Was `$state(new Map<...>())` originally — that proxies the *reference*
+ * but Svelte 5 does NOT track method calls on a native `Map` (`.set`,
+ * `.delete`, `.get`) through the plain-state proxy. Result: `runMint`'s
+ * phase transitions (`setPhase` → `attempts.set(key, …)`) wrote through,
+ * but the page's `$derived(mint.attempts.get('mint') ?? null)` never
+ * re-ran, so the modal stayed in the pre-confirm idle state for the
+ * entire lifecycle of the mint. From the user's POV: click "Confirm
+ * Mint" → nothing visible happens → reload → balance has changed.
+ *
+ * `SvelteMap` from `svelte/reactivity` is the official replacement —
+ * its mutations are properly tracked by `$derived`/`$effect`.
+ */
+const attempts = new SvelteMap<string, MintAttempt>();
 
 /** Per-attempt cleanup timers, keyed by attempt key (always `'mint'`). */
 const cleanupTimers = new Map<string, ReturnType<typeof setTimeout>>();

@@ -50,6 +50,7 @@
 import { getPoolAggregate, MarketsFetchError } from '@areal/sdk/markets-rest';
 import type { PublicKey } from '@solana/web3.js';
 import type { ClusterName } from '@areal/sdk/network';
+import { SvelteMap } from 'svelte/reactivity';
 
 import { markets } from '$lib/markets/store.svelte';
 import { network } from '$lib/network/network.svelte';
@@ -79,7 +80,7 @@ function toCluster(id: NetworkId): ClusterName {
 }
 
 let status: PriceFeedStatus = $state('idle');
-const rows = $state(new Map<string, PriceFeedRow>());
+const rows = new SvelteMap<string, PriceFeedRow>();
 
 // Mutable bookkeeping (not reactive).
 let pendingRefresh: Promise<void> | null = null;

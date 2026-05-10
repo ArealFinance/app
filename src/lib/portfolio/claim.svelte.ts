@@ -71,6 +71,7 @@
  *      to tell the user to wait.)
  */
 import { tick } from 'svelte';
+import { SvelteMap } from 'svelte/reactivity';
 import {
 	Connection,
 	type PublicKey,
@@ -114,7 +115,7 @@ const TERMINAL_CLEANUP_MS = 3_000;
 /** Decimal-string regex — proof.cumulativeAmount must match before BigInt. */
 const DECIMAL_RE = /^\d+$/;
 
-const attempts = $state(new Map<string, ClaimAttempt>());
+const attempts = new SvelteMap<string, ClaimAttempt>();
 
 /** Per-attempt cleanup timers, keyed by otMintBase58. */
 const cleanupTimers = new Map<string, ReturnType<typeof setTimeout>>();
