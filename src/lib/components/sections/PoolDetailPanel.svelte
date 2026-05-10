@@ -180,6 +180,34 @@
 		return { expected, min: applySlippageU128(expected, slippageBps) };
 	});
 
+	/**
+	 * Counterpart amount (the SECOND token's value) derived from the
+	 * primary `depositAmount` and the pool's current reserve ratio.
+	 * Surfaced in the Standards-mode UI as a read-only mirror of the
+	 * non-primary side. Empty string if we lack enough info to derive.
+	 */
+	const counterpartAmountDisplay = $derived.by((): string => {
+		if (!pool.row || pool.decimalsA === undefined || pool.decimalsB === undefined) return '';
+		const decA = pool.decimalsA;
+		const decB = pool.decimalsB;
+		const primaryDec = depositSide === 'A' ? decA : decB;
+		const primaryRaw = toBaseUnits(depositAmount, primaryDec);
+		if (primaryRaw === 0n) return '';
+		const ps = livePool;
+		if (!ps || ps.reserveA === 0n || ps.reserveB === 0n) {
+			// Empty pool — no ratio yet, mirror the primary 1:1 so the user
+			// at least sees something. Real fresh-pool seeds use Standards
+			// directly; the contract derives shares from min(amountA, amountB).
+			return depositAmount;
+		}
+		const counter =
+			depositSide === 'A'
+				? (primaryRaw * ps.reserveB) / ps.reserveA
+				: (primaryRaw * ps.reserveA) / ps.reserveB;
+		const counterDec = depositSide === 'A' ? decB : decA;
+		return formatTokenAmount(counter, counterDec, Math.min(counterDec, 6));
+	});
+
 	const slippagePct = $derived((slippageBps / 100).toFixed(2).replace(/\.?0+$/, ''));
 	const draftExpectedSharesDisplay = $derived(
 		draftSharesQuote ? formatTokenAmount(draftSharesQuote.expected, 6, 4) : null
@@ -701,65 +729,138 @@
 						</div>
 					{/if}
 
-					<div class="currency-grid">
-						<button
-							type="button"
-							class="currency-card"
-							class:currency-card-active={depositSide === 'B'}
-							onclick={() => (depositSide = 'B')}
-						>
-							<span class="currency-logo" style:background={pool.pairB.iconSrc ? 'transparent' : pool.pairB.bg}>
-								{#if pool.pairB.iconSrc}
-									<img src={pool.pairB.iconSrc} alt="" loading="lazy" />
-								{:else}
-									<span class="pool-letter">
-										{pool.pairB.iconLetter ?? pool.pairB.symbol[0]}
-									</span>
-								{/if}
-							</span>
-							<span class="currency-sym">{pool.pairB.symbol}</span>
-						</button>
-						<button
-							type="button"
-							class="currency-card"
-							class:currency-card-active={depositSide === 'A'}
-							onclick={() => (depositSide = 'A')}
-						>
-							<span class="currency-logo" style:background={pool.pairA.iconSrc ? 'transparent' : pool.pairA.bg}>
-								{#if pool.pairA.iconSrc}
-									<img src={pool.pairA.iconSrc} alt="" loading="lazy" />
-								{:else}
-									<span class="pool-letter">
-										{pool.pairA.iconLetter ?? pool.pairA.symbol[0]}
-									</span>
-								{/if}
-							</span>
-							<span class="currency-sym">{pool.pairA.symbol}</span>
-						</button>
-					</div>
+					{#if depositMode === 'Zap'}
+						<!-- Zap: pick which token you have; the contract auto-balances. -->
+						<div class="currency-grid">
+							<button
+								type="button"
+								class="currency-card"
+								class:currency-card-active={depositSide === 'B'}
+								onclick={() => (depositSide = 'B')}
+							>
+								<span class="currency-logo" style:background={pool.pairB.iconSrc ? 'transparent' : pool.pairB.bg}>
+									{#if pool.pairB.iconSrc}
+										<img src={pool.pairB.iconSrc} alt="" loading="lazy" />
+									{:else}
+										<span class="pool-letter">
+											{pool.pairB.iconLetter ?? pool.pairB.symbol[0]}
+										</span>
+									{/if}
+								</span>
+								<span class="currency-sym">{pool.pairB.symbol}</span>
+							</button>
+							<button
+								type="button"
+								class="currency-card"
+								class:currency-card-active={depositSide === 'A'}
+								onclick={() => (depositSide = 'A')}
+							>
+								<span class="currency-logo" style:background={pool.pairA.iconSrc ? 'transparent' : pool.pairA.bg}>
+									{#if pool.pairA.iconSrc}
+										<img src={pool.pairA.iconSrc} alt="" loading="lazy" />
+									{:else}
+										<span class="pool-letter">
+											{pool.pairA.iconLetter ?? pool.pairA.symbol[0]}
+										</span>
+									{/if}
+								</span>
+								<span class="currency-sym">{pool.pairA.symbol}</span>
+							</button>
+						</div>
 
-					<div class="deposit">
-						<p class="deposit-label">
-							Deposit {depositSide === 'A' ? pool.pairA.symbol : pool.pairB.symbol}
-						</p>
-						<div class="deposit-field">
-							<input
-								class="deposit-input"
-								type="text"
-								inputmode="decimal"
-								placeholder="0"
-								bind:value={depositAmount}
-							/>
-							<button type="button" class="deposit-max" onclick={setMax}>MAX</button>
+						<div class="deposit">
+							<p class="deposit-label">
+								Deposit {depositSide === 'A' ? pool.pairA.symbol : pool.pairB.symbol}
+							</p>
+							<div class="deposit-field">
+								<input
+									class="deposit-input"
+									type="text"
+									inputmode="decimal"
+									placeholder="0"
+									bind:value={depositAmount}
+								/>
+								<button type="button" class="deposit-max" onclick={setMax}>MAX</button>
+							</div>
+							<div class="deposit-meta">
+								<span class="deposit-meta-sub">≈ $889.92</span>
+								<span class="deposit-meta-sub">
+									Available {pool.userBalance}
+									{depositSide === 'A' ? pool.pairA.symbol : pool.pairB.symbol}
+								</span>
+							</div>
 						</div>
-						<div class="deposit-meta">
-							<span class="deposit-meta-sub">≈ $889.92</span>
-							<span class="deposit-meta-sub">
-								Available {pool.userBalance}
-								{depositSide === 'A' ? pool.pairA.symbol : pool.pairB.symbol}
-							</span>
-						</div>
-					</div>
+					{:else}
+						<!--
+						 Standards mode: BOTH tokens deposited together — render
+						 two stacked deposit cards (Figma macet 2.x). Primary side
+						 (`depositSide`) drives the bound `depositAmount`; the
+						 other card mirrors a derived counter-amount via the
+						 pool's reserve ratio. Clicking on the mirrored card
+						 promotes that side to primary.
+						-->
+						{#each ['B', 'A'] as side (side)}
+							{@const token = side === 'A' ? pool.pairA : pool.pairB}
+							{@const isPrimary = depositSide === side}
+							<div class="standards-card" class:standards-card-active={isPrimary}>
+								<header class="standards-card-head">
+									<span
+										class="standards-logo"
+										style:background={token.iconSrc ? 'transparent' : token.bg}
+									>
+										{#if token.iconSrc}
+											<img src={token.iconSrc} alt="" loading="lazy" />
+										{:else}
+											<span class="pool-letter">
+												{token.iconLetter ?? token.symbol[0]}
+											</span>
+										{/if}
+									</span>
+									<p class="standards-title">
+										Deposit <strong>{token.symbol}</strong>
+									</p>
+								</header>
+								<div class="deposit-field standards-field">
+									{#if isPrimary}
+										<input
+											class="deposit-input"
+											type="text"
+											inputmode="decimal"
+											placeholder="0"
+											bind:value={depositAmount}
+										/>
+									{:else}
+										<input
+											class="deposit-input deposit-input-mirror"
+											type="text"
+											inputmode="decimal"
+											placeholder="0"
+											readonly
+											value={counterpartAmountDisplay}
+											onfocus={() => (depositSide = side as DepositSide)}
+										/>
+									{/if}
+									<button
+										type="button"
+										class="deposit-max"
+										onclick={() => {
+											depositSide = side as DepositSide;
+											setMax();
+										}}
+									>
+										MAX
+									</button>
+								</div>
+								<div class="deposit-meta">
+									<span class="deposit-meta-sub">≈ $889.92</span>
+									<span class="deposit-meta-sub">
+										Available {pool.userBalance}
+										{token.symbol}
+									</span>
+								</div>
+							</div>
+						{/each}
+					{/if}
 
 					{#if isMasterPool}
 						<MasterPoolGuard symbolA={pool.pairA.symbol} symbolB={pool.pairB.symbol} />
@@ -1708,6 +1809,71 @@
 		font-size: 12px;
 		letter-spacing: -0.6px;
 		color: var(--color-text-muted);
+	}
+
+	/* ─── Standards mode (two-token deposit) ────────────────────────────
+	 * Two stacked cards inside the Add-Liquidity tab. Mirrors Figma macet:
+	 * each card carries an icon + "Deposit X" header, a single amount input
+	 * with MAX, and a meta row (≈ USD value, available balance). The
+	 * `standards-card-active` accent matches the Zap currency-card-active
+	 * outline so the primary side reads consistently across modes.
+	 */
+	.standards-card {
+		display: flex;
+		flex-direction: column;
+		gap: 12px;
+		padding: 16px;
+		background-color: #080a0f;
+		border: 1px solid #333548;
+		border-radius: 24px;
+	}
+	.standards-card-active {
+		border-color: var(--color-primary, #8b5cf6);
+		box-shadow: 0 0 0 1px rgba(139, 92, 246, 0.4);
+	}
+	.standards-card-head {
+		display: flex;
+		align-items: center;
+		gap: 12px;
+	}
+	.standards-logo {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 40px;
+		height: 40px;
+		border-radius: 12px;
+		overflow: hidden;
+	}
+	.standards-logo img {
+		width: 100%;
+		height: 100%;
+		object-fit: contain;
+	}
+	.standards-title {
+		margin: 0;
+		font-family: var(--font-body);
+		font-weight: 500;
+		font-size: 16px;
+		color: var(--color-text-muted);
+	}
+	.standards-title strong {
+		color: var(--color-text);
+		font-weight: 700;
+	}
+	/* Inner deposit-field inside a standards-card has its own outer card,
+	 * so drop the second border + bg to avoid the nested-frame look. */
+	.standards-field {
+		background-color: transparent;
+		border: 0;
+		padding: 0;
+		height: auto;
+		border-top: 1px solid #1a1d2a;
+		padding-top: 12px;
+	}
+	.deposit-input-mirror {
+		color: var(--color-text);
+		cursor: pointer;
 	}
 
 	.cta {
