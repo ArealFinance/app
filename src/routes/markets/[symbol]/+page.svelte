@@ -196,6 +196,12 @@
 	function symbolForMint(mint: PublicKey): string {
 		const known = markets.tokens.find((t) => t.mint.equals(mint));
 		if (known) return known.symbol;
+		// USDC isn't enumerated in `markets.tokens` (which only lists OTs +
+		// the synthesised RWT singleton) — match it against the cluster's
+		// configured USDC mint and surface its canonical 'USDC' symbol.
+		// Without this, RWT/USDC pools render the mint's base58 prefix
+		// ('F9NV…' on Testnet) instead of 'USDC'.
+		if (mint.equals(network.usdcMint)) return 'USDC';
 		// Unknown mint → 4-char base58 prefix as a last-resort label.
 		return mint.toBase58().slice(0, 4);
 	}
