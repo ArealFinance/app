@@ -341,6 +341,21 @@ describe('lp-claims service', () => {
 		expect(mocks.buildClaimLpFeesTx).toHaveBeenCalledTimes(2);
 	});
 
+	it('null row: silently no-ops without FSM entry or side effects', async () => {
+		setupHappyPathMocks();
+
+		// `start(null)` guards against the render→click race where
+		// `selectedLpRow` is nulled between template guard and click handler.
+		await lpClaims.start(null);
+		await settle();
+
+		expect(lpClaims.attempts.size).toBe(0);
+		expect(mocks.buildClaimLpFeesTx).not.toHaveBeenCalled();
+		expect(mocks.toastWarning).not.toHaveBeenCalled();
+		expect(mocks.toastError).not.toHaveBeenCalled();
+		expect(mocks.showError).not.toHaveBeenCalled();
+	});
+
 	it('nothing-to-claim pre-flight: warns + returns without FSM entry', async () => {
 		const row = makeRow({
 			cumulativeFeesPerShareA: 100n,

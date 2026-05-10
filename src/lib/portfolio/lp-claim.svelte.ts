@@ -283,7 +283,14 @@ async function runClaim(row: HolderLpRow): Promise<void> {
 	}
 }
 
-function start(row: HolderLpRow): Promise<void> {
+function start(row: HolderLpRow | null): Promise<void> {
+	// Defensive null-guard: the page button's template guard
+	// (`{#if selectedLpRow && hasClaimableFees(selectedLpRow)}`) is only
+	// checked at render time. If `lpRows` mutates between render and the
+	// click microtask (wallet switch, WS-driven snapshot replacement),
+	// `selectedLpRow` may be null when the closure executes. Quietly no-op.
+	if (row === null) return Promise.resolve();
+
 	const key = row.positionAddress.toBase58();
 
 	// Single-flight: drop duplicate clicks for the same position.
