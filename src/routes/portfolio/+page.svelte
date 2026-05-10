@@ -69,7 +69,11 @@
 				symbol: row.metadata.symbol,
 				logoLetter: row.metadata.symbol.slice(0, 1).toUpperCase(),
 				qty: formatTokenAmount(row.balance, row.metadata.decimals, 2),
-				apy: formatPercent(apy),
+				// `apyForMint` returns a backend ratio (1.0 = 100%); convert to
+				// human-percent units (5.0 = 5%) for display via `formatPercent`.
+				// `change24h` is already in percent units at the source — do
+				// NOT convert it.
+				apy: formatPercent(apy === null ? null : apy * 100),
 				apyTone: (apy !== null && apy < 0 ? 'danger' : 'success') as Tone,
 				price24h: formatPercent(change),
 				price24hTone: (change !== null && change < 0 ? 'danger' : 'success') as Tone,
@@ -129,7 +133,10 @@
 		);
 	}
 
-	function startClaimFees(row: HolderLpRow) {
+	function startClaimFees(row: HolderLpRow | null) {
+		// `selectedLpRow` is `HolderLpRow | null` and the underlying store may
+		// nullify it between render and click microtask (wallet switch,
+		// WS-driven snapshot replacement). `lpClaims.start` no-ops on null.
 		void lpClaims.start(row);
 	}
 
@@ -204,6 +211,11 @@
 	// Combines OT side (token mint × `apyForMint`) AND LP side (position's
 	// pool's `apy24h`). Weighted by USDC value. Skip rows where either USDC
 	// or APY is null. Returns null when denominator is 0.
+	//
+	// `apyForMint` and `lpRowApy` both return backend ratios (1.0 = 100%).
+	// We scale by 100 here so `portfolioApy` is in human-percent units —
+	// `formatPercent` then renders "5.00%" and `dailyIncomeDisplay` divides
+	// by 100 to recover the ratio for the daily-income arithmetic.
 	const portfolioApy = $derived.by<number | null>(() => {
 		let weightedSum = 0;
 		let totalWeight = 0;
@@ -211,19 +223,19 @@
 			const tokenMeta = markets.snapshot?.tokens.find((t) => t.mint.equals(row.otMint));
 			const priceUsdc = tokenMeta?.priceUsdc ?? null;
 			if (priceUsdc === null) continue;
-			const apy = priceFeed.apyForMint(row.otMint);
-			if (apy === null) continue;
+			const apyRatio = priceFeed.apyForMint(row.otMint);
+			if (apyRatio === null) continue;
 			const divisor = 10 ** row.metadata.decimals;
 			const value = (Number(row.balance) / divisor) * priceUsdc;
-			weightedSum += value * apy;
+			weightedSum += value * (apyRatio * 100);
 			totalWeight += value;
 		}
 		for (const lpRow of lpRows) {
 			const value = lpRow.valuation.totalUsdc;
 			if (value === null) continue;
-			const apy = lpRowApy(lpRow);
-			if (apy === null) continue;
-			weightedSum += value * apy;
+			const apyRatio = lpRowApy(lpRow);
+			if (apyRatio === null) continue;
+			weightedSum += value * (apyRatio * 100);
 			totalWeight += value;
 		}
 		if (totalWeight === 0) return null;
@@ -780,7 +792,8 @@
 								<div class="lp-list">
 									{#each lpRows as row (row.positionAddress.toBase58())}
 										{@const rowKey = row.positionAddress.toBase58()}
-										{@const apy = lpRowApy(row)}
+										{@const apyRatio = lpRowApy(row)}
+										{@const apy = apyRatio === null ? null : apyRatio * 100}
 										{@const apyTone = (apy !== null && apy < 0
 											? 'danger'
 											: 'success') as Tone}
