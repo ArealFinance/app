@@ -45,6 +45,7 @@
 		vaultStore,
 		type MintIntent
 	} from '$lib/mint';
+	import { faucet } from '$lib/faucet';
 	import { applyMintSlippage } from '@areal/sdk/rwt-engine';
 	import { formatTokenAmount } from '$lib/portfolio/format';
 	import { Gear, Check, ThumbsUp, Bolt } from '$lib/icons';
@@ -132,6 +133,24 @@
 
 	const usdcBalance = $derived(userBalances.usdc);
 	const rwtBalance = $derived(userBalances.rwt);
+
+	// Testnet USDC faucet — show only when the connected wallet has a *known
+	// zero* USDC balance on the Areal-hosted Testnet validator (`localnet`).
+	// `usdcBalance === null` means the balance read hasn't returned yet —
+	// don't render the button until we know it's actually zero, otherwise it
+	// flickers on top of a (possibly non-zero) balance during the loading
+	// window. Hidden (not just disabled) on devnet/mainnet so the wallet
+	// auth header doesn't have to gate it.
+	const showFaucetButton = $derived(
+		wallet.isConnected && network.current === 'localnet' && usdcBalance === 0n
+	);
+	const faucetInFlight = $derived(faucet.state.inFlight);
+
+	function handleFaucetClick() {
+		const pk = wallet.publicKey;
+		if (!pk) return;
+		void faucet.claim(pk.toBase58());
+	}
 
 	const usdcBalanceDisplay = $derived(
 		usdcBalance !== null
@@ -373,6 +392,26 @@
 							aria-label="Amount of USDC to deposit"
 						/>
 					</div>
+
+					{#if showFaucetButton}
+						<!--
+						 Testnet faucet entry-point — only rendered for connected
+						 wallets on the Areal-hosted Testnet validator with a known
+						 zero USDC balance. Disabled (not hidden) while a request
+						 is in flight so the user gets feedback that their click
+						 was registered.
+						-->
+						<div class="faucet-row">
+							<button
+								class="faucet-btn"
+								type="button"
+								disabled={faucetInFlight}
+								onclick={handleFaucetClick}
+							>
+								{faucetInFlight ? 'Sending…' : 'Get 1000 test USDC'}
+							</button>
+						</div>
+					{/if}
 
 					<!-- ─────── To row (RWT, read-only) ─────── -->
 					<div class="mint-row">
@@ -673,6 +712,35 @@
 		display: flex;
 		flex-direction: column;
 		gap: var(--space-2);
+	}
+
+	/* ─── Testnet faucet button (chip-style, only on /mint Testnet) ─── */
+	.faucet-row {
+		display: flex;
+		justify-content: center;
+	}
+	.faucet-btn {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		padding: var(--space-1) var(--space-3);
+		background-color: var(--color-bg);
+		color: var(--color-text);
+		border: 0;
+		border-radius: var(--radius-md);
+		font-family: 'Onest', var(--font-body);
+		font-size: var(--text-xs);
+		font-weight: var(--font-weight-medium);
+		letter-spacing: var(--tracking-tight);
+		cursor: pointer;
+		transition: background-color var(--motion-base) var(--ease-out);
+	}
+	.faucet-btn:hover:not(:disabled) {
+		background-color: var(--color-dark-700);
+	}
+	.faucet-btn:disabled {
+		opacity: 0.6;
+		cursor: not-allowed;
 	}
 
 	.quote-error {
