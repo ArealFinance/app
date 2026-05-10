@@ -27,7 +27,7 @@
  */
 import type { Connection, PublicKey } from '@solana/web3.js';
 
-import { INITIAL_NAV, parseRwtVault, type RwtVault } from '@areal/sdk/rwt-engine';
+import { INITIAL_NAV, NAV_SCALE, parseRwtVault, type RwtVault } from '@areal/sdk/rwt-engine';
 import { findRwtVaultPda } from '@areal/sdk/pda';
 
 import { network } from '$lib/network/network.svelte';
@@ -45,19 +45,26 @@ let activePdaBase58: string | null = null;
 
 /**
  * Compute the NAV used by the on-chain `mint_rwt::handler` to price a
- * mint. Mirrors `quoteMintRwt`'s internal calculation:
+ * mint. Mirrors `contracts/rwt-engine/src/nav.rs::calculate_nav` and the
+ * SDK's `quoteMintRwt::calculateNav` exactly:
  *
- *   - supply == 0  → INITIAL_NAV (vault is empty, $1 par)
- *   - supply  > 0  → totalInvestedCapital / totalRwtSupply (book value)
+ *   - supply == 0      → INITIAL_NAV (bootstrap, $1 par)
+ *   - otherwise        → max(1, capital * NAV_SCALE / supply)
  *
- * Returned as bigint (USDC lamports per RWT lamport) — caller scales for
- * display.
+ * The `NAV_SCALE` (1e6, matching RWT's 6 decimals) MUST be applied before
+ * division, otherwise integer truncation collapses any reasonable book
+ * value to 0/1 — e.g. a 1:1 vault (capital == supply, both 10^13 lamports)
+ * would otherwise yield raw `1n` which formats as "$0.0000" in the
+ * 6-decimal display path. See vault.svelte.ts callers (`liveNavDisplay`)
+ * and the SDK's matching helper.
  */
 function computeNav(v: RwtVault): bigint {
 	if (v.totalRwtSupply === 0n) return INITIAL_NAV;
-	// Book value: lamports-of-USDC per lamport-of-RWT. Both decimals are 6.
-	// On-chain rounds down, we mirror that with bigint division.
-	return v.totalInvestedCapital / v.totalRwtSupply;
+	// Same widening as Rust (`mul_div_u128_u64`). Result is fixed-point with
+	// `NAV_SCALE` precision: 1.0 NAV → 1_000_000n.
+	const raw = (v.totalInvestedCapital * NAV_SCALE) / v.totalRwtSupply;
+	// Clamp matches the contract's NAV=0 prevention at extreme ratios.
+	return raw === 0n ? 1n : raw;
 }
 
 function teardownCycle() {

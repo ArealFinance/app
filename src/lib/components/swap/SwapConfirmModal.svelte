@@ -14,7 +14,7 @@
 	 *
 	 * 7 distinct states keyed off `attempt?.phase` (or `null` for the
 	 * pre-confirm idle state):
-	 *   1. idle pre-confirm    — quote breakdown + Sign in wallet / Cancel
+	 *   1. idle pre-confirm    — quote breakdown + Confirm Swap / Cancel
 	 *   2. preparing           — spinner ("Re-quoting against fresh reserves…")
 	 *   3. awaiting-signature  — wallet icon + "Confirm in your wallet…"
 	 *   4. broadcasting        — spinner ("Broadcasting…")
@@ -167,7 +167,7 @@
 				<button type="button" class="btn btn-ghost" onclick={onclose}>Cancel</button>
 				<button type="button" class="btn btn-primary" onclick={onconfirm}>
 					<WalletSimple size={18} />
-					<span>Sign in wallet</span>
+					<span>Confirm Swap</span>
 				</button>
 			</div>
 		{:else if attempt.phase === 'preparing'}
