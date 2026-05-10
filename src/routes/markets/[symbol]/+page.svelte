@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount, onDestroy } from 'svelte';
+	import { onMount, onDestroy, untrack } from 'svelte';
 	import { PublicKey } from '@solana/web3.js';
 
 	import { page } from '$app/state';
@@ -360,9 +360,17 @@
 	// modal unmounts silently, leaving `poolStore` listeners attached to
 	// the OLD wsConnection. This effect explicitly tears the pool subscription
 	// down so we don't leak a stale-cluster depth window.
+	//
+	// IMPORTANT: read `openPoolId` via `untrack` so this effect ONLY fires
+	// on `network.current` changes. A naive read would also subscribe to
+	// `openPoolId` itself — every `openPool()` call would set the id, the
+	// effect would re-run, see `openPoolId !== null`, and call
+	// `closePool()` synchronously, which resets it to null. Net effect: the
+	// modal never opens. (Visible bug: clicking a pool row in the LIQUIDITY
+	// tab did nothing.)
 	$effect(() => {
-		void network.current; // track network changes
-		if (openPoolId !== null) {
+		void network.current; // track network changes only
+		if (untrack(() => openPoolId) !== null) {
 			closePool();
 		}
 	});
