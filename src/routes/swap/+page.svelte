@@ -58,7 +58,44 @@
 	const poolsForCluster = $derived(KNOWN_POOLS_BY_CLUSTER[network.current]);
 	let activePool = $state<PoolEntry | null>(null);
 	let aToB = $state(true);
-	let poolsOpen = $state(false);
+	/* Per-side dropdown open flags. Was a single `poolsOpen` for the only
+	 * (legacy) From-side picker; now both From and To are real token
+	 * pickers, so each owns its open state and outside-click closes both. */
+	let fromOpen = $state(false);
+	let toOpen = $state(false);
+
+	/**
+	 * Flat list of every distinct token across the cluster's pools.
+	 * Drives the From and To dropdowns. Today (one RWT/USDC pool) it has 2
+	 * entries; when OT and other markets land, this auto-grows.
+	 */
+	type TokenInfo = { mint: PublicKey; symbol: string; decimals: number };
+	const availableTokens = $derived.by<TokenInfo[]>(() => {
+		const seen = new Map<string, TokenInfo>();
+		for (const p of poolsForCluster) {
+			const ka = p.mintA.toBase58();
+			if (!seen.has(ka)) {
+				seen.set(ka, { mint: p.mintA, symbol: p.symbolA, decimals: p.decimalsA });
+			}
+			const kb = p.mintB.toBase58();
+			if (!seen.has(kb)) {
+				seen.set(kb, { mint: p.mintB, symbol: p.symbolB, decimals: p.decimalsB });
+			}
+		}
+		return Array.from(seen.values());
+	});
+
+	/** Find a pool that supports the (from, to) directed pair, with direction. */
+	function findPoolForPair(
+		from: PublicKey,
+		to: PublicKey
+	): { pool: PoolEntry; aToB: boolean } | null {
+		for (const p of poolsForCluster) {
+			if (p.mintA.equals(from) && p.mintB.equals(to)) return { pool: p, aToB: true };
+			if (p.mintB.equals(from) && p.mintA.equals(to)) return { pool: p, aToB: false };
+		}
+		return null;
+	}
 
 	const fromMint = $derived<PublicKey | null>(
 		activePool ? (aToB ? activePool.mintA : activePool.mintB) : null
@@ -220,11 +257,80 @@
 	}
 
 	function selectPool(entry: PoolEntry) {
-		poolsOpen = false;
+		fromOpen = false;
+		toOpen = false;
 		if (activePool && activePool.poolPda.equals(entry.poolPda)) return;
 		activePool = entry;
 		fromAmountStr = '';
 		void quote.activatePool(entry);
+	}
+
+	/**
+	 * Pick a token for the FROM side. If the user picks the token currently
+	 * occupying the To side, swap them (visually equivalent to flipping
+	 * direction). Otherwise resolve a pool that connects (newFrom, currentTo);
+	 * if none exists, fall back to any pool containing newFrom and pull the
+	 * other side onto To.
+	 */
+	function selectFromToken(token: TokenInfo) {
+		fromOpen = false;
+		// Same token already selected — no-op.
+		if (fromMint && token.mint.equals(fromMint)) return;
+		// Picked the current To-side → flip direction.
+		if (toMint && token.mint.equals(toMint)) {
+			flipDirection();
+			return;
+		}
+		if (toMint) {
+			const match = findPoolForPair(token.mint, toMint);
+			if (match) {
+				activePool = match.pool;
+				aToB = match.aToB;
+				fromAmountStr = '';
+				void quote.activatePool(match.pool);
+				return;
+			}
+		}
+		// No pool for this exact pair — pick any pool containing the new
+		// From token and re-derive To from the other side.
+		const fallback = poolsForCluster.find(
+			(p) => p.mintA.equals(token.mint) || p.mintB.equals(token.mint)
+		);
+		if (fallback) {
+			activePool = fallback;
+			aToB = fallback.mintA.equals(token.mint);
+			fromAmountStr = '';
+			void quote.activatePool(fallback);
+		}
+	}
+
+	/** Symmetric to selectFromToken — picks a token for the TO side. */
+	function selectToToken(token: TokenInfo) {
+		toOpen = false;
+		if (toMint && token.mint.equals(toMint)) return;
+		if (fromMint && token.mint.equals(fromMint)) {
+			flipDirection();
+			return;
+		}
+		if (fromMint) {
+			const match = findPoolForPair(fromMint, token.mint);
+			if (match) {
+				activePool = match.pool;
+				aToB = match.aToB;
+				fromAmountStr = '';
+				void quote.activatePool(match.pool);
+				return;
+			}
+		}
+		const fallback = poolsForCluster.find(
+			(p) => p.mintA.equals(token.mint) || p.mintB.equals(token.mint)
+		);
+		if (fallback) {
+			activePool = fallback;
+			aToB = fallback.mintB.equals(token.mint);
+			fromAmountStr = '';
+			void quote.activatePool(fallback);
+		}
 	}
 
 	function openConfirm() {
@@ -302,9 +408,10 @@
 
 	// Click outside the dropdowns to close them.
 	$effect(() => {
-		if (!poolsOpen && !settingsOpen) return;
+		if (!fromOpen && !toOpen && !settingsOpen) return;
 		const close = () => {
-			poolsOpen = false;
+			fromOpen = false;
+			toOpen = false;
 			settingsOpen = false;
 		};
 		document.addEventListener('click', close);
@@ -373,8 +480,8 @@
 				</div>
 			{:else}
 				<div class="swap-stack">
-					<!-- ─────── From row ─────── -->
-					<div class="swap-row" class:is-open={poolsOpen}>
+					<!-- ─────── From row (token picker + amount input) ─────── -->
+					<div class="swap-row" class:is-open={fromOpen}>
 						<div class="row-head">
 							<span class="row-label">From</span>
 							{#if fromBalanceDisplay}
@@ -384,16 +491,17 @@
 						<button
 							type="button"
 							class="swap-token-chip"
-							class:is-open={poolsOpen}
+							class:is-open={fromOpen}
 							onclick={(e) => {
 								e.stopPropagation();
-								poolsOpen = !poolsOpen;
+								fromOpen = !fromOpen;
+								toOpen = false;
 							}}
 							aria-haspopup="listbox"
-							aria-expanded={poolsOpen}
+							aria-expanded={fromOpen}
 						>
 							<span class="swap-token-symbol">{fromSymbol}</span>
-							{#if poolsOpen}
+							{#if fromOpen}
 								<AngleUpSmall size={16} />
 							{:else}
 								<AngleDownSmall size={16} />
@@ -408,45 +516,60 @@
 							aria-label="Amount to swap from"
 						/>
 
-						{#if poolsOpen}
+						{#if fromOpen}
 							<div
 								class="swap-dropdown"
 								role="listbox"
 								tabindex="-1"
 								onclick={(e) => e.stopPropagation()}
 								onkeydown={(e) => {
-									if (e.key === 'Escape') poolsOpen = false;
+									if (e.key === 'Escape') fromOpen = false;
 								}}
 							>
-								{#each poolsForCluster as entry (entry.poolPda.toBase58())}
-									{@const isSelected =
-										activePool !== null && activePool.poolPda.equals(entry.poolPda)}
+								{#each availableTokens as token (token.mint.toBase58())}
+									{@const isSelected = fromMint !== null && token.mint.equals(fromMint)}
 									<button
 										type="button"
 										class="swap-option"
 										class:is-selected={isSelected}
 										role="option"
 										aria-selected={isSelected}
-										onclick={() => selectPool(entry)}
+										onclick={() => selectFromToken(token)}
 									>
-										<span class="swap-option-symbol">{entry.label}</span>
+										<span class="swap-option-symbol">{token.symbol}</span>
 									</button>
 								{/each}
 							</div>
 						{/if}
 					</div>
 
-					<!-- ─────── To row (read-only) ─────── -->
-					<div class="swap-row">
+					<!-- ─────── To row (token picker; amount read-only) ─────── -->
+					<div class="swap-row" class:is-open={toOpen}>
 						<div class="row-head">
 							<span class="row-label">To</span>
 							{#if toBalanceDisplay}
 								<span class="row-balance">{toBalanceDisplay} {toSymbol}</span>
 							{/if}
 						</div>
-						<div class="swap-token-chip swap-token-chip-static">
+						<button
+							type="button"
+							class="swap-token-chip"
+							class:is-open={toOpen}
+							onclick={(e) => {
+								e.stopPropagation();
+								toOpen = !toOpen;
+								fromOpen = false;
+							}}
+							aria-haspopup="listbox"
+							aria-expanded={toOpen}
+						>
 							<span class="swap-token-symbol">{toSymbol}</span>
-						</div>
+							{#if toOpen}
+								<AngleUpSmall size={16} />
+							{:else}
+								<AngleDownSmall size={16} />
+							{/if}
+						</button>
 						<input
 							class="swap-amount swap-amount-readonly"
 							type="text"
@@ -455,6 +578,32 @@
 							value={toAmountDisplay}
 							aria-label="Amount to receive (computed)"
 						/>
+
+						{#if toOpen}
+							<div
+								class="swap-dropdown"
+								role="listbox"
+								tabindex="-1"
+								onclick={(e) => e.stopPropagation()}
+								onkeydown={(e) => {
+									if (e.key === 'Escape') toOpen = false;
+								}}
+							>
+								{#each availableTokens as token (token.mint.toBase58())}
+									{@const isSelected = toMint !== null && token.mint.equals(toMint)}
+									<button
+										type="button"
+										class="swap-option"
+										class:is-selected={isSelected}
+										role="option"
+										aria-selected={isSelected}
+										onclick={() => selectToToken(token)}
+									>
+										<span class="swap-option-symbol">{token.symbol}</span>
+									</button>
+								{/each}
+							</div>
+						{/if}
 					</div>
 
 					<!-- Flip button. Sits between the two rows. -->
@@ -684,10 +833,6 @@
 		background-color: var(--color-dark-700);
 		filter: brightness(1.1);
 	}
-	.swap-token-chip-static {
-		cursor: default;
-	}
-
 	.swap-token-symbol {
 		font-family: 'Onest', var(--font-body);
 		font-size: var(--text-base);
