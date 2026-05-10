@@ -186,8 +186,8 @@
 	type LiquidityPool = {
 		id: string;
 		poolAddress: PublicKey;
-		pairA: { symbol: string; bg: string; iconLetter?: string };
-		pairB: { symbol: string; bg: string; iconLetter?: string };
+		pairA: { symbol: string; bg: string; iconLetter?: string; iconSrc?: string };
+		pairB: { symbol: string; bg: string; iconLetter?: string; iconSrc?: string };
 		tvl: string;
 		kind: 'Concentrated' | 'Standard';
 		raw: EnrichedPoolRow;
@@ -208,6 +208,23 @@
 		return '#71739044';
 	}
 
+	/**
+	 * Resolve a token symbol to its canonical Figma SVG mark in
+	 * `static/images/tokens/`. Returned as a public URL ready for
+	 * `<img src=...>`. Falls back to `undefined` for unknown tokens —
+	 * the consumer (PoolDetailPanel etc) then renders the letter
+	 * placeholder on `bgForSymbol(...)`. Same icon set is used by
+	 * `markets/+page.svelte::avatarFor`, `QuickSwap`, etc.
+	 */
+	function iconSrcForSymbol(sym: string): string | undefined {
+		const upper = sym.toUpperCase();
+		if (upper === 'RWT') return '/images/tokens/rwt-mark.svg';
+		if (upper === 'SPRK') return '/images/tokens/sparkles.svg';
+		if (upper === 'USDC') return '/images/tokens/usdc.svg';
+		if (upper === 'USDT' || upper === 'USDt') return '/images/tokens/usdt-t.svg';
+		return undefined;
+	}
+
 	const liquidityPools = $derived<LiquidityPool[]>(
 		tokenPools.map((p) => {
 			const symA = symbolForMint(p.tokenAMint);
@@ -215,8 +232,18 @@
 			return {
 				id: p.poolAddress.toBase58(),
 				poolAddress: p.poolAddress,
-				pairA: { symbol: symA, bg: bgForSymbol(symA), iconLetter: symA[0] },
-				pairB: { symbol: symB, bg: bgForSymbol(symB), iconLetter: symB[0] },
+				pairA: {
+					symbol: symA,
+					bg: bgForSymbol(symA),
+					iconLetter: symA[0],
+					iconSrc: iconSrcForSymbol(symA)
+				},
+				pairB: {
+					symbol: symB,
+					bg: bgForSymbol(symB),
+					iconLetter: symB[0],
+					iconSrc: iconSrcForSymbol(symB)
+				},
 				tvl: formatTvl(p.tvlUsdc),
 				kind: p.poolType === 0 ? 'Standard' : 'Concentrated',
 				raw: p
