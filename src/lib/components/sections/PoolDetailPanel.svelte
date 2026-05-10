@@ -85,7 +85,12 @@
 
 	type DepositSide = 'A' | 'B';
 	let depositSide = $state<DepositSide>('B');
-	let depositAmount = $state('899');
+	// Empty by default. The original Figma mockup shipped with '899'
+	// pre-filled to make screenshots look populated, but that bleeds
+	// into production: opening the modal pre-stages a phantom deposit
+	// the user never typed. Start empty so MAX / typing are always
+	// the source.
+	let depositAmount = $state('');
 
 	// Slippage bps — single source for both Add/Zap minShares and Remove
 	// payout-floor derivation. Surfaced via the gear popover (mirrors the
@@ -791,7 +796,7 @@
 								<button type="button" class="deposit-max" onclick={setMax}>MAX</button>
 							</div>
 							<div class="deposit-meta">
-								<span class="deposit-meta-sub">≈ $889.92</span>
+								<span class="deposit-meta-sub"></span>
 								<span class="deposit-meta-sub">
 									Available {availableForSide(depositSide)}
 									{depositSide === 'A' ? pool.pairA.symbol : pool.pairB.symbol}
@@ -860,7 +865,7 @@
 									</button>
 								</div>
 								<div class="deposit-meta">
-									<span class="deposit-meta-sub">≈ $889.92</span>
+									<span class="deposit-meta-sub"></span>
 									<span class="deposit-meta-sub">
 										Available {availableForSide(side as DepositSide)}
 										{token.symbol}
