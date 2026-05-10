@@ -18,7 +18,6 @@
 import type { PublicKey } from '@solana/web3.js';
 
 import { findAssociatedTokenAddressPda } from '@areal/sdk/pda';
-import { RWT_MINTS, USDC_MINTS } from '@areal/sdk/network';
 
 import { wallet } from '$lib/stores/wallet.svelte';
 import { network } from '$lib/network/network.svelte';
@@ -46,8 +45,7 @@ async function refreshUsdc(): Promise<void> {
 		usdc = null;
 		return;
 	}
-	const mint = USDC_MINTS[network.current];
-	usdc = await readBalance(owner, mint);
+	usdc = await readBalance(owner, network.usdcMint);
 }
 
 async function refreshRwt(): Promise<void> {
@@ -56,8 +54,7 @@ async function refreshRwt(): Promise<void> {
 		rwt = null;
 		return;
 	}
-	const mint = RWT_MINTS[network.current];
-	rwt = await readBalance(owner, mint);
+	rwt = await readBalance(owner, network.rwtMint);
 }
 
 async function refreshAll(): Promise<void> {

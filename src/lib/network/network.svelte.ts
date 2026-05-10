@@ -23,7 +23,9 @@
  * `Connection` objects are cheap to construct, so the getter pattern is
  * fine — no need for explicit caching.
  */
-import type { Connection } from '@solana/web3.js';
+import type { Connection, PublicKey } from '@solana/web3.js';
+
+import { RWT_MINTS, USDC_MINTS } from '@areal/sdk/network';
 
 import { createConnection, createWsConnection } from '$lib/sdk/connection';
 import { ENDPOINTS, NETWORK_IDS, type NetworkEndpoint, type NetworkId } from './endpoints';
@@ -93,6 +95,24 @@ export const network = {
 	 */
 	get holdersBackendAvailable(): boolean {
 		return ENDPOINTS[current].holdersBackendAvailable !== false;
+	},
+	/**
+	 * Active USDC mint for the current cluster.
+	 *
+	 * Honours `endpoint.usdcMint` override (set on Testnet/`localnet` to
+	 * the bootstrap-init.ts-created test mint, which differs from the
+	 * SDK's R20-pinned `USDC_MINTS[localnet]` default). Use this instead
+	 * of reading `USDC_MINTS[network.current]` directly anywhere balance,
+	 * quote, or transaction code lives — otherwise we'd target an ATA
+	 * derived from a mint the on-chain programs don't accept and surface
+	 * "0 balance" / "invalid mint" depending on the path.
+	 */
+	get usdcMint(): PublicKey {
+		return ENDPOINTS[current].usdcMint ?? USDC_MINTS[current];
+	},
+	/** Same override pattern for RWT — see `usdcMint` for rationale. */
+	get rwtMint(): PublicKey {
+		return ENDPOINTS[current].rwtMint ?? RWT_MINTS[current];
 	},
 	setNetwork(id: NetworkId) {
 		// Defensive guard: reject ids outside the known set. Callers cast at

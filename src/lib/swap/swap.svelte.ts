@@ -240,7 +240,9 @@ async function runSwap(intent: SwapIntent): Promise<void> {
 	const cluster = network.current;
 
 	// Pre-flight 1: mainnet must not touch the R20 placeholder RWT mint.
-	const rwtMint = RWT_MINTS[cluster];
+	// Use `network.rwtMint` (override-aware) so Testnet picks up the
+	// bootstrap-init non-canonical mint instead of the SDK default.
+	const rwtMint = network.rwtMint;
 	if (cluster === 'mainnet' && isPlaceholderRwtMint(rwtMint)) {
 		failSilent(
 			key,

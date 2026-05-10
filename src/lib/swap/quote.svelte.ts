@@ -114,7 +114,7 @@ function recomputeQuote() {
 		return;
 	}
 
-	const rwtMint = RWT_MINTS[network.current];
+	const rwtMint = network.rwtMint;
 	result = quoteSwap({
 		pool,
 		config,

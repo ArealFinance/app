@@ -17,7 +17,7 @@ import { PublicKey } from '@solana/web3.js';
 import { findDexConfigPda, findPoolStatePda } from '@areal/sdk/pda';
 import { PROGRAM_IDS, RWT_MINTS, USDC_MINTS } from '@areal/sdk/network';
 
-import type { NetworkId } from '$lib/network/endpoints';
+import { ENDPOINTS, type NetworkId } from '$lib/network/endpoints';
 
 /** Decimals per token symbol — mirrored from on-chain mint metadata. */
 const USDC_DECIMALS = 6;
@@ -70,10 +70,18 @@ export function canonicalMintOrder(
 	return cmp < 0 ? { mintA: a, mintB: b } : { mintA: b, mintB: a };
 }
 
-/** Build a USDC↔RWT pool entry for a given cluster. */
+/** Build a USDC↔RWT pool entry for a given cluster.
+ *
+ * Honours `ENDPOINTS[cluster].{usdcMint,rwtMint}` overrides (set on
+ * Testnet/`localnet` to bootstrap-init.ts-created test mints). Without
+ * these overrides the pool PDA would derive from the SDK-default mints
+ * the Testnet validator's on-chain dex doesn't know about, and the
+ * swap form would surface "no pool for this pair".
+ */
 function buildUsdcRwtEntry(cluster: NetworkId): PoolEntry {
-	const usdc = USDC_MINTS[cluster];
-	const rwt = RWT_MINTS[cluster];
+	const ep = ENDPOINTS[cluster];
+	const usdc = ep.usdcMint ?? USDC_MINTS[cluster];
+	const rwt = ep.rwtMint ?? RWT_MINTS[cluster];
 
 	const { mintA, mintB } = canonicalMintOrder(usdc, rwt);
 	const usdcIsA = mintA.equals(usdc);

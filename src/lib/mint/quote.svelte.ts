@@ -78,7 +78,10 @@ function recomputeQuote() {
 		return;
 	}
 	const cluster = toCluster(network.current);
-	const rwtMint = RWT_MINTS[cluster];
+	// Override-aware (Testnet): `network.rwtMint` falls back to RWT_MINTS[cluster]
+	// for devnet/mainnet but uses `endpoint.rwtMint` on the Areal Testnet
+	// validator where bootstrap-init.ts created a non-canonical mint.
+	const rwtMint = network.rwtMint;
 
 	result = quoteMintRwt({
 		vault,
