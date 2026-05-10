@@ -395,27 +395,6 @@
 						/>
 					</div>
 
-					{#if showFaucetButton}
-						<!--
-						 Testnet faucet entry-point — rendered for any connected
-						 wallet on the Areal-hosted Testnet validator. Backend
-						 enforces a 24h per-wallet rate-limit, so always-show is
-						 fine. Disabled (not hidden) while a request is in flight
-						 so the user gets feedback that their click was
-						 registered.
-						-->
-						<div class="faucet-row">
-							<button
-								class="faucet-btn"
-								type="button"
-								disabled={faucetInFlight}
-								onclick={handleFaucetClick}
-							>
-								{faucetInFlight ? 'Sending…' : 'Get 1000 test USDC'}
-							</button>
-						</div>
-					{/if}
-
 					<!-- ─────── To row (RWT, read-only) ─────── -->
 					<div class="mint-row">
 						<div class="row-head">
@@ -468,6 +447,33 @@
 				{mintButtonLabel}
 			</Button>
 		</section>
+
+		{#if showFaucetButton}
+			<!--
+			 Testnet USDC faucet — its own card between the mint form and the
+			 "Why mint RWT?" panel. Placing it INSIDE the mint form (between
+			 Pay/Receive) broke the form's read-flow, so it lives as a sibling
+			 section now: still highly visible, but doesn't clutter the input
+			 sequence. Backend rate-limits to 1 claim per wallet per 24h.
+			-->
+			<section class="faucet-card" aria-labelledby="faucet-card-title">
+				<div class="faucet-text">
+					<h3 id="faucet-card-title" class="faucet-title">Need test USDC?</h3>
+					<p class="faucet-sub">
+						Claim 1000 test USDC on Testnet to start minting RWT. One claim per
+						wallet every 24 hours.
+					</p>
+				</div>
+				<button
+					class="faucet-btn"
+					type="button"
+					disabled={faucetInFlight}
+					onclick={handleFaucetClick}
+				>
+					{faucetInFlight ? 'Sending…' : 'Claim 1000 USDC'}
+				</button>
+			</section>
+		{/if}
 
 		<section class="info-card" aria-labelledby="info-card-title">
 			<div class="info-aurora" aria-hidden="true"></div>
@@ -717,39 +723,76 @@
 		gap: var(--space-2);
 	}
 
-	/* ─── Testnet faucet button (only on /mint Testnet) ───
-	 * Sized + coloured loud enough to be obvious even when the user already
-	 * has a non-zero USDC balance. Filled with the brand primary so it sits
-	 * visually between the muted Pay/Receive cards. Was previously a tiny
-	 * chip on `--color-bg` which was nearly invisible on the dark mint card.
+	/* ─── Testnet faucet card (only on /mint Testnet) ───
+	 * Lives as its own section between the mint form and the
+	 * "Why mint RWT?" info card. Two-column on desktop (text left,
+	 * CTA right), stacks on mobile. Visually distinct from the mint
+	 * card but lower weight so it doesn't compete with the primary
+	 * action.
 	 */
-	.faucet-row {
+	.faucet-card {
 		display: flex;
-		justify-content: center;
-		margin: calc(-1 * var(--space-2)) 0;
+		flex-direction: column;
+		align-items: stretch;
+		gap: var(--space-3);
+		padding: var(--space-4) var(--space-5);
+		background: linear-gradient(
+			135deg,
+			color-mix(in srgb, var(--color-primary) 12%, var(--color-surface)),
+			var(--color-surface)
+		);
+		border: 1px solid color-mix(in srgb, var(--color-primary) 28%, transparent);
+		border-radius: var(--radius-lg);
+	}
+	@media (min-width: 480px) {
+		.faucet-card {
+			flex-direction: row;
+			align-items: center;
+			justify-content: space-between;
+		}
+	}
+	.faucet-text {
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+		min-width: 0;
+	}
+	.faucet-title {
+		margin: 0;
+		font-family: var(--font-sans);
+		font-size: var(--text-base);
+		font-weight: var(--font-weight-semibold);
+		color: var(--color-text);
+	}
+	.faucet-sub {
+		margin: 0;
+		font-family: var(--font-body);
+		font-size: var(--text-xs);
+		color: var(--color-text-muted);
+		line-height: 1.4;
 	}
 	.faucet-btn {
+		flex-shrink: 0;
 		display: inline-flex;
 		align-items: center;
 		justify-content: center;
-		gap: var(--space-2);
-		padding: var(--space-2) var(--space-5);
+		padding: var(--space-2) var(--space-4);
 		background: linear-gradient(135deg, var(--color-primary, #8B5CF6), #6D28D9);
 		color: #fff;
 		border: 1px solid rgba(255, 255, 255, 0.12);
-		border-radius: var(--radius-pill, 999px);
+		border-radius: var(--radius-md);
 		font-family: 'Onest', var(--font-body);
 		font-size: var(--text-sm);
 		font-weight: var(--font-weight-semibold);
 		letter-spacing: var(--tracking-tight);
 		cursor: pointer;
-		box-shadow: 0 4px 18px rgba(139, 92, 246, 0.35);
+		box-shadow: 0 2px 12px rgba(139, 92, 246, 0.25);
 		transition: transform var(--motion-base) var(--ease-out),
 			box-shadow var(--motion-base) var(--ease-out);
 	}
 	.faucet-btn:hover:not(:disabled) {
 		transform: translateY(-1px);
-		box-shadow: 0 6px 24px rgba(139, 92, 246, 0.5);
+		box-shadow: 0 4px 18px rgba(139, 92, 246, 0.4);
 	}
 	.faucet-btn:disabled {
 		opacity: 0.6;
