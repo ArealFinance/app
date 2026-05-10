@@ -501,12 +501,10 @@
 		{ id: 'btc', symbol: 'BTC', tokens: '50 000,00 tokens', usd: '$12.5k', yieldPct: '1590%', color: '#D89D44', bubbleSize: 80 }
 	];
 
-	type RwaBreakdownRow = { label: string; qty: string; usd: string; pct: string; pctTone: 'purple' | 'teal' | 'pink' };
-	const rwaBreakdown: RwaBreakdownRow[] = [
-		{ label: 'NFT 1', qty: '10.00K', usd: '$11.4k', pct: '53%', pctTone: 'purple' },
-		{ label: 'NFT 2', qty: '10.00K', usd: '$11.4k', pct: '40%', pctTone: 'teal' },
-		{ label: 'NFT 2', qty: '10.00K', usd: '$11.4k', pct: '7%', pctTone: 'pink' }
-	];
+	// RWA breakdown / multi-asset donut deferred until the
+	// ownership-token program exposes per-asset attribution. One token
+	// currently maps to one underlying RWA, so a multi-row breakdown is
+	// noise.
 
 	type DataReport = { id: string; title: string; href: string; pinned?: boolean };
 	const dataReports: DataReport[] = [
@@ -524,6 +522,9 @@
 		date: string;
 		image?: string;
 	};
+	// Single underlying RWA per OT for now. When the ownership-token
+	// metadata schema gains per-asset arrays this will derive from
+	// on-chain data.
 	const nftCards: NftCard[] = [
 		{
 			id: 'mini-1',
@@ -533,15 +534,6 @@
 			price: '23,500 USD',
 			date: '14.04.2026',
 			image: '/images/rwa/mini-cooper.png'
-		},
-		{
-			id: 'mini-2',
-			title: 'Mini Cooper',
-			category: 'Unactive',
-			year: '2023',
-			price: '23,500 USD',
-			date: '14.04.2026',
-			image: '/images/rwa/mini-cooper-bw.png'
 		}
 	];
 
@@ -717,38 +709,14 @@
 						</div>
 
 						{#if activeDetailTab === 'RWA’s'}
-							<div class="detail-card">
-								<div class="detail-donut" aria-hidden="true">
-									<TickWheel
-										value={0.53}
-										colorA="#A56EFF"
-										colorB="#1FB7B7"
-										size={134}
-										tickCount={50}
-										tickLength={10}
-										tickWidth={3}
-									/>
-									<div class="detail-donut-center">
-										<span class="detail-donut-label">Portfolio</span>
-										<span class="detail-donut-value">{EM_DASH}</span>
-									</div>
-								</div>
-
-								<div class="detail-rows">
-									{#each rwaBreakdown as row (row.label)}
-										<div class="detail-row">
-											<span class="detail-marker detail-marker-{row.pctTone}"></span>
-											<span class="detail-symbol">{row.label}</span>
-											<span class="detail-amount">
-												<span class="detail-qty">{row.qty}</span>
-												<span class="detail-usd">{row.usd}</span>
-											</span>
-											<span class="detail-pill detail-pill-{row.pctTone}">{row.pct}</span>
-										</div>
-									{/each}
-								</div>
-							</div>
-
+							<!--
+							 Multi-asset breakdown (donut + NFT 1/2/3 rows) was the
+							 Figma macet's mockup state. Production today binds one
+							 OT to one underlying RWA — drop the breakdown entirely
+							 and render the single asset card. When the OT metadata
+							 schema gains a per-asset array this section will grow
+							 back into a list with attribution.
+							-->
 							<div class="nft-grid">
 								{#each nftCards as nft (nft.id)}
 									<article class="nft-card">
