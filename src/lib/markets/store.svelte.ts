@@ -197,13 +197,19 @@ async function doFetch(): Promise<void> {
 
 	const conn = network.connection;
 	const programIds = network.endpoint.programIds;
+	const rwtMintOverride = network.endpoint.rwtMint;
 
 	try {
 		const snap = await getMarketsSnapshot(conn, toCluster(networkId), {
 			nativeDexProgramId: programIds.nativeDex,
 			ownershipTokenProgramId: programIds.ownershipToken,
 			rwtEngineProgramId: programIds.rwtEngine,
-			includeNav: true
+			includeNav: true,
+			// Per-cluster RWT mint override (see `endpoints.ts` `rwtMint`).
+			// Undefined for devnet/mainnet → SDK falls back to its canonical
+			// `RWT_MINTS[cluster]`. Set on Testnet so the snapshot reads our
+			// bootstrap-init.ts mint instead of the unfunded R20 placeholder.
+			...(rwtMintOverride ? { rwtMint: rwtMintOverride } : {})
 		});
 
 		// Late-response guard. If the network changed while we were

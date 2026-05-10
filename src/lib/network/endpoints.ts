@@ -62,6 +62,15 @@ export interface NetworkEndpoint {
 	realtimeWsUrl: string;
 	programIds: NetworkProgramIds;
 	usdcMint: PublicKey;
+	/**
+	 * Optional override for the RWT mint pubkey on this cluster. Defaults
+	 * (`undefined`) tell the SDK to use its canonical `RWT_MINTS[cluster]`
+	 * table. Set this when the on-chain RWT mint differs from the SDK's
+	 * R20-pinned default — e.g. on the Areal-hosted Testnet validator
+	 * where bootstrap-init.ts created a non-canonical mint because the
+	 * deployer doesn't hold the canonical keypair.
+	 */
+	rwtMint?: PublicKey;
 }
 
 export const NETWORK_IDS: NetworkId[] = ['localnet', 'devnet', 'mainnet'];
@@ -88,7 +97,16 @@ export const ENDPOINTS: Record<NetworkId, NetworkEndpoint> = {
 		backendApiUrl: AREAL_BACKEND_URL,
 		realtimeWsUrl: AREAL_REALTIME_WS_URL,
 		programIds: PROGRAM_IDS,
-		usdcMint: USDC_MINTS.localnet
+		usdcMint: USDC_MINTS.localnet,
+		// Bootstrap-init.ts on the Areal-hosted Testnet validator created the
+		// RWT mint at this address (random keypair generated at runtime — the
+		// deployer doesn't hold the canonical R20 keypair). Without this
+		// override the SDK looks up `RWT_MINTS.localnet` (canonical
+		// 6YRfYtkZmq...) which doesn't exist on chain → empty Total Supply,
+		// no price, no NAV. Drop this override once we either (a) recover
+		// the canonical R20 keypair and re-bootstrap, or (b) rebuild the
+		// contracts on the validator with a new R20-pinned mint.
+		rwtMint: new PublicKey('3pBtHBiBwh4agqghTYuDQnZV1po5YahbaBGywtiZooRr')
 	},
 	devnet: {
 		id: 'devnet',
