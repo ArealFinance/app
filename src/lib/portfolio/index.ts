@@ -4,3 +4,7 @@ export type { PortfolioRow, PortfolioSnapshot } from '@areal/sdk/portfolio';
 export { claims, type ClaimAttempt, type ClaimPhase } from './claim.svelte';
 export { historyStore, type HistoryStore, type HistoryStatus } from './history.svelte';
 export { kindLabel, relativeTime, rowDescription, solscanLink } from './history-format';
+export { lpPortfolio, type LpPortfolioStatus } from './lp-portfolio-store.svelte';
+export { lpClaims, type LpClaimAttempt, type LpClaimPhase } from './lp-claim.svelte';
+export { priceFeed, type PriceFeedRow, type PriceFeedStatus } from './prices-store.svelte';
+export type { HolderLpRow, HolderLpSnapshot } from '@areal/sdk/lp-portfolio';
