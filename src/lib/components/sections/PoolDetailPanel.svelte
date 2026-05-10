@@ -124,8 +124,56 @@
 		const v = side === 'A' ? pool.userBalanceA : pool.userBalanceB;
 		return v ?? '0';
 	}
+	/**
+	 * Standards-aware MAX. Naïve "depositAmount = userBalance(side)" is
+	 * wrong in Standards mode: the counter-side amount is derived from the
+	 * pool's reserve ratio, so picking 1000 on a side where the user holds
+	 * 1000 silently demands 1000 on the other side too — which the user
+	 * may not actually have. Result: the form looked like "you can deposit
+	 * 1000" but the on-chain TX would fail when it tried to debit a
+	 * counter-amount the user didn't have.
+	 *
+	 * Real cap = MIN(
+	 *   userBalance(primary),
+	 *   userBalance(counter) × reserve(primary) / reserve(counter)
+	 * )
+	 *
+	 * Zap mode keeps the simple single-side semantic — the contract
+	 * auto-balances ~50% of one input, no two-side constraint.
+	 */
 	function setMax() {
-		depositAmount = availableForSide(depositSide);
+		const decA = pool.decimalsA;
+		const decB = pool.decimalsB;
+		if (
+			depositMode === 'Zap' ||
+			!pool.row ||
+			decA === undefined ||
+			decB === undefined
+		) {
+			depositAmount = availableForSide(depositSide);
+			return;
+		}
+		const ps = livePool;
+		// Empty pool / no live state — fall back to plain side balance.
+		if (!ps || ps.reserveA === 0n || ps.reserveB === 0n) {
+			depositAmount = availableForSide(depositSide);
+			return;
+		}
+		const balA = toBaseUnits(pool.userBalanceA ?? '0', decA);
+		const balB = toBaseUnits(pool.userBalanceB ?? '0', decB);
+		let primaryMax: bigint;
+		if (depositSide === 'A') {
+			// Counter side needs primary × reserveB / reserveA — but we only
+			// have balB on that side. Cap primary so the implied counter
+			// stays within balB.
+			const counterCap = (balB * ps.reserveA) / ps.reserveB;
+			primaryMax = balA < counterCap ? balA : counterCap;
+		} else {
+			const counterCap = (balA * ps.reserveB) / ps.reserveA;
+			primaryMax = balB < counterCap ? balB : counterCap;
+		}
+		const dec = depositSide === 'A' ? decA : decB;
+		depositAmount = formatTokenAmount(primaryMax, dec, Math.min(dec, 6));
 	}
 
 	// Parse the user's typed amount into base-units bigint. Returns 0n on
