@@ -26,7 +26,15 @@
 		fees24h: string;
 		binStep: string;
 		priceLabels: string[];
-		userBalance: string;
+		/**
+		 * Holder's wallet balance for tokenA / tokenB, formatted for
+		 * display (decimals already applied). Optional — when absent
+		 * the panel renders 'Available 0 …'. Populated by the markets
+		 * page once the wallet is connected and the per-side ATA reads
+		 * settle.
+		 */
+		userBalanceA?: string;
+		userBalanceB?: string;
 		/**
 		 * Optional live depth ladder for Standard pools. When present it
 		 * replaces the mock distribution chart with the SDK-computed ladder.
@@ -106,8 +114,13 @@
 	// guards). Withdraw CTA stays enabled regardless.
 	const addCtaDisabled = $derived(isMasterPool || !hasOnChain);
 
+	/** Side-aware available balance. Falls back to '0' when missing. */
+	function availableForSide(side: DepositSide): string {
+		const v = side === 'A' ? pool.userBalanceA : pool.userBalanceB;
+		return v ?? '0';
+	}
 	function setMax() {
-		depositAmount = pool.userBalance;
+		depositAmount = availableForSide(depositSide);
 	}
 
 	// Parse the user's typed amount into base-units bigint. Returns 0n on
@@ -780,7 +793,7 @@
 							<div class="deposit-meta">
 								<span class="deposit-meta-sub">≈ $889.92</span>
 								<span class="deposit-meta-sub">
-									Available {pool.userBalance}
+									Available {availableForSide(depositSide)}
 									{depositSide === 'A' ? pool.pairA.symbol : pool.pairB.symbol}
 								</span>
 							</div>
@@ -849,7 +862,7 @@
 								<div class="deposit-meta">
 									<span class="deposit-meta-sub">≈ $889.92</span>
 									<span class="deposit-meta-sub">
-										Available {pool.userBalance}
+										Available {availableForSide(side as DepositSide)}
 										{token.symbol}
 									</span>
 								</div>

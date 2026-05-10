@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount, onDestroy, untrack } from 'svelte';
 	import { PublicKey } from '@solana/web3.js';
+	import { findAssociatedTokenAddressPda } from '@areal/sdk/pda';
 
 	import { page } from '$app/state';
 	import AppShell from '$lib/components/sections/AppShell.svelte';
@@ -236,6 +237,37 @@
 		return mint.toBase58().slice(0, 4);
 	}
 
+	/**
+	 * Per-mint user-balance cache (mintBase58 -> raw bigint balance).
+	 * Populated by the `$effect` below whenever the open pool or wallet
+	 * changes. Falls through to `0n` when an account doesn't exist (the
+	 * holder simply hasn't ever held that mint yet).
+	 */
+	let userTokenBalances = $state(new Map<string, bigint>());
+
+	$effect(() => {
+		const pk = wallet.publicKey;
+		const lp = openPoolId ? liquidityPools.find((p) => p.id === openPoolId) : null;
+		if (!pk || !lp) return;
+		const conn = network.connection;
+		const mints = [lp.raw.tokenAMint, lp.raw.tokenBMint];
+		void Promise.all(
+			mints.map(async (mint) => {
+				const [ata] = findAssociatedTokenAddressPda(pk, mint);
+				try {
+					const r = await conn.getTokenAccountBalance(ata);
+					return { key: mint.toBase58(), bal: BigInt(r.value.amount) };
+				} catch {
+					return { key: mint.toBase58(), bal: 0n };
+				}
+			})
+		).then((rows) => {
+			const next = new Map(userTokenBalances);
+			for (const r of rows) next.set(r.key, r.bal);
+			userTokenBalances = next;
+		});
+	});
+
 	function bgForSymbol(sym: string): string {
 		const upper = sym.toUpperCase();
 		if (upper === 'RWT') return '#A56EFF';
@@ -391,7 +423,16 @@
 			fees24h: EM_DASH,
 			binStep: EM_DASH,
 			priceLabels: [],
-			userBalance: '0',
+			userBalanceA: formatTokenAmount(
+				userTokenBalances.get(raw.tokenAMint.toBase58()) ?? 0n,
+				decA,
+				Math.min(decA, 4)
+			),
+			userBalanceB: formatTokenAmount(
+				userTokenBalances.get(raw.tokenBMint.toBase58()) ?? 0n,
+				decB,
+				Math.min(decB, 4)
+			),
 			depth: poolStore.depth,
 			row: raw,
 			decimalsA: decA,
