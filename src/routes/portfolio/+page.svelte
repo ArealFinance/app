@@ -12,11 +12,16 @@
 	import { realtimeClient } from '$lib/realtime/client.svelte';
 	import { toast } from '$lib/components/ui';
 	import { portfolio, RWT_DECIMALS } from '$lib/portfolio/store.svelte';
-	import { formatTokenAmount } from '$lib/portfolio/format';
+	import { formatTokenAmount, formatUsd, formatPercent } from '$lib/portfolio/format';
 	import { claims, type ClaimAttempt } from '$lib/portfolio/claim.svelte';
 	import { historyStore } from '$lib/portfolio/history.svelte';
+	import { lpPortfolio } from '$lib/portfolio/lp-portfolio-store.svelte';
+	import { lpClaims } from '$lib/portfolio/lp-claim.svelte';
+	import { priceFeed } from '$lib/portfolio/prices-store.svelte';
+	import { markets } from '$lib/markets/store.svelte';
 	import { ClaimConfirmModal, HistorySection } from '$lib/components/portfolio';
 	import type { PortfolioRow } from '@areal/sdk/portfolio';
+	import type { HolderLpRow } from '@areal/sdk/lp-portfolio';
 	import { createTxToastHandler } from '$lib/portfolio/tx-toast';
 
 	const isConnected = $derived(wallet.isConnected);
@@ -38,31 +43,42 @@
 		canClaim: boolean;
 	};
 
-	type LpPosition = {
-		id: string;
-		pair: [string, string];
-		apy: string;
-		apyTone: Tone;
-		selected?: boolean;
-	};
-
-	// Phase 6: token list is sourced from on-chain holder portfolio. Price /
-	// APY / value columns are placeholder dashes — Phase 7 will pipe in
-	// pricing & APY signals.
+	// Phase 3 — token list is enriched with real APY (priceFeed), real USDC
+	// price (markets snapshot), real USDC value (qty × price), and real 24h
+	// change (priceFeed). All four collapse to '—' when the upstream value
+	// is null. Tone is `success` when the value is ≥0 (or null — em-dash is
+	// neutral, tone is irrelevant), `danger` when <0.
 	const tokens = $derived<OwnershipToken[]>(
-		portfolio.rows.map((row) => ({
-			symbol: row.metadata.symbol,
-			logoLetter: row.metadata.symbol.slice(0, 1).toUpperCase(),
-			qty: formatTokenAmount(row.balance, row.metadata.decimals, 2),
-			apy: '—',
-			apyTone: 'success' as const,
-			price24h: '—',
-			price24hTone: 'success' as const,
-			price: '—',
-			value: '—',
-			row,
-			canClaim: row.distributor !== null && (row.claimableNow ?? 0n) > 0n
-		}))
+		portfolio.rows.map((row) => {
+			const tokenMeta = markets.snapshot?.tokens.find((t) => t.mint.equals(row.otMint));
+			const priceUsdc = tokenMeta?.priceUsdc ?? null;
+			const apy = priceFeed.apyForMint(row.otMint);
+			const change = priceFeed.change24hForMint(row.otMint);
+
+			// Convert raw bigint → human number for value calc. Sub-cent
+			// dust is OK here — the value field is always rendered through
+			// `formatUsd` which truncates display to two decimals.
+			let valueUsdc: number | null = null;
+			if (priceUsdc !== null) {
+				const divisor = 10 ** row.metadata.decimals;
+				const balanceFloat = Number(row.balance) / divisor;
+				valueUsdc = balanceFloat * priceUsdc;
+			}
+
+			return {
+				symbol: row.metadata.symbol,
+				logoLetter: row.metadata.symbol.slice(0, 1).toUpperCase(),
+				qty: formatTokenAmount(row.balance, row.metadata.decimals, 2),
+				apy: formatPercent(apy),
+				apyTone: (apy !== null && apy < 0 ? 'danger' : 'success') as Tone,
+				price24h: formatPercent(change),
+				price24hTone: (change !== null && change < 0 ? 'danger' : 'success') as Tone,
+				price: priceUsdc !== null ? formatUsd(priceUsdc) : '—',
+				value: formatUsd(valueUsdc),
+				row,
+				canClaim: row.distributor !== null && (row.claimableNow ?? 0n) > 0n
+			};
+		})
 	);
 
 	// Sum claimable across rows. When ANY row's claimable is unknown
@@ -85,16 +101,147 @@
 			: ''
 	);
 
-	// TODO Phase 7 — LP positions come from native-dex/yield positions module.
-	const positions: LpPosition[] = [
-		{ id: 'lp-1', pair: ['USDt', 'RWT'], apy: '3.8% APY', apyTone: 'success', selected: true },
-		{ id: 'lp-2', pair: ['USDt', 'RWT'], apy: '1.7% APY', apyTone: 'danger' },
-		{ id: 'lp-3', pair: ['USDt', 'RWT'], apy: '3.8% APY', apyTone: 'success' },
-		{ id: 'lp-4', pair: ['USDt', 'RWT'], apy: '3.8% APY', apyTone: 'success' },
-		{ id: 'lp-5', pair: ['USDt', 'RWT'], apy: '3.8% APY', apyTone: 'success' }
-	];
+	// Phase 3 — LP positions come from `lpPortfolio` store (on-chain).
+	const lpRows = $derived(lpPortfolio.rows);
 
-	let selectedLp = $state(positions[0]?.id);
+	// Selection lives by base58 string so the value survives row re-orders
+	// (Svelte uses object identity for selection bindings; bigints in the
+	// HolderLpRow shape would otherwise force us to compare by reference).
+	let selectedLpId = $state<string | null>(null);
+	$effect(() => {
+		const ids = new Set(lpRows.map((r) => r.positionAddress.toBase58()));
+		if (selectedLpId === null || !ids.has(selectedLpId)) {
+			selectedLpId = lpRows[0]?.positionAddress.toBase58() ?? null;
+		}
+	});
+	const selectedLpRow = $derived<HolderLpRow | null>(
+		lpRows.find((r) => r.positionAddress.toBase58() === selectedLpId) ?? null
+	);
+
+	function lpRowApy(row: HolderLpRow): number | null {
+		return priceFeed.rows.get(row.poolAddress.toBase58())?.apy24h ?? null;
+	}
+
+	function hasClaimableFees(row: HolderLpRow): boolean {
+		return (
+			row.pool.cumulativeFeesPerShareA > row.position.feesClaimedPerShareA ||
+			row.pool.cumulativeFeesPerShareB > row.position.feesClaimedPerShareB
+		);
+	}
+
+	function startClaimFees(row: HolderLpRow) {
+		void lpClaims.start(row);
+	}
+
+	// ── Top-block totals ────────────────────────────────────────────────
+	const tokensTotalUsdc = $derived(
+		portfolio.rows.reduce((sum, row) => {
+			const tokenMeta = markets.snapshot?.tokens.find((t) => t.mint.equals(row.otMint));
+			const priceUsdc = tokenMeta?.priceUsdc ?? null;
+			if (priceUsdc === null) return sum;
+			const divisor = 10 ** row.metadata.decimals;
+			return sum + (Number(row.balance) / divisor) * priceUsdc;
+		}, 0)
+	);
+	const lpTotalUsdc = $derived(lpPortfolio.totalUsdc ?? 0);
+	const totalValueUsd = $derived(tokensTotalUsdc + lpTotalUsdc);
+
+	// ── Assets distribution buckets ────────────────────────────────────
+	// OT side: bucket by `markets.snapshot.tokens[*].category` (protocol /
+	// ownership / stock / unknown). LP side: single 'lp' bucket.
+	interface CategoryBucket {
+		key: string;
+		label: string;
+		usdc: number;
+		pct: number;
+		color: string;
+	}
+	const CATEGORY_COLORS: Record<string, string> = {
+		ownership: '#A56EFF',
+		lp: '#D844C6',
+		protocol: '#1FB7B7',
+		stock: '#FFB347',
+		unknown: '#7E7190'
+	};
+	const CATEGORY_LABELS: Record<string, string> = {
+		ownership: 'Ownership tokens',
+		lp: 'LP',
+		protocol: 'Protocol',
+		stock: 'Stock OT',
+		unknown: 'Other'
+	};
+	const categoryBuckets = $derived.by<CategoryBucket[]>(() => {
+		const sums = new Map<string, number>();
+		for (const row of portfolio.rows) {
+			const tokenMeta = markets.snapshot?.tokens.find((t) => t.mint.equals(row.otMint));
+			const priceUsdc = tokenMeta?.priceUsdc ?? null;
+			if (priceUsdc === null) continue;
+			const divisor = 10 ** row.metadata.decimals;
+			const value = (Number(row.balance) / divisor) * priceUsdc;
+			const key = tokenMeta?.category ?? 'unknown';
+			sums.set(key, (sums.get(key) ?? 0) + value);
+		}
+		if (lpTotalUsdc > 0) sums.set('lp', (sums.get('lp') ?? 0) + lpTotalUsdc);
+		const total = Array.from(sums.values()).reduce((a, b) => a + b, 0);
+		const out: CategoryBucket[] = [];
+		for (const [key, usdc] of sums) {
+			if (usdc <= 0) continue;
+			out.push({
+				key,
+				label: CATEGORY_LABELS[key] ?? key,
+				usdc,
+				pct: total > 0 ? (usdc / total) * 100 : 0,
+				color: CATEGORY_COLORS[key] ?? '#7E7190'
+			});
+		}
+		out.sort((a, b) => b.usdc - a.usdc);
+		return out;
+	});
+	const categoryCount = $derived(categoryBuckets.length);
+	const legendEntries = $derived(categoryBuckets);
+
+	// ── Portfolio APY (USDC-weighted average) ──────────────────────────
+	// Combines OT side (token mint × `apyForMint`) AND LP side (position's
+	// pool's `apy24h`). Weighted by USDC value. Skip rows where either USDC
+	// or APY is null. Returns null when denominator is 0.
+	const portfolioApy = $derived.by<number | null>(() => {
+		let weightedSum = 0;
+		let totalWeight = 0;
+		for (const row of portfolio.rows) {
+			const tokenMeta = markets.snapshot?.tokens.find((t) => t.mint.equals(row.otMint));
+			const priceUsdc = tokenMeta?.priceUsdc ?? null;
+			if (priceUsdc === null) continue;
+			const apy = priceFeed.apyForMint(row.otMint);
+			if (apy === null) continue;
+			const divisor = 10 ** row.metadata.decimals;
+			const value = (Number(row.balance) / divisor) * priceUsdc;
+			weightedSum += value * apy;
+			totalWeight += value;
+		}
+		for (const lpRow of lpRows) {
+			const value = lpRow.valuation.totalUsdc;
+			if (value === null) continue;
+			const apy = lpRowApy(lpRow);
+			if (apy === null) continue;
+			weightedSum += value * apy;
+			totalWeight += value;
+		}
+		if (totalWeight === 0) return null;
+		return weightedSum / totalWeight;
+	});
+	const portfolioApyDisplay = $derived(formatPercent(portfolioApy));
+	const dailyIncomeDisplay = $derived(
+		portfolioApy !== null ? formatUsd((totalValueUsd * portfolioApy) / 100 / 365) : '—'
+	);
+
+	// Backlog — portfolio-level 24h change requires a snapshot history
+	// series the SDK does not yet surface. Render '—' until then.
+	const change24hDisplay = '—';
+
+	// Backlog — earning rate display (RWT/sec) requires distributor
+	// emission_rate, which the SDK's holder-portfolio reader doesn't
+	// surface. Render '—' until then; do NOT compute snapshot deltas.
+	const earningRateDisplay = '—';
 
 	// ── Phase 7: Claim wiring ────────────────────────────────────────────
 	//
@@ -159,13 +306,23 @@
 	}
 
 	// Lifecycle — stores handle wallet/network re-fires on their own.
+	// `markets.start/stop` is NOT ref-counted, but SvelteKit page instances
+	// don't coexist (each route's onDestroy fires before the next route's
+	// onMount), so it's safe to bracket the lifetime per page. Same pattern
+	// the markets pages already use.
 	onMount(() => {
 		portfolio.start();
 		historyStore.start();
+		lpPortfolio.start();
+		markets.start();
+		priceFeed.start();
 	});
 	onDestroy(() => {
 		portfolio.stop();
 		historyStore.stop();
+		lpPortfolio.stop();
+		markets.stop();
+		priceFeed.stop();
 	});
 
 	/*
@@ -296,7 +453,7 @@
 										<path d="M2 14a10 10 0 0 1 20 0" />
 										<circle cx="12" cy="14" r="1.5" fill="currentColor" />
 									</svg>
-									<span>+0.00000026 RWT/sec</span>
+									<span>{earningRateDisplay}</span>
 								</div>
 							</div>
 
@@ -356,7 +513,7 @@
 						<div class="claim-section claim-bottom">
 							<div class="rewards-block">
 								<div class="kpi-label">Total Value</div>
-								<div class="kpi-value">$200,995.85</div>
+								<div class="kpi-value">{formatUsd(totalValueUsd)}</div>
 							</div>
 
 							<div class="dist-section">
@@ -364,43 +521,49 @@
 									<span class="dist-title">Assets distribution</span>
 									<span class="dist-count">
 										<span class="dist-count-dot" aria-hidden="true"></span>
-										<span>5 categories</span>
+										<span>{categoryCount} categories</span>
 									</span>
 								</div>
 
+								<!-- The chart curve is a presentational mock until the
+								     backend exposes a portfolio snapshot history series.
+								     The legend below is real-data driven. -->
 								<AssetsDistributionChart />
 
 								<div class="dist-legend">
-									<div class="legend-row">
-										<span class="legend-marker legend-purple"></span>
-										<span class="legend-label">Ownership tokens</span>
-										<span class="legend-value">$404.45</span>
-										<span class="legend-pill legend-pill-purple">40.61%</span>
-									</div>
-									<div class="legend-row">
-										<span class="legend-marker legend-pink"></span>
-										<span class="legend-label">LP</span>
-										<span class="legend-value">$379.69</span>
-										<span class="legend-pill legend-pill-pink">21.26%</span>
-									</div>
+									{#each legendEntries as entry (entry.key)}
+										<div class="legend-row">
+											<span
+												class="legend-marker"
+												style:color={entry.color}
+											></span>
+											<span class="legend-label">{entry.label}</span>
+											<span class="legend-value">{formatUsd(entry.usdc)}</span>
+											<span
+												class="legend-pill"
+												style:background-color="{entry.color}33"
+												style:color={entry.color}
+											>{entry.pct.toFixed(2)}%</span>
+										</div>
+									{/each}
 								</div>
 							</div>
 
 							<div class="stats-row">
 								<div class="stat-cell">
 									<span class="stat-label">Portfolio APY</span>
-									<span class="stat-value stat-value-positive">1.55%</span>
+									<span class="stat-value stat-value-positive">{portfolioApyDisplay}</span>
 								</div>
 								<div class="stat-cell">
 									<span class="stat-label">Daily Income</span>
-									<span class="stat-value stat-value-positive">$0.02</span>
+									<span class="stat-value stat-value-positive">{dailyIncomeDisplay}</span>
 								</div>
 								<div class="stat-cell">
+									<!-- Backlog — portfolio-level 24h change requires a
+									     snapshot history series the SDK does not yet
+									     surface. -->
 									<span class="stat-label">24h change</span>
-									<span class="stat-value stat-value-positive">
-										<ArrowUpSmall size={14} variant="filled" />
-										5.02%
-									</span>
+									<span class="stat-value stat-value-positive">{change24hDisplay}</span>
 								</div>
 							</div>
 						</div>
@@ -440,8 +603,7 @@
 									<span class="last-updated">Updated {lastUpdatedDisplay}</span>
 								{/if}
 								{#if isConnected && portfolio.isReady && tokens.length > 0}
-									<!-- TODO Phase 7 — section total comes from price feed. -->
-									<span class="section-total">~ —</span>
+									<span class="section-total">~ {formatUsd(tokensTotalUsdc)}</span>
 								{/if}
 							</div>
 						</header>
@@ -563,16 +725,23 @@
 						<header class="section-head">
 							<div class="section-head-left">
 								<h2>Liquidity positions</h2>
-								{#if isConnected}
-									<span class="count-badge count-badge-purple">22</span>
+								{#if isConnected && lpPortfolio.isReady}
+									<span class="count-badge count-badge-purple">{lpRows.length}</span>
 								{/if}
 							</div>
-							{#if isConnected}
-								<span class="section-total">~ $211.71</span>
+							{#if isConnected && lpPortfolio.isReady && lpRows.length > 0}
+								<span class="section-total"
+									>~ {lpPortfolio.totalUsdc !== null ? formatUsd(lpPortfolio.totalUsdc) : '—'}</span
+								>
 							{/if}
 						</header>
 
-						<div class="section-body" class:section-body-split={isConnected}>
+						<div
+							class="section-body"
+							class:section-body-split={isConnected &&
+								lpPortfolio.isReady &&
+								lpRows.length > 0}
+						>
 							{#if !isConnected}
 								<img
 									class="empty-illu"
@@ -584,32 +753,73 @@
 								/>
 								<p class="empty-title">You do not currently hold any tokens</p>
 								<p class="empty-sub">Start adding tokens</p>
+							{:else if lpPortfolio.isLoading && !lpPortfolio.snapshot}
+								<p class="empty-title">Loading…</p>
+								<p class="empty-sub">Reading on-chain LP positions</p>
+							{:else if lpPortfolio.hasError}
+								<p class="empty-title">Could not load LP positions</p>
+								<p class="empty-sub">{lpPortfolio.error}</p>
+								<button
+									type="button"
+									class="retry-btn"
+									onclick={() => lpPortfolio.refresh()}>Retry</button
+								>
+							{:else if lpRows.length === 0}
+								<img
+									class="empty-illu"
+									src="/images/portfolio/lp-empty.svg"
+									alt=""
+									width="96"
+									height="69"
+									aria-hidden="true"
+								/>
+								<p class="empty-title">No LP positions yet</p>
+								<p class="empty-sub">Provide liquidity to start earning fees</p>
 							{:else}
 								<!-- LEFT pane: positions list -->
 								<div class="lp-list">
-									{#each positions as p (p.id)}
+									{#each lpRows as row (row.positionAddress.toBase58())}
+										{@const rowKey = row.positionAddress.toBase58()}
+										{@const apy = lpRowApy(row)}
+										{@const apyTone = (apy !== null && apy < 0
+											? 'danger'
+											: 'success') as Tone}
 										<button
 											type="button"
 											class="lp-item"
-											class:lp-item-selected={selectedLp === p.id}
-											onclick={() => (selectedLp = p.id)}
+											class:lp-item-selected={selectedLpId === rowKey}
+											onclick={() => (selectedLpId = rowKey)}
 										>
+											<!-- Letter-circle fallback for both sides — no
+											     symbol→logo helper exists in-app yet, and the
+											     hardcoded USDt/RWT icons would be wrong for
+											     non-RWT pairs. -->
 											<span class="lp-logos">
-												<span class="lp-logo" style:background-color="#009393">
-													<img src="/images/tokens/usdt-t.svg" alt="" aria-hidden="true" loading="lazy" />
+												<span class="lp-logo lp-logo-fallback">
+													<span class="token-letter"
+														>{row.symbolA.slice(0, 1).toUpperCase()}</span
+													>
 												</span>
-												<span class="lp-logo lp-logo-overlap" style:background-color="#9E60F6">
-													<img src="/images/tokens/rwt-mark.svg" alt="" aria-hidden="true" loading="lazy" />
+												<span class="lp-logo lp-logo-overlap lp-logo-fallback">
+													<span class="token-letter"
+														>{row.symbolB.slice(0, 1).toUpperCase()}</span
+													>
 												</span>
 											</span>
-											<span class="lp-pair">{p.pair[0]} / {p.pair[1]}</span>
-											<span class="apy-pill apy-pill-{p.apyTone} lp-apy">
-												{#if p.apyTone === 'success'}
-													<span class="caret-icon"><ArrowUpSmall size={12} variant="filled" /></span>
-												{:else}
-													<span class="caret-icon caret-down"><ArrowUpSmall size={12} variant="filled" /></span>
+											<span class="lp-pair">{row.symbolA} / {row.symbolB}</span>
+											<span class="apy-pill apy-pill-{apyTone} lp-apy">
+												{#if apy !== null}
+													{#if apyTone === 'success'}
+														<span class="caret-icon"
+															><ArrowUpSmall size={12} variant="filled" /></span
+														>
+													{:else}
+														<span class="caret-icon caret-down"
+															><ArrowUpSmall size={12} variant="filled" /></span
+														>
+													{/if}
 												{/if}
-												{p.apy}
+												{formatPercent(apy)}
 											</span>
 										</button>
 									{/each}
@@ -619,15 +829,20 @@
 								<!-- RIGHT pane: detail -->
 								<div class="lp-detail">
 									<header class="lp-detail-head">
-										<h3>USDt / RWT</h3>
+										<h3>
+											{selectedLpRow
+												? `${selectedLpRow.symbolA} / ${selectedLpRow.symbolB}`
+												: '—'}
+										</h3>
 									</header>
 									<hr class="lp-detail-divider" aria-hidden="true" />
 
 									<div class="lp-donut" aria-hidden="true">
-										<!-- 53% RWT (purple) starts at 12 o'clock going CW; the
-										     remaining 47% USDt (teal) wraps the left half. -->
+										<!-- TickWheel value = ratioA (USDC share of side A,
+										     0..1). Colours are the protocol identity (purple A
+										     / teal B); per-pair theming is a backlog item. -->
 										<TickWheel
-											value={0.53}
+											value={selectedLpRow?.valuation.ratioA ?? 0}
 											colorA="#A56EFF"
 											colorB="#1FB7B7"
 											size={130}
@@ -637,34 +852,101 @@
 										/>
 										<div class="lp-donut-center">
 											<span class="lp-donut-label">Your Position</span>
-											<span class="lp-donut-value">$211.71</span>
+											<span class="lp-donut-value"
+												>{formatUsd(selectedLpRow?.valuation.totalUsdc)}</span
+											>
 										</div>
 									</div>
 
 									<hr class="lp-detail-divider" aria-hidden="true" />
 
-									<div class="lp-detail-rows">
-										<div class="lp-detail-row">
-											<span class="lp-detail-marker lp-marker-purple"></span>
-											<span class="lp-detail-symbol">RWT</span>
-											<span class="lp-detail-amount">
-												<span class="lp-detail-qty">10.00K</span>
-												<span class="lp-detail-usd">$11.4k</span>
-											</span>
-											<span class="lp-detail-pill lp-pill-purple">53%</span>
+									{#if selectedLpRow}
+										<div class="lp-detail-rows">
+											<div class="lp-detail-row">
+												<span class="lp-detail-marker lp-marker-purple"></span>
+												<span class="lp-detail-symbol">{selectedLpRow.symbolA}</span>
+												<span class="lp-detail-amount">
+													<span class="lp-detail-qty"
+														>{formatTokenAmount(
+															selectedLpRow.valuation.amountA,
+															selectedLpRow.decimalsA,
+															2
+														)}</span
+													>
+													<span class="lp-detail-usd"
+														>{formatUsd(selectedLpRow.valuation.usdcA)}</span
+													>
+												</span>
+												<span class="lp-detail-pill lp-pill-purple"
+													>{selectedLpRow.valuation.pctA !== null
+														? `${(selectedLpRow.valuation.pctA * 100).toFixed(0)}%`
+														: '—'}</span
+												>
+											</div>
+											<div class="lp-detail-row">
+												<span class="lp-detail-marker lp-marker-teal"></span>
+												<span class="lp-detail-symbol">{selectedLpRow.symbolB}</span>
+												<span class="lp-detail-amount">
+													<span class="lp-detail-qty"
+														>{formatTokenAmount(
+															selectedLpRow.valuation.amountB,
+															selectedLpRow.decimalsB,
+															2
+														)}</span
+													>
+													<span class="lp-detail-usd"
+														>{formatUsd(selectedLpRow.valuation.usdcB)}</span
+													>
+												</span>
+												<span class="lp-detail-pill lp-pill-teal"
+													>{selectedLpRow.valuation.pctB !== null
+														? `${(selectedLpRow.valuation.pctB * 100).toFixed(0)}%`
+														: '—'}</span
+												>
+											</div>
 										</div>
-										<div class="lp-detail-row">
-											<span class="lp-detail-marker lp-marker-teal"></span>
-											<span class="lp-detail-symbol">USDt</span>
-											<span class="lp-detail-amount">
-												<span class="lp-detail-qty">10.00K</span>
-												<span class="lp-detail-usd">$11.4k</span>
-											</span>
-											<span class="lp-detail-pill lp-pill-teal">47%</span>
-										</div>
-									</div>
+									{/if}
 
-									<button type="button" class="lp-manage-btn">Manage</button>
+									<div class="lp-detail-actions">
+										<button type="button" class="lp-manage-btn">Manage</button>
+										{#if selectedLpRow && hasClaimableFees(selectedLpRow)}
+											{@const feeAttempt =
+												lpClaims.attempts.get(selectedLpRow.positionAddress.toBase58()) ??
+												null}
+											<button
+												type="button"
+												class="lp-claim-fees-btn lp-claim-fees-btn-{feeAttempt?.phase ??
+													'idle'}"
+												disabled={feeAttempt !== null &&
+													feeAttempt.phase !== 'success' &&
+													feeAttempt.phase !== 'error'}
+												onclick={() => startClaimFees(selectedLpRow)}
+											>
+												{#if feeAttempt === null}
+													<Check size={14} />
+													<span>Claim Fees</span>
+												{:else if feeAttempt.phase === 'preparing'}
+													<span class="btn-spinner" aria-hidden="true"></span>
+													<span>Preparing…</span>
+												{:else if feeAttempt.phase === 'awaiting-signature'}
+													<span class="btn-spinner" aria-hidden="true"></span>
+													<span>Sign in wallet…</span>
+												{:else if feeAttempt.phase === 'broadcasting'}
+													<span class="btn-spinner" aria-hidden="true"></span>
+													<span>Broadcasting…</span>
+												{:else if feeAttempt.phase === 'confirming'}
+													<span class="btn-spinner" aria-hidden="true"></span>
+													<span>Confirming…</span>
+												{:else if feeAttempt.phase === 'success'}
+													<Check size={14} />
+													<span>Claimed!</span>
+												{:else if feeAttempt.phase === 'error'}
+													<Xmark size={14} />
+													<span>Failed</span>
+												{/if}
+											</button>
+										{/if}
+									</div>
 								</div>
 							{/if}
 						</div>
@@ -1540,11 +1822,6 @@
 		border-radius: 10px;
 		overflow: hidden;
 	}
-	.lp-logo img {
-		width: 60%;
-		height: 60%;
-		object-fit: contain;
-	}
 	.lp-logo-overlap {
 		margin-left: -8px;
 		border: 2px solid var(--color-surface-inset);
@@ -1702,7 +1979,6 @@
 		align-items: center;
 		justify-content: center;
 		height: 48px;
-		margin-top: var(--space-2);
 		background-color: var(--color-white-900);
 		color: var(--color-text-inverse);
 		border: 0;
@@ -1713,6 +1989,65 @@
 		letter-spacing: var(--tracking-tight);
 		text-transform: uppercase;
 		cursor: pointer;
+		flex: 1;
+	}
+
+	/* LP detail action row — Manage + optional Claim Fees, side by side. */
+	.lp-detail-actions {
+		display: flex;
+		flex-direction: row;
+		gap: var(--space-2);
+		margin-top: var(--space-2);
+	}
+	.lp-claim-fees-btn {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		gap: var(--space-2);
+		flex: 1;
+		height: 48px;
+		background: transparent;
+		border: 2px solid var(--color-green-900);
+		border-radius: var(--radius-lg);
+		font-family: var(--font-sans);
+		font-size: var(--text-base);
+		font-weight: var(--font-weight-bold);
+		letter-spacing: var(--tracking-tight);
+		text-transform: uppercase;
+		color: var(--color-text);
+		cursor: pointer;
+		transition: background-color var(--motion-base) var(--ease-out);
+	}
+	.lp-claim-fees-btn :global(svg) {
+		color: var(--color-green-900);
+	}
+	.lp-claim-fees-btn:hover:not(:disabled) {
+		background-color: var(--color-success-bg-soft);
+	}
+	.lp-claim-fees-btn:disabled {
+		cursor: not-allowed;
+		opacity: 0.7;
+	}
+	.lp-claim-fees-btn-error {
+		border-color: var(--color-danger);
+	}
+	.lp-claim-fees-btn-error :global(svg) {
+		color: var(--color-danger);
+	}
+	.lp-claim-fees-btn-success {
+		background-color: var(--color-success-bg-medium);
+	}
+
+	/* Letter-circle fallback for LP item logos when there is no
+	 * symbol→asset-logo helper available. Mirrors `.token-logo` shape. */
+	.lp-logo-fallback {
+		background-color: var(--color-token-logo-fallback-bg);
+	}
+	.lp-logo-fallback .token-letter {
+		font-family: var(--font-body);
+		font-size: 12px;
+		font-weight: var(--font-weight-bold);
+		color: white;
 	}
 
 	/* ---------- Mobile ---------- */
@@ -1761,6 +2096,9 @@
 		}
 		.stats-row {
 			grid-template-columns: 1fr 1fr;
+		}
+		.lp-detail-actions {
+			flex-direction: column;
 		}
 	}
 </style>
