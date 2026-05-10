@@ -83,6 +83,17 @@ export const network = {
 	get rpcSubscriptionsAvailable(): boolean {
 		return Boolean(ENDPOINTS[current].wsRpcUrl);
 	},
+	/**
+	 * Whether the backend deployed `/markets/tokens/<mint>/holders` for the
+	 * active cluster. `false` on Testnet (the validator's indexer hasn't
+	 * shipped the holders projection yet) — callers MUST gate any
+	 * `holdersStore.track()` registration on this flag, otherwise the
+	 * browser logs a 404 to the network panel on first poll. Defaults
+	 * `true` for any cluster that doesn't explicitly opt out.
+	 */
+	get holdersBackendAvailable(): boolean {
+		return ENDPOINTS[current].holdersBackendAvailable !== false;
+	},
 	setNetwork(id: NetworkId) {
 		// Defensive guard: reject ids outside the known set. Callers cast at
 		// the boundary (e.g. URL params, user input) so a bogus value can

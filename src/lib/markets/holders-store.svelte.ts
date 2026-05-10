@@ -237,6 +237,12 @@ function stop(): void {
 }
 
 function track(mint: PublicKey): void {
+	// Hard gate: skip entirely on clusters that don't expose the holders
+	// endpoint. The browser logs ANY non-2xx response to the network
+	// panel before our `MarketsFetchError` catch can run — so even
+	// silently-handled 404s leave a red entry in DevTools. Refusing to
+	// register the mint is the only way to keep the console clean.
+	if (!network.holdersBackendAvailable) return;
 	const key = mint.toBase58();
 	if (tracked.has(key)) return;
 	tracked.add(key);

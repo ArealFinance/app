@@ -83,6 +83,17 @@ export interface NetworkEndpoint {
 	 * deployer doesn't hold the canonical keypair.
 	 */
 	rwtMint?: PublicKey;
+	/**
+	 * Whether the backend exposes `/markets/tokens/<mint>/holders` for this
+	 * cluster. The Areal Testnet validator's indexer doesn't ship this
+	 * projection yet, so the endpoint returns 404 — and even though we
+	 * catch the error in `holders-store`, the browser still logs the 404
+	 * to the network panel before JS sees it. Setting this `false` makes
+	 * the store skip the request entirely. Devnet/Mainnet leave it
+	 * `true` (default) so the SDK call path works as soon as the backend
+	 * surface is deployed there.
+	 */
+	holdersBackendAvailable?: boolean;
 }
 
 export const NETWORK_IDS: NetworkId[] = ['localnet', 'devnet', 'mainnet'];
@@ -127,7 +138,12 @@ export const ENDPOINTS: Record<NetworkId, NetworkEndpoint> = {
 		// Drop both when the validator is rebuilt with the SDK's
 		// canonical R20 pins.
 		usdcMint: new PublicKey('F9NVj8dFsqxbCfytfmrEWDjdDhmpV1YrjRuxiusGr9Ys'),
-		rwtMint: new PublicKey('3pBtHBiBwh4agqghTYuDQnZV1po5YahbaBGywtiZooRr')
+		rwtMint: new PublicKey('3pBtHBiBwh4agqghTYuDQnZV1po5YahbaBGywtiZooRr'),
+		// Testnet indexer hasn't shipped the holders projection yet — skip
+		// the call entirely so the browser doesn't log a 404 to the network
+		// panel. Drop this flag (or flip to true) once the backend deploys
+		// `/markets/tokens/<mint>/holders` against the Testnet validator.
+		holdersBackendAvailable: false
 	},
 	devnet: {
 		id: 'devnet',

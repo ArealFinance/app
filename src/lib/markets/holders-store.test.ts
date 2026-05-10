@@ -17,7 +17,8 @@ const MINT_B = new PublicKey('11111111111111111111111111111113');
 
 const mocks = vi.hoisted(() => ({
 	getTokenHolders: vi.fn(),
-	currentNetwork: 'devnet' as 'devnet' | 'mainnet' | 'localnet'
+	currentNetwork: 'devnet' as 'devnet' | 'mainnet' | 'localnet',
+	holdersBackendAvailable: true
 }));
 
 class FakeMarketsFetchError extends Error {
@@ -48,6 +49,13 @@ vi.mock('$lib/network/network.svelte', () => ({
 		// `holders-store` actually reads.
 		get endpoint() {
 			return { backendApiUrl: 'http://example' };
+		},
+		// Tests assume the backend exposes `/markets/tokens/<mint>/holders`.
+		// `holders-store.track()` reads this flag and short-circuits when
+		// false — we override per-test below for the "feature gated off"
+		// case.
+		get holdersBackendAvailable() {
+			return mocks.holdersBackendAvailable;
 		}
 	}
 }));
@@ -80,6 +88,7 @@ describe('holdersStore', () => {
 		vi.useFakeTimers();
 		mocks.getTokenHolders.mockReset();
 		mocks.currentNetwork = 'devnet';
+		mocks.holdersBackendAvailable = true;
 
 		const mod = await import('./holders-store.svelte');
 		holdersStore = mod.holdersStore;
@@ -155,6 +164,19 @@ describe('holdersStore', () => {
 		// Last-good wins: count retained, status still 'ready' (we have a row).
 		expect(holdersStore.countForMint(MINT_A)).toBe(500);
 		expect(holdersStore.status).toBe('ready');
+	});
+
+	it('track() is a no-op when network.holdersBackendAvailable is false', async () => {
+		// Testnet (localnet) doesn't expose `/markets/tokens/<mint>/holders`.
+		// We must NOT issue a request — even a silently-handled 404 leaves
+		// a red entry in the browser's network panel.
+		mocks.holdersBackendAvailable = false;
+		holdersStore.track(MINT_A);
+		await holdersStore.refresh();
+
+		expect(mocks.getTokenHolders).not.toHaveBeenCalled();
+		expect(holdersStore.countForMint(MINT_A)).toBeNull();
+		expect(holdersStore.status).toBe('idle');
 	});
 
 	it('404 marks mint unavailable, status stays ready, future refreshes skip it', async () => {
