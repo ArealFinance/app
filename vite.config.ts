@@ -5,39 +5,182 @@
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { sveltekit } from '@sveltejs/kit/vite';
-import { defineConfig } from 'vite';
+import { defineConfig, type PluginOption, type ViteDevServer } from 'vite';
 import { nodePolyfills } from 'vite-plugin-node-polyfills';
 import { HttpsProxyAgent } from 'https-proxy-agent';
+import https from 'https';
+import http from 'http';
+import { Readable } from 'stream';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const TOPLEVEL_BUFFER = path.resolve(__dirname, 'node_modules/buffer');
 
 /*
- * Optional outbound HTTPS proxy for the Vite dev proxy.
+ * Outbound HTTPS proxy for the Vite dev proxy. Auto-picked from `HTTPS_PROXY`
+ * / `https_proxy` shell vars (Node's `https` module ignores them by default,
+ * unlike curl, so we wire the agent ourselves).
  *
- * OPT-IN by `VITE_USE_HTTPS_PROXY=1`. We deliberately do NOT auto-pick up
- * `HTTPS_PROXY` / `https_proxy` from the shell because:
- *
- *   1. Node's built-in `https` module ignores those vars (unlike curl), so
- *      direct Vite-proxy → upstream connections work fine on machines where
- *      `curl` happens to route through Clash / Sing-Box / similar.
- *   2. Routing the dev proxy through a local Clash/Sing-Box endpoint
- *      sporadically fails the TLS handshake to Cloudflare (observed
- *      ~1-in-3 with `SSL_ERROR_SYSCALL` after 5s). Each failure surfaces
- *      as a `502 Bad Gateway` in the browser even though the upstream is
- *      healthy.
- *
- * Set `VITE_USE_HTTPS_PROXY=1` only on machines that genuinely require
- * the local proxy for outbound TLS (corporate firewalls, etc.). The
- * proxy URL is then read from `HTTPS_PROXY` / `https_proxy` as before.
+ * Empirically required on dev machines that run Clash / Sing-Box in TUN
+ * mode: those tools transparently intercept outbound TLS at the kernel
+ * level and break the handshake to Cloudflare with
+ * `decryption failed or bad record mac`. Routing through the explicit HTTP
+ * proxy port (e.g. `127.0.0.1:7897`) bypasses the TUN intercept and
+ * succeeds most of the time. Set `VITE_NO_HTTPS_PROXY=1` to opt out on
+ * machines where the proxy makes things worse than a direct connection.
  */
-const httpsProxyOptIn = process.env.VITE_USE_HTTPS_PROXY === '1';
+const httpsProxyOptOut = process.env.VITE_NO_HTTPS_PROXY === '1';
 const httpsProxyEnv = process.env.HTTPS_PROXY ?? process.env.https_proxy ?? null;
 const httpsProxyAgent =
-	httpsProxyOptIn && httpsProxyEnv ? new HttpsProxyAgent(httpsProxyEnv) : undefined;
+	!httpsProxyOptOut && httpsProxyEnv ? new HttpsProxyAgent(httpsProxyEnv) : undefined;
+
+/*
+ * Custom dev proxy with retry-on-TLS-error.
+ *
+ * Vite's built-in `server.proxy` (http-proxy under the hood) doesn't survive
+ * the Clash / Sing-Box TLS-flake pattern: the upstream connection sometimes
+ * fails the handshake (`Client network socket disconnected before secure
+ * TLS connection was established`) and Vite's internal `error` listener
+ * writes `502 Bad Gateway` to the response *before* any user-installed
+ * listener can react. `removeAllListeners('error')` from `configure()` is
+ * also useless because Vite re-attaches its listener after configure runs.
+ *
+ * This middleware bypasses http-proxy entirely. It uses Node's built-in
+ * `https` (with our `httpsProxyAgent` when configured) to issue the
+ * upstream request, retries the request up to MAX_RETRIES on a TLS-handshake
+ * error, and only writes a real 502 to the browser if every attempt fails.
+ */
+const UPSTREAM_HOST = 'api.areal.finance';
+const UPSTREAM_PROTO = 'https:';
+const MAX_RETRIES = 5;
+/** Paths that should be proxied to the Areal backend. */
+const PROXY_PATHS = ['/auth/', '/portfolio/', '/markets/', '/socket.io/'];
+
+function shouldProxy(req: http.IncomingMessage): boolean {
+	const url = req.url ?? '';
+	if (!PROXY_PATHS.some((p) => url === p.slice(0, -1) || url.startsWith(p))) return false;
+	// `/markets` and `/portfolio` collide with SvelteKit page routes. When the
+	// browser navigates (Accept: text/html), let SvelteKit serve the page;
+	// fetch/XHR requests carry application/json and fall through to us.
+	const accept = req.headers.accept ?? '';
+	if (accept.includes('text/html')) return false;
+	// Socket.IO upgrades happen on the underlying server.upgrade — this
+	// middleware only sees plain HTTP polls, which we don't proxy because
+	// the realtime gateway path is non-critical for dev.
+	return true;
+}
+
+function readRequestBody(req: http.IncomingMessage): Promise<Buffer | null> {
+	if (req.method === 'GET' || req.method === 'HEAD') return Promise.resolve(null);
+	return new Promise((resolve, reject) => {
+		const chunks: Uint8Array[] = [];
+		req.on('data', (c: Uint8Array) => chunks.push(c));
+		req.on('end', () => resolve(Buffer.concat(chunks)));
+		req.on('error', reject);
+	});
+}
+
+function isRetryableError(err: NodeJS.ErrnoException): boolean {
+	const m = err.message ?? '';
+	return (
+		m.includes('TLS') ||
+		m.includes('socket disconnected') ||
+		m.includes('ECONNRESET') ||
+		m.includes('decryption failed') ||
+		err.code === 'ECONNRESET' ||
+		err.code === 'EPIPE' ||
+		err.code === 'ETIMEDOUT'
+	);
+}
+
+async function proxyOnce(
+	req: http.IncomingMessage,
+	res: http.ServerResponse,
+	body: Buffer | null
+): Promise<void> {
+	return new Promise((resolve, reject) => {
+		const opts: https.RequestOptions = {
+			protocol: UPSTREAM_PROTO,
+			hostname: UPSTREAM_HOST,
+			path: req.url,
+			method: req.method,
+			headers: {
+				...req.headers,
+				host: UPSTREAM_HOST
+			},
+			agent: httpsProxyAgent ?? undefined
+		};
+		// Node strips `connection: keep-alive` when the agent is reused; nothing
+		// to do here.
+		const upstream = https.request(opts, (upRes) => {
+			res.writeHead(upRes.statusCode ?? 502, upRes.headers);
+			upRes.pipe(res);
+			upRes.on('end', () => resolve());
+			upRes.on('error', reject);
+		});
+		upstream.on('error', reject);
+		if (body) Readable.from(body).pipe(upstream);
+		else upstream.end();
+	});
+}
+
+async function handleProxy(req: http.IncomingMessage, res: http.ServerResponse): Promise<void> {
+	const body = await readRequestBody(req);
+	let lastErr: NodeJS.ErrnoException | null = null;
+	for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+		try {
+			await proxyOnce(req, res, body);
+			return;
+		} catch (err) {
+			const e = err as NodeJS.ErrnoException;
+			lastErr = e;
+			if (res.headersSent) {
+				// Stream started — can't retry, the client already got bytes.
+				console.warn(`[dev-proxy] mid-response error on ${req.url}: ${e.message}`);
+				try {
+					res.destroy();
+				} catch {
+					/* noop */
+				}
+				return;
+			}
+			if (!isRetryableError(e) || attempt === MAX_RETRIES) break;
+			console.warn(
+				`[dev-proxy] retry ${attempt}/${MAX_RETRIES} ${req.url}: ${e.message}`
+			);
+			await new Promise((r) => setTimeout(r, 100 * attempt));
+		}
+	}
+	if (!res.headersSent) {
+		res.writeHead(502, { 'content-type': 'text/plain' });
+		res.end(`Bad Gateway: ${lastErr?.message ?? 'unknown'}`);
+	}
+}
+
+function arealDevProxy(): PluginOption {
+	return {
+		name: 'areal-dev-proxy',
+		configureServer(server: ViteDevServer) {
+			server.middlewares.use((req, res, next) => {
+				// Vite types `req` as Connect.IncomingMessage which is structurally
+				// a subset of http.IncomingMessage at runtime but missing several
+				// properties in its declared type. Cast to the runtime shape.
+				const reqHttp = req as unknown as http.IncomingMessage;
+				if (!shouldProxy(reqHttp)) return next();
+				handleProxy(reqHttp, res).catch((err) => {
+					console.error('[dev-proxy] handler crashed', err);
+					if (!res.headersSent) {
+						res.writeHead(500, { 'content-type': 'text/plain' });
+						res.end('Internal Proxy Error');
+					}
+				});
+			});
+		}
+	};
+}
 
 export default defineConfig({
 	plugins: [
+		arealDevProxy(),
 		sveltekit(),
 		nodePolyfills({
 			include: ['buffer', 'crypto', 'stream', 'util', 'process'],
@@ -95,58 +238,6 @@ export default defineConfig({
 		dedupe: ['@solana/web3.js', 'buffer']
 		// `buffer` override is wired through `nodePolyfills.overrides` above —
 		// see comment there for the v5 → v6 BigInt-method gap.
-	},
-	/*
-	 * Dev proxy — forwards Areal backend paths from `localhost:5173` to the
-	 * production API at `api.areal.finance`. Without this, `/auth/login` and
-	 * friends hit the absolute https URL and are blocked by the Cloudflare
-	 * Transform Rule that pins `Access-Control-Allow-Origin` to the deployed
-	 * hostnames (`app.areal.finance`, `panel.areal.finance`, etc.) — local
-	 * dev origins are never in that allowlist, so the browser CORS-blocks.
-	 *
-	 * `endpoints.ts` flips `backendApiUrl` / `realtimeWsUrl` to the current
-	 * dev origin in `import.meta.env.DEV`, so app code fetches to the dev
-	 * server, which proxies upstream as the same origin (CORS off the
-	 * picture entirely). `ws: true` enables Socket.IO WebSocket upgrade.
-	 *
-	 * `/markets` and `/portfolio` collide with SvelteKit page routes (the
-	 * pages live at /markets and /portfolio). The `bypass` function returns
-	 * the original URL untouched when the browser is navigating (Accept:
-	 * text/html), so SvelteKit serves the page; fetch/XHR requests (which
-	 * carry Accept: application/json) fall through to the proxy.
-	 */
-	server: {
-		proxy: {
-			'/auth': {
-				target: 'https://api.areal.finance',
-				changeOrigin: true,
-				secure: true,
-				agent: httpsProxyAgent
-			},
-			'/portfolio': {
-				target: 'https://api.areal.finance',
-				changeOrigin: true,
-				secure: true,
-				agent: httpsProxyAgent,
-				bypass: (req) =>
-					req.headers.accept?.includes('text/html') ? (req.url ?? false) : undefined
-			},
-			'/markets': {
-				target: 'https://api.areal.finance',
-				changeOrigin: true,
-				secure: true,
-				agent: httpsProxyAgent,
-				bypass: (req) =>
-					req.headers.accept?.includes('text/html') ? (req.url ?? false) : undefined
-			},
-			'/socket.io': {
-				target: 'https://api.areal.finance',
-				changeOrigin: true,
-				secure: true,
-				agent: httpsProxyAgent,
-				ws: true
-			}
-		}
 	},
 	// @solana/web3.js ships raw TypeScript that some bundler paths can't
 	// transpile cleanly. The SDK and arlex-client both rely on the
