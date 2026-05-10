@@ -97,15 +97,24 @@ export const ENDPOINTS: Record<NetworkId, NetworkEndpoint> = {
 		backendApiUrl: AREAL_BACKEND_URL,
 		realtimeWsUrl: AREAL_REALTIME_WS_URL,
 		programIds: PROGRAM_IDS,
-		usdcMint: USDC_MINTS.localnet,
-		// Bootstrap-init.ts on the Areal-hosted Testnet validator created the
-		// RWT mint at this address (random keypair generated at runtime — the
-		// deployer doesn't hold the canonical R20 keypair). Without this
-		// override the SDK looks up `RWT_MINTS.localnet` (canonical
-		// 6YRfYtkZmq...) which doesn't exist on chain → empty Total Supply,
-		// no price, no NAV. Drop this override once we either (a) recover
-		// the canonical R20 keypair and re-bootstrap, or (b) rebuild the
-		// contracts on the validator with a new R20-pinned mint.
+		// Bootstrap-init.ts on the Areal-hosted Testnet validator created
+		// fresh test mints under the deployer's keypair. After Path B
+		// (R20-redeploy of contracts pinned to these mints, see
+		// `scripts/migrate-mints.sh` run on 2026-05-10), the on-chain
+		// programs accept these as the canonical RWT/USDC pair. The SDK's
+		// default `RWT_MINTS.localnet` / `USDC_MINTS.localnet` point at
+		// the original R20 placeholders, so the markets-snapshot reads
+		// would land on empty accounts and every price / TVL / market
+		// cap would surface as `—`. We set:
+		//   - `usdcMint` to the existing test USDC (replaces the
+		//     `USDC_MINTS.localnet` lookup wherever the markets layer
+		//     consumes `network.endpoint.usdcMint`).
+		//   - `rwtMint` as the optional override threaded through to
+		//     the SDK snapshot opts (no equivalent default field on
+		//     `NetworkEndpoint`).
+		// Drop both when the validator is rebuilt with the SDK's
+		// canonical R20 pins.
+		usdcMint: new PublicKey('F9NVj8dFsqxbCfytfmrEWDjdDhmpV1YrjRuxiusGr9Ys'),
 		rwtMint: new PublicKey('3pBtHBiBwh4agqghTYuDQnZV1po5YahbaBGywtiZooRr')
 	},
 	devnet: {

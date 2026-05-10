@@ -198,6 +198,7 @@ async function doFetch(): Promise<void> {
 	const conn = network.connection;
 	const programIds = network.endpoint.programIds;
 	const rwtMintOverride = network.endpoint.rwtMint;
+	const usdcMintOverride = network.endpoint.usdcMint;
 
 	try {
 		const snap = await getMarketsSnapshot(conn, toCluster(networkId), {
@@ -205,11 +206,13 @@ async function doFetch(): Promise<void> {
 			ownershipTokenProgramId: programIds.ownershipToken,
 			rwtEngineProgramId: programIds.rwtEngine,
 			includeNav: true,
-			// Per-cluster RWT mint override (see `endpoints.ts` `rwtMint`).
-			// Undefined for devnet/mainnet → SDK falls back to its canonical
-			// `RWT_MINTS[cluster]`. Set on Testnet so the snapshot reads our
-			// bootstrap-init.ts mint instead of the unfunded R20 placeholder.
-			...(rwtMintOverride ? { rwtMint: rwtMintOverride } : {})
+			// Per-cluster mint overrides (see `endpoints.ts`). When undefined
+			// the SDK falls back to `RWT_MINTS[cluster]` / `USDC_MINTS[cluster]`
+			// from its canonical R20 table. Both are set on Testnet so the
+			// snapshot reads our bootstrap-init.ts test mints (the contracts
+			// have been re-pinned to these via `migrate-mints.sh`).
+			...(rwtMintOverride ? { rwtMint: rwtMintOverride } : {}),
+			...(usdcMintOverride ? { usdcMint: usdcMintOverride } : {})
 		});
 
 		// Late-response guard. If the network changed while we were
