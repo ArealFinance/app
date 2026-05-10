@@ -31,21 +31,34 @@ export function createConnection(rpcUrl: string): Connection {
 }
 
 /**
- * Subscription-capable `Connection` — websocket enabled (default endpoint
- * derived from `rpcUrl` by web3.js).
+ * Subscription-capable `Connection` — websocket enabled when an explicit
+ * `wsEndpoint` is provided.
  *
  * Use for `onAccountChange`, `onLogs`, `onSlotChange`, etc. — the live-update
  * path. Phase 6 portfolio reactivity uses this; one-shot reads should keep
  * using `createConnection` to avoid an idle WS per page.
  *
- * Same commitment / timeout choices as `createConnection`; the only
- * difference is leaving `wsEndpoint` unset so web3.js infers it from the
- * RPC URL (e.g. `https://...` → `wss://...`).
+ * When `wsEndpoint` is omitted (e.g. on the Areal-hosted Testnet, where the
+ * Cloudflared tunnel only exposes HTTP for `rpc.areal.finance` and the
+ * validator's WS port 8900 is firewalled from the public internet), we
+ * pass `false` to disable web3.js's WS pump. Subscriptions registered on
+ * such a Connection no-op silently — that matches the desired UX (no
+ * realtime updates, but no console-spammy WS reconnect failures either).
+ * Stores that depend on subscriptions (`vault.svelte.ts`) are responsible
+ * for tolerating a no-op subscription gracefully.
  */
-export function createWsConnection(rpcUrl: string): Connection {
+export function createWsConnection(rpcUrl: string, wsEndpoint?: string): Connection {
+	if (wsEndpoint && wsEndpoint.length > 0) {
+		return new Connection(rpcUrl, {
+			commitment: 'confirmed',
+			wsEndpoint,
+			confirmTransactionInitialTimeout: 120_000
+		});
+	}
 	return new Connection(rpcUrl, {
 		commitment: 'confirmed',
-		// wsEndpoint omitted — web3.js derives ws endpoint from rpcUrl.
+		// @ts-expect-error — see `createConnection` for the `false` rationale.
+		wsEndpoint: false,
 		confirmTransactionInitialTimeout: 120_000
 	});
 }

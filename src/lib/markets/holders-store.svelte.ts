@@ -43,10 +43,8 @@
  */
 import { getTokenHolders } from '@areal/sdk/markets-rest';
 import type { PublicKey } from '@solana/web3.js';
-import type { ClusterName } from '@areal/sdk/network';
 
 import { network } from '$lib/network/network.svelte';
-import type { NetworkId } from '$lib/network/endpoints';
 
 export type HoldersStatus = 'idle' | 'loading' | 'ready' | 'error';
 
@@ -58,10 +56,6 @@ export interface HoldersRow {
 }
 
 const POLL_INTERVAL_MS = 60_000;
-
-function toCluster(id: NetworkId): ClusterName {
-	return id as ClusterName;
-}
 
 let status: HoldersStatus = $state('idle');
 const tracked = $state(new Set<string>());
@@ -83,9 +77,17 @@ const inFlightByMint = new Map<string, Promise<void>>();
 /** Bound listener reference — stored so `stop()` can detach the same fn. */
 let visibilityListener: (() => void) | null = null;
 
-async function fetchOne(mint: string, cluster: ClusterName, seq: number): Promise<void> {
+async function fetchOne(mint: string, baseUrl: string, seq: number): Promise<void> {
 	try {
-		const row = await getTokenHolders({ mint, cluster });
+		// Pass `baseUrl` instead of `cluster` so the SDK's
+		// `BACKEND_API_BASE_URLS[cluster]` lookup is bypassed — that table
+		// pins `localnet` to `http://localhost:3010`, the dev backend port,
+		// which doesn't exist for users on the deployed app and breaks the
+		// dev server too (the absolute URL skips the Vite proxy). Wiring
+		// `network.endpoint.backendApiUrl` here matches what we already do
+		// for auth / history / markets snapshots — see those files for the
+		// matching env-resolution chain.
+		const row = await getTokenHolders({ mint, baseUrl });
 
 		// Late-response guard. A newer refresh started — drop this result.
 		if (seq !== refreshSeq) return;
@@ -119,7 +121,7 @@ async function doRefresh(mintFilter?: string): Promise<void> {
 	}
 
 	status = status === 'idle' ? 'loading' : status;
-	const cluster = toCluster(network.current);
+	const baseUrl = network.endpoint.backendApiUrl;
 
 	const tasks: Promise<void>[] = [];
 	for (const mint of mints) {
@@ -130,7 +132,7 @@ async function doRefresh(mintFilter?: string): Promise<void> {
 			tasks.push(existing);
 			continue;
 		}
-		const p = fetchOne(mint, cluster, seq).finally(() => {
+		const p = fetchOne(mint, baseUrl, seq).finally(() => {
 			inFlightByMint.delete(mint);
 		});
 		inFlightByMint.set(mint, p);

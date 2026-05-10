@@ -65,7 +65,8 @@ export const network = {
 	},
 	/** Subscription-capable Connection. Use for onAccountChange / onLogs. */
 	get wsConnection(): Connection {
-		return createWsConnection(ENDPOINTS[current].rpcUrl);
+		const ep = ENDPOINTS[current];
+		return createWsConnection(ep.rpcUrl, ep.wsRpcUrl);
 	},
 	setNetwork(id: NetworkId) {
 		// Defensive guard: reject ids outside the known set. Callers cast at

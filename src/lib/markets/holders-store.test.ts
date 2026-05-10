@@ -39,6 +39,15 @@ vi.mock('$lib/network/network.svelte', () => ({
 	network: {
 		get current() {
 			return mocks.currentNetwork;
+		},
+		// `holders-store.fetchOne` now passes `network.endpoint.backendApiUrl`
+		// straight through to the SDK as `baseUrl` — bypasses the SDK's
+		// stale `BACKEND_API_BASE_URLS[cluster]` lookup that pinned
+		// `localnet` to `http://localhost:3010`. The real `endpoint` getter
+		// returns much more, but this mock exposes only the field
+		// `holders-store` actually reads.
+		get endpoint() {
+			return { backendApiUrl: 'http://example' };
 		}
 	}
 }));
@@ -92,7 +101,11 @@ describe('holdersStore', () => {
 		expect(mocks.getTokenHolders).toHaveBeenCalledTimes(1);
 		const args = mocks.getTokenHolders.mock.calls[0]![0];
 		expect(args.mint).toBe(MINT_A.toBase58());
-		expect(args.cluster).toBe('devnet');
+		// We now pass `baseUrl` (from `network.endpoint.backendApiUrl`) instead
+		// of `cluster`, so the SDK skips its stale `BACKEND_API_BASE_URLS`
+		// lookup and hits the per-network override directly.
+		expect(args.baseUrl).toBe('http://example');
+		expect(args.cluster).toBeUndefined();
 
 		expect(holdersStore.countForMint(MINT_A)).toBe(1234);
 		expect(holdersStore.status).toBe('ready');

@@ -56,6 +56,18 @@ export interface NetworkEndpoint {
 	id: NetworkId;
 	label: string;
 	rpcUrl: string;
+	/**
+	 * Optional explicit WebSocket endpoint for the Solana RPC (subscription
+	 * connection). Devnet / mainnet leave this `undefined`, and web3.js
+	 * derives `wss://...` from `rpcUrl` as usual. Testnet sets it `null`
+	 * (typed `undefined` here, runtime-distinct via the WS-disabled path
+	 * in `lib/sdk/connection.ts::createWsConnection`) because the
+	 * Cloudflared tunnel for `rpc.areal.finance` only proxies HTTP — the
+	 * validator's WS port 8900 is firewalled from the public internet, so
+	 * `wss://rpc.areal.finance/` always 502s. Subscriptions on the
+	 * resulting Connection no-op silently rather than fail-loop.
+	 */
+	wsRpcUrl?: string;
 	/** Public REST API base URL (auth, history, markets snapshots). */
 	backendApiUrl: string;
 	/** Realtime gateway WebSocket URL (Socket.IO `/realtime` namespace). */
