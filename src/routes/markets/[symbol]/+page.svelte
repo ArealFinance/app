@@ -191,7 +191,7 @@
 	// Active chart period — bound through to <PoolHistoryChart>. The chart
 	// component owns the tabs UI + labels; we keep this state here so it
 	// survives modal opens / detail-tab switches without losing user intent.
-	let activePeriod = $state<Period>('7D');
+	let activePeriod = $state<Period>('24H');
 
 	type DetailTab = 'RWA’s' | 'Liquidity' | 'Data' | 'Governance' | 'RWT Vault';
 	const detailTabs = $derived<DetailTab[]>(

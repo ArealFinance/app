@@ -46,7 +46,7 @@
 	let {
 		pool,
 		currentPrice,
-		period = $bindable<Period>('7D'),
+		period = $bindable<Period>('24H'),
 		store = defaultStore
 	}: PoolHistoryChartProps = $props();
 

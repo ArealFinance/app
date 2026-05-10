@@ -73,7 +73,7 @@ let status: SnapshotsStatus = $state('idle');
 let rows: SnapshotRow[] = $state([]);
 let aggregate: DailyAggregateRow[] = $state([]);
 let error: string | null = $state(null);
-let period: Period = $state('7D');
+let period: Period = $state('24H');
 
 // Mutable bookkeeping (NOT reactive).
 let activePoolBase58: string | null = null;
@@ -402,7 +402,7 @@ export function __resetSnapshotsForTests(): void {
 	rows = [];
 	aggregate = [];
 	error = null;
-	period = '7D';
+	period = '24H';
 	dispatchedAgainstCluster = null;
 }
 
