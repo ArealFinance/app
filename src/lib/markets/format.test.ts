@@ -5,7 +5,9 @@ import {
 	formatPrice,
 	formatTokenAmount,
 	formatPercentage,
-	formatFee
+	formatFee,
+	formatHolders,
+	EM_DASH
 } from './format';
 
 describe('formatTvl', () => {
@@ -119,5 +121,27 @@ describe('formatFee', () => {
 		expect(formatFee(30)).toBe('0.30%');
 		expect(formatFee(0)).toBe('0.00%');
 		expect(formatFee(100)).toBe('1.00%');
+	});
+});
+
+describe('formatHolders', () => {
+	it('renders sub-thousand counts as comma-grouped integers', () => {
+		expect(formatHolders(0)).toBe('0');
+		expect(formatHolders(942)).toBe('942');
+	});
+
+	it('renders thousands with K suffix and 1 dp, stripping trailing ".0"', () => {
+		expect(formatHolders(1234)).toBe('1.2K');
+		expect(formatHolders(15_000)).toBe('15K');
+	});
+
+	it('renders millions with M suffix and 2 dp', () => {
+		expect(formatHolders(2_500_000)).toBe('2.50M');
+	});
+
+	it('returns em-dash for null/undefined/NaN', () => {
+		expect(formatHolders(null)).toBe(EM_DASH);
+		expect(formatHolders(undefined)).toBe(EM_DASH);
+		expect(formatHolders(Number.NaN)).toBe(EM_DASH);
 	});
 });

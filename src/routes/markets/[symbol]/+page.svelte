@@ -28,9 +28,11 @@
 		formatTvl,
 		formatPrice,
 		formatTokenAmount,
-		formatFee
+		formatFee,
+		formatHolders
 	} from '$lib/markets';
 	import type { TokenRow, EnrichedPoolRow } from '$lib/markets';
+	import { holdersStore } from '$lib/markets/holders-store.svelte';
 	import { priceFeed } from '$lib/portfolio';
 	import { formatPercent } from '$lib/portfolio/format';
 	import { wallet } from '$lib/stores/wallet.svelte';
@@ -45,6 +47,17 @@
 	);
 
 	const isVaultToken = $derived(tokenRow?.category === 'protocol');
+
+	// Track this token's mint with the backend-polled holders store. The
+	// store handles the initial fetch internally; we just need to register
+	// (and unregister on token swap / unmount) so the polling loop knows
+	// which mints to keep fresh.
+	$effect(() => {
+		const mint = tokenRow?.mint;
+		if (!mint) return;
+		holdersStore.track(mint);
+		return () => holdersStore.untrack(mint);
+	});
 
 	/**
 	 * 24h price change for this token, sourced from the backend-polled
@@ -426,11 +439,15 @@
 		// "24H change" stat cell. Idempotent — safe alongside other pages
 		// that also call `start()`.
 		priceFeed.start();
+		// Backend-polled holder counts. Drives the "Holders" stat cell.
+		// Idempotent — start() is safe to call across remount.
+		holdersStore.start();
 	});
 	onDestroy(() => {
 		poolStore.deactivate();
 		markets.stop();
 		priceFeed.stop();
+		holdersStore.stop();
 	});
 </script>
 
@@ -521,7 +538,7 @@
 						</div>
 						<div class="stat-cell">
 							<span class="stat-label">Holders</span>
-							<span class="stat-value">{EM_DASH}</span>
+							<span class="stat-value">{formatHolders(holdersStore.countForMint(t.mint))}</span>
 						</div>
 					</section>
 				</aside>

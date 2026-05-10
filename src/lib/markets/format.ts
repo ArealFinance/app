@@ -12,7 +12,7 @@
  * to special-case missing data.
  */
 
-const EM_DASH = '—';
+export const EM_DASH = '—';
 
 /**
  * Format a USDC TVL as "$1.23M" / "$45.7K" / "$1,234". Nulls and NaN
@@ -101,4 +101,23 @@ export function formatPercentage(bps: number | null | undefined): string {
  */
 export function formatFee(bps: number): string {
 	return `${(bps / 100).toFixed(2)}%`;
+}
+
+/**
+ * Format a holder count compactly:
+ *
+ *   - <  1_000     → comma-grouped integer ("942", "0")
+ *   - <  1_000_000 → "X.YK" with trailing ".0" stripped ("1.2K", "15K")
+ *   - else         → "X.YYM" (2 dp, no stripping — matches `formatTvl`)
+ *
+ * Null / undefined / NaN collapse to em-dash so the UI never has to
+ * special-case missing data.
+ */
+export function formatHolders(n: number | null | undefined): string {
+	if (n === null || n === undefined || !Number.isFinite(n)) return EM_DASH;
+	if (n < 1_000) return n.toLocaleString('en-US');
+	if (n < 1_000_000) {
+		return (n / 1_000).toFixed(1).replace(/\.0$/, '') + 'K';
+	}
+	return (n / 1_000_000).toFixed(2) + 'M';
 }

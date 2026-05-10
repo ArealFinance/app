@@ -16,7 +16,9 @@ export {
 	formatPrice,
 	formatTokenAmount,
 	formatPercentage,
-	formatFee
+	formatFee,
+	formatHolders,
+	EM_DASH
 } from './format';
 export type {
 	MarketsSnapshot,
