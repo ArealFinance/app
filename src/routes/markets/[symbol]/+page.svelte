@@ -729,14 +729,29 @@
 										<li>
 											<button type="button" class="pool-row" onclick={() => openPool(p)}>
 												<span class="pool-logos">
-													<span class="pool-logo" style:background-color={p.pairA.bg}>
-														<span>{p.pairA.iconLetter ?? p.pairA.symbol[0]}</span>
+													<span
+														class="pool-logo"
+														style:background-color={p.pairA.iconSrc
+															? 'transparent'
+															: p.pairA.bg}
+													>
+														{#if p.pairA.iconSrc}
+															<img src={p.pairA.iconSrc} alt="" loading="lazy" />
+														{:else}
+															<span>{p.pairA.iconLetter ?? p.pairA.symbol[0]}</span>
+														{/if}
 													</span>
 													<span
 														class="pool-logo pool-logo-overlap"
-														style:background-color={p.pairB.bg}
+														style:background-color={p.pairB.iconSrc
+															? 'transparent'
+															: p.pairB.bg}
 													>
-														<span>{p.pairB.iconLetter ?? p.pairB.symbol[0]}</span>
+														{#if p.pairB.iconSrc}
+															<img src={p.pairB.iconSrc} alt="" loading="lazy" />
+														{:else}
+															<span>{p.pairB.iconLetter ?? p.pairB.symbol[0]}</span>
+														{/if}
 													</span>
 												</span>
 												<span class="pool-symbol">{p.pairA.symbol}</span>
@@ -1257,6 +1272,11 @@
 		font-size: 14px;
 		color: #fff;
 		overflow: hidden;
+	}
+	.pool-logo img {
+		width: 100%;
+		height: 100%;
+		object-fit: contain;
 	}
 	.pool-logo-overlap {
 		margin-left: -10px;
