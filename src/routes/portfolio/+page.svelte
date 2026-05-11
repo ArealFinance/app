@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
+	import { goto } from '$app/navigation';
 	import { PublicKey } from '@solana/web3.js';
 	import { Rooms } from '@areal/sdk/realtime';
 	import AppShell from '$lib/components/sections/AppShell.svelte';
@@ -159,6 +160,22 @@
 			row.pool.cumulativeFeesPerShareA > row.position.feesClaimedPerShareA ||
 			row.pool.cumulativeFeesPerShareB > row.position.feesClaimedPerShareB
 		);
+	}
+
+	/**
+	 * Manage LP position → jump to the pool detail page for the non-RWT
+	 * side of the pair. /markets/[symbol] resolves the symbol against the
+	 * markets snapshot's tokens list — passing `symbolA` works for RWT/X
+	 * pools (lands on the RWT page where the pair shows up as one of its
+	 * pool rows). Lowercased to match the route's case convention.
+	 */
+	function manageLp(row: HolderLpRow): void {
+		// Prefer the non-RWT side for the route — the pool detail panel
+		// on /markets/<symbol> drills into that token's view, which is
+		// what "manage this LP" should land on.
+		const sym =
+			row.symbolA.toLowerCase() === 'rwt' ? row.symbolB : row.symbolA;
+		void goto(`/markets/${sym.toLowerCase()}`);
 	}
 
 	function startClaimFees(row: HolderLpRow | null) {
@@ -987,7 +1004,14 @@
 									{/if}
 
 									<div class="lp-detail-actions">
-										<button type="button" class="lp-manage-btn">Manage</button>
+										<button
+											type="button"
+											class="lp-manage-btn"
+											disabled={!selectedLpRow}
+											onclick={() => selectedLpRow && manageLp(selectedLpRow)}
+										>
+											Manage
+										</button>
 										{#if selectedLpRow && hasClaimableFees(selectedLpRow)}
 											{@const feeAttempt =
 												lpClaims.attempts.get(selectedLpRow.positionAddress.toBase58()) ??
