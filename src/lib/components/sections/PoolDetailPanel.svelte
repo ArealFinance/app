@@ -159,13 +159,13 @@
 		return v ?? '0';
 	}
 	/**
-	 * Standards-aware MAX. Naïve "depositAmount = userBalance(side)" is
-	 * wrong in Standards mode: the counter-side amount is derived from the
-	 * pool's reserve ratio, so picking 1000 on a side where the user holds
-	 * 1000 silently demands 1000 on the other side too — which the user
-	 * may not actually have. Result: the form looked like "you can deposit
-	 * 1000" but the on-chain TX would fail when it tried to debit a
-	 * counter-amount the user didn't have.
+	 * Standards-aware MAX as a derived value. Naïve "userBalance(side)"
+	 * is wrong in Standards mode: the counter-side amount is derived
+	 * from the pool's reserve ratio, so picking 1000 on a side where
+	 * the user holds 1000 silently demands 1000 on the other side too
+	 * — which the user may not actually have. Result: the form looked
+	 * like "you can deposit 1000" but the on-chain TX would fail when
+	 * it tried to debit a counter-amount the user didn't have.
 	 *
 	 * Real cap = MIN(
 	 *   userBalance(primary),
@@ -174,41 +174,82 @@
 	 *
 	 * Zap mode keeps the simple single-side semantic — the contract
 	 * auto-balances ~50% of one input, no two-side constraint.
+	 *
+	 * Returns both the bigint base-units cap and a display string. The
+	 * cap is consumed by the typed-input clamp (`$effect` below); the
+	 * display by `setMax` and by the same clamp when it has to rewrite
+	 * the field.
 	 */
-	function setMax() {
+	const maxDeposit = $derived.by((): { base: bigint; display: string; dec: number } => {
 		const decA = pool.decimalsA;
 		const decB = pool.decimalsB;
+		const fallbackDec = decA ?? decB ?? 9;
+		const fallbackDisplay = availableForSide(depositSide);
+
 		if (
 			depositMode === 'Zap' ||
 			!pool.row ||
 			decA === undefined ||
 			decB === undefined
 		) {
-			depositAmount = availableForSide(depositSide);
-			return;
+			const dec = depositSide === 'A' ? (decA ?? fallbackDec) : (decB ?? fallbackDec);
+			return {
+				base: toBaseUnits(fallbackDisplay, dec),
+				display: fallbackDisplay,
+				dec
+			};
 		}
 		const ps = livePool;
-		// Empty pool / no live state — fall back to plain side balance.
+		const dec = depositSide === 'A' ? decA : decB;
 		if (!ps || ps.reserveA === 0n || ps.reserveB === 0n) {
-			depositAmount = availableForSide(depositSide);
-			return;
+			return {
+				base: toBaseUnits(fallbackDisplay, dec),
+				display: fallbackDisplay,
+				dec
+			};
 		}
 		const balA = toBaseUnits(pool.userBalanceA ?? '0', decA);
 		const balB = toBaseUnits(pool.userBalanceB ?? '0', decB);
 		let primaryMax: bigint;
 		if (depositSide === 'A') {
-			// Counter side needs primary × reserveB / reserveA — but we only
-			// have balB on that side. Cap primary so the implied counter
-			// stays within balB.
+			// Counter side needs primary × reserveB / reserveA — but we
+			// only have balB on that side. Cap primary so the implied
+			// counter stays within balB.
 			const counterCap = (balB * ps.reserveA) / ps.reserveB;
 			primaryMax = balA < counterCap ? balA : counterCap;
 		} else {
 			const counterCap = (balA * ps.reserveB) / ps.reserveA;
 			primaryMax = balB < counterCap ? balB : counterCap;
 		}
-		const dec = depositSide === 'A' ? decA : decB;
-		depositAmount = formatTokenAmount(primaryMax, dec, Math.min(dec, 6));
+		return {
+			base: primaryMax,
+			display: formatTokenAmount(primaryMax, dec, Math.min(dec, 6)),
+			dec
+		};
+	});
+
+	function setMax(): void {
+		depositAmount = maxDeposit.display;
 	}
+
+	/**
+	 * Clamp typed input to the active mode's MAX. The MAX button alone
+	 * isn't enough — users can type any number and the form would
+	 * happily accept it, then the on-chain TX reverts with
+	 * `InsufficientFunds`. We re-validate on every keystroke (and on
+	 * mode/side switches, since the cap changes).
+	 *
+	 * Only rewrites the field when the parsed value strictly EXCEEDS
+	 * the cap — partial inputs (empty, trailing dot, leading zeros) are
+	 * passed through untouched so the user can keep typing naturally.
+	 */
+	$effect(() => {
+		if (depositAmount === '') return;
+		const parsed = toBaseUnits(depositAmount, maxDeposit.dec);
+		if (parsed > maxDeposit.base && maxDeposit.base >= 0n) {
+			depositAmount = maxDeposit.display;
+		}
+	});
 
 	// Parse the user's typed amount into base-units bigint. Returns 0n on
 	// any parse failure so the FSM's pre-flight zero-amount guard fires
