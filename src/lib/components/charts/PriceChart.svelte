@@ -70,7 +70,23 @@
 		});
 	}
 
-	const smoothed = $derived(smoothSeries(data, smoothingWindow));
+	const smoothedRaw = $derived(smoothSeries(data, smoothingWindow));
+
+	/**
+	 * Repeat the first and last points twice so `curveBasis` (B-spline)
+	 * gets pulled exactly onto the real endpoints. Without this anchoring
+	 * the rendered line floats inside the convex hull of the control
+	 * points — at the right edge that would visually disconnect from the
+	 * trailing price pill ("0.9238"). Two repeats are enough: a cubic
+	 * B-spline reaches a control point when it has multiplicity 3 in the
+	 * sequence (the duplicate + the original = 3 total).
+	 */
+	const smoothed = $derived.by<PricePoint[]>(() => {
+		if (smoothedRaw.length === 0) return smoothedRaw;
+		const first = smoothedRaw[0]!;
+		const last = smoothedRaw[smoothedRaw.length - 1]!;
+		return [first, first, ...smoothedRaw, last, last];
+	});
 
 	const xDomain = $derived<[number, number]>([
 		smoothed[0]?.x ?? 0,

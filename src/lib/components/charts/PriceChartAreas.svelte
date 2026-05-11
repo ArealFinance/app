@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { getContext } from 'svelte';
-	import { area, line, curveBumpX } from 'd3-shape';
+	import { area, line, curveBasis } from 'd3-shape';
 	import type { Readable } from 'svelte/store';
 	import type { ScaleLinear } from 'd3-scale';
 
@@ -25,13 +25,17 @@
 	// without `<defs>` id collisions (NAV Growth + Price chart on the same screen).
 	const uid = $props.id();
 
-	// `curveBumpX` — horizontal cubic Bézier between each pair of points.
-	// At every data point the curve is horizontal, then arcs as a smooth
-	// S into the next point. Combined with the rolling-average smoother
-	// in the parent, this turns the Testnet plateau-jump-plateau shape
-	// into a flowing wave instead of the previous near-right-angle
-	// transitions Catmull-Rom couldn't fully iron out.
-	const SMOOTHING = curveBumpX;
+	// `curveBasis` — B-spline through every point. Unlike `curveBumpX`
+	// (one cubic per segment → visible kinks at each control point on a
+	// dense series) or `curveCatmullRom` (passes through points but
+	// preserves slope discontinuities), basis renders a single
+	// continuously-differentiable path that reads as a true flowing
+	// wave. The B-spline doesn't pass exactly through interior points,
+	// but the parent's rolling-average smoother already pre-blurs the
+	// y-values, so the on-line offset is sub-pixel for realistic data.
+	// Endpoint precision is handled in the parent via repeated first/
+	// last points (so the trailing pill anchors visually).
+	const SMOOTHING = curveBasis;
 	const areaGen = $derived(
 		area<Point>()
 			.x((d) => $xScale(d.x))
@@ -108,14 +112,22 @@
 </g>
 
 <!-- Area fill (main vertical fade) -->
-<path d={areaGen($data) ?? ''} fill="url(#grad-price-fill-{uid})" />
+<path
+	d={areaGen($data) ?? ''}
+	fill="url(#grad-price-fill-{uid})"
+	shape-rendering="geometricPrecision"
+/>
 
 <!-- Right-side horizontal glow, clipped to area, height-capped to top band per Figma -->
 <g clip-path="url(#clip-price-area-{uid})">
 	<rect x="0" y="0" width={$width} height={Math.max($height * 0.34, 92)} fill="url(#grad-price-fill-h-{uid})" />
 </g>
 
-<!-- Line stroke on top -->
+<!-- Line stroke on top.
+     `shape-rendering="geometricPrecision"` opts into the path-AA branch
+     in WebKit/Blink; the default `auto` heuristic can downgrade to a
+     speed-tuned mode on long bezier chains, which is what produced the
+     "pixelated" look users saw with bumpX. -->
 <path
 	d={lineGen($data) ?? ''}
 	fill="none"
@@ -123,6 +135,7 @@
 	stroke-width="2"
 	stroke-linecap="round"
 	stroke-linejoin="round"
+	shape-rendering="geometricPrecision"
 />
 
 {#if badgeLabel && lastPoint}
