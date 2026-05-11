@@ -1182,24 +1182,25 @@
 		top: 0;
 		height: 18px;
 		/* Outer mat colour (the Card variant="inset" surface) shows through
-		 * each cut. Each cut is rounded ONLY on the centre-facing end (toward
-		 * the connector); the outer end stays flush with the section's outer
-		 * vertical edge. radius=9px = height/2 → full semicircle on the
-		 * inner end. Concave fillets in the section material show only at
-		 * the inner cut ends (around the connector). */
+		 * each cut. Each cut is a full pill (radius=9px=height/2) — both ends
+		 * rounded. Section material wraps around all four pill ends, producing
+		 * the four concave fillets seen in the Figma source. */
 		background-color: var(--color-surface-inset);
 	}
 	.claim-cut-left {
-		left: 0;
+		/* Inset 9px from section's outer vertical edge so the section material
+		 * wraps around the outer rounded end too (4 concave fillets total —
+		 * 2 inner near the connector, 2 outer near the section's outer edges). */
+		left: 9px;
 		/* 37px = half of 74px connector core. Together both cuts leave a
 		 * 74px section-coloured strip in the centre — the visible connector. */
 		right: calc(50% + 37px);
-		border-radius: 0 9px 9px 0;
+		border-radius: 9px;
 	}
 	.claim-cut-right {
 		left: calc(50% + 37px);
-		right: 0;
-		border-radius: 9px 0 0 9px;
+		right: 9px;
+		border-radius: 9px;
 	}
 
 	/* Crystal — fills claim-shell full width with baked-in aurora glow.
