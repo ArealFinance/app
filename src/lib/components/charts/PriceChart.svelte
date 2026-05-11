@@ -73,12 +73,47 @@
 		smoothed[0]?.x ?? 0,
 		smoothed[smoothed.length - 1]?.x ?? 1
 	]);
+
+	/**
+	 * Expanded yDomain so the data sits roughly in the center of the canvas
+	 * (matches the Figma macet) instead of being stretched edge-to-edge by
+	 * LayerCake's default auto-scale. With auto-scale a 0.5 → 0.9 NAV swing
+	 * fills the entire chart height; tiny mid-day wiggles end up looking
+	 * like dramatic crashes/spikes.
+	 *
+	 * Window picked as `max(range × 3, midpoint × 0.15)`:
+	 *  - The `× 3` factor anchors the data band at ~33% of canvas height
+	 *    for typical swings, leaving the rest as "breathing room".
+	 *  - The `× 0.15` floor saves micro-swings (e.g. NAV that only varies
+	 *    by 0.5%) from being amplified to look like wild oscillations.
+	 */
+	const yDomain = $derived.by<[number, number]>(() => {
+		if (smoothed.length === 0) return [0, 1];
+		let lo = Infinity;
+		let hi = -Infinity;
+		for (const pt of smoothed) {
+			if (pt.y < lo) lo = pt.y;
+			if (pt.y > hi) hi = pt.y;
+		}
+		if (!Number.isFinite(lo) || !Number.isFinite(hi)) return [0, 1];
+		const mid = (lo + hi) / 2;
+		const range = hi - lo;
+		const expanded = Math.max(range * 3, Math.abs(mid) * 0.15, 1e-9);
+		return [mid - expanded / 2, mid + expanded / 2];
+	});
 </script>
 
 <div class="chart">
 	<div class="chart-canvas">
 		<div class="chart-canvas-inner">
-			<LayerCake padding={{ top: 0, right: 0, bottom: 0, left: 0 }} x="x" y="y" data={smoothed} {xDomain}>
+			<LayerCake
+				padding={{ top: 0, right: 0, bottom: 0, left: 0 }}
+				x="x"
+				y="y"
+				data={smoothed}
+				{xDomain}
+				{yDomain}
+			>
 				<Svg pointerEvents={false}>
 					<PriceChartAreas badgeLabel={currentPrice} />
 				</Svg>
