@@ -183,21 +183,19 @@
 						</button>
 					{/if}
 				</div>
-				{#if !isOtherOpen}
-					<input
-						class="qs-input"
-						type="text"
-						inputmode="decimal"
-						placeholder="0.00"
-						bind:value={
-							() => amount,
-							(v) => {
-								if (side === 'pinned') pinnedAmount = v;
-								else otherAmount = v;
-							}
+				<input
+					class="qs-input"
+					type="text"
+					inputmode="decimal"
+					placeholder="0.00"
+					bind:value={
+						() => amount,
+						(v) => {
+							if (side === 'pinned') pinnedAmount = v;
+							else otherAmount = v;
 						}
-					/>
-				{/if}
+					}
+				/>
 			</div>
 		</div>
 	{/snippet}
