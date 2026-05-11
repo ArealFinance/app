@@ -377,6 +377,7 @@
 	/* Panel: dark outer with logo on the left and a lighter inset on the right. */
 	.qs-panel {
 		position: relative;
+		z-index: 1;
 		display: flex;
 		flex: none;
 		align-items: center;
@@ -474,14 +475,16 @@
 		color: var(--color-blue-500);
 	}
 
-	/* Dropdown — replaces flip/other-card/CTA when open; scrollable list with fade. */
+	/* Dropdown — overlaps the bottom half of the trigger card (input area) so
+	   only the label-row with the chevron stays visible above. */
 	.qs-dropdown {
 		position: relative;
+		z-index: 2;
 		flex: 1;
 		display: flex;
 		flex-direction: column;
 		gap: 4px;
-		margin: 8px 0 0;
+		margin: -28px 0 0;
 		padding: 4px;
 		list-style: none;
 		max-height: 280px;
