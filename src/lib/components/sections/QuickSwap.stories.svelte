@@ -49,3 +49,16 @@
 		<QuickSwap pinnedToken={sprk} initialOther={usdt} />
 	</div>
 </Story>
+
+<Story
+	name="SettingsHint"
+	parameters={{
+		docs: {
+			description: { story: 'Click the gear icon in the header to open Slippage Tolerance.' }
+		}
+	}}
+>
+	<div style="width: 324px;">
+		<QuickSwap pinnedToken={rwt} initialOther={usdt} />
+	</div>
+</Story>

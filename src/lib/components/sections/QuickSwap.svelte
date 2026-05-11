@@ -86,15 +86,67 @@
 
 	const fromSide = $derived(pinnedSide === 'from' ? 'pinned' : 'other');
 	const toSide = $derived(pinnedSide === 'from' ? 'other' : 'pinned');
+
+	// Settings panel
+	const SLIPPAGE_PRESETS = [0.1, 0.5, 1] as const;
+	let isSettingsOpen = $state(false);
+	let slippagePreset = $state<number | null>(0.5);
+	let slippageCustom = $state('');
+
+	function toggleSettings() {
+		isSettingsOpen = !isSettingsOpen;
+	}
+	function pickSlippage(p: number) {
+		slippagePreset = p;
+		slippageCustom = '';
+	}
+	function onCustomInput(v: string) {
+		slippageCustom = v;
+		if (v.trim() !== '') slippagePreset = null;
+	}
 </script>
 
 <aside class="quick-swap">
 	<header class="qs-head">
 		<h3>Quick Swap</h3>
-		<button type="button" class="qs-settings" aria-label="Swap settings">
-			<Gear size={20} />
+		<button
+			type="button"
+			class="qs-settings"
+			class:qs-settings-active={isSettingsOpen}
+			aria-label="Swap settings"
+			aria-expanded={isSettingsOpen}
+			onclick={toggleSettings}
+		>
+			<Gear size={20} variant="duotone" />
 		</button>
 	</header>
+
+	{#if isSettingsOpen}
+		<section class="qs-slippage" aria-label="Slippage tolerance">
+			<span class="qs-slippage-label">Slippage Tolerance</span>
+			<div class="qs-slippage-row">
+				{#each SLIPPAGE_PRESETS as p (p)}
+					<button
+						type="button"
+						class="qs-chip"
+						class:qs-chip-selected={slippagePreset === p}
+						onclick={() => pickSlippage(p)}
+					>
+						{p}%
+					</button>
+				{/each}
+				<label class="qs-chip qs-chip-input">
+					<input
+						type="text"
+						inputmode="decimal"
+						placeholder="0.00"
+						bind:value={() => slippageCustom, (v: string) => onCustomInput(v)}
+					/>
+					<span>%</span>
+				</label>
+			</div>
+		</section>
+	{/if}
 
 	{#snippet panel(side: 'pinned' | 'other', label: string)}
 		{@const token = side === 'pinned' ? pinnedToken : other}
@@ -234,6 +286,89 @@
 	}
 	.qs-settings:hover {
 		opacity: 1;
+	}
+	.qs-settings-active {
+		background-color: var(--color-text);
+		color: var(--color-text-inverse);
+		opacity: 1;
+	}
+
+	/* Slippage settings panel — collapsed by default, opens above the from-card. */
+	.qs-slippage {
+		display: flex;
+		flex-direction: column;
+		gap: 12px;
+		padding: 12px 14px 14px;
+		background-color: var(--color-bg);
+		border-radius: 20px;
+	}
+	.qs-slippage-label {
+		font-family: 'Onest', var(--font-body);
+		font-size: 14px;
+		font-weight: 500;
+		line-height: 1.4;
+		letter-spacing: -0.6px;
+		color: var(--color-text);
+	}
+	.qs-slippage-row {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 4px;
+	}
+	.qs-chip {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		height: 34px;
+		padding: 7px 10px;
+		background-color: var(--color-surface-inset);
+		border: 1px solid var(--color-border);
+		border-radius: 12px;
+		font-family: 'Onest', var(--font-body);
+		font-size: 14px;
+		font-weight: 500;
+		line-height: 1.4;
+		letter-spacing: -0.6px;
+		color: var(--color-text);
+		cursor: pointer;
+		transition:
+			background-color var(--motion-base) var(--ease-out),
+			color var(--motion-base) var(--ease-out);
+	}
+	.qs-chip:hover {
+		background-color: rgba(255, 255, 255, 0.06);
+	}
+	.qs-chip-selected {
+		background-color: var(--color-text);
+		color: var(--color-text-inverse);
+		border-color: transparent;
+	}
+	.qs-chip-selected:hover {
+		background-color: var(--color-text);
+	}
+	.qs-chip-input {
+		flex: 1;
+		min-width: 96px;
+		gap: 2px;
+		cursor: text;
+	}
+	.qs-chip-input input {
+		flex: 1;
+		min-width: 0;
+		width: 100%;
+		background: transparent;
+		border: 0;
+		padding: 0;
+		font: inherit;
+		color: var(--color-text);
+		text-align: left;
+		outline: none;
+	}
+	.qs-chip-input input::placeholder {
+		color: var(--color-text-muted);
+	}
+	.qs-chip-input span {
+		color: var(--color-text-muted);
 	}
 
 	/* Panel: dark outer with logo on the left and a lighter inset on the right. */
