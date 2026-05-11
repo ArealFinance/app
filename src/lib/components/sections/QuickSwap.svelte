@@ -579,7 +579,7 @@
 		display: flex;
 		justify-content: center;
 		margin: -18px 0;
-		z-index: 1;
+		z-index: 3;
 	}
 	.qs-flip-btn {
 		position: relative;
