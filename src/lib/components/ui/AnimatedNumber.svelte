@@ -16,7 +16,7 @@
 	 * Defaults match the portfolio "Unclaimed Rewards" pill: 1500 ms,
 	 * linear, 6 RWT decimals — sync'd with `portfolio.store`'s 1.5 s poll.
 	 */
-	import { onDestroy } from 'svelte';
+	import { onDestroy, untrack } from 'svelte';
 
 	type Easing = 'linear' | 'easeOutCubic';
 
@@ -42,12 +42,19 @@
 		easing = 'linear'
 	}: Props = $props();
 
-	// Start at 0; the first $effect run snaps to whatever `value` is on
-	// initial render (see `firstRun` guard below) so the user doesn't
-	// stare at a slow 0→N count-up on page load. Subsequent updates tween
-	// normally for the live-ticking feel.
-	let displayed = $state(0);
-	let firstRun = true;
+	// Seed `displayed` from the incoming prop AT MOUNT, not from 0. On a
+	// fresh page-load where the store is still empty this snaps to 0 anyway;
+	// but on SPA re-navigation back to a page whose store still holds a
+	// cached snapshot, the component renders the current value immediately
+	// (no 0 → N tween, no brief "0.000000" flash before the first $effect
+	// runs). `firstRun` is only true when we MOUNTED on a zero — once
+	// real data lands we treat the next update as a snap, then tween
+	// normally afterwards for the live-ticking feel.
+	// `untrack` so $state's initializer captures only the AT-MOUNT value of
+	// the `value` prop (no reactivity needed here — subsequent updates flow
+	// through the $effect below, not through this initializer).
+	let displayed = $state(untrack(() => value));
+	let firstRun = $state(untrack(() => value === 0));
 	let raf: number | null = null;
 
 	const EASING_FNS: Record<Easing, (t: number) => number> = {
