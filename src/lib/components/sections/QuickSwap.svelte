@@ -200,9 +200,7 @@
 		</div>
 	{/snippet}
 
-	{@render panel(fromSide, 'From')}
-
-	{#if isOtherOpen}
+	{#snippet dropdown()}
 		<ul class="qs-dropdown" role="listbox">
 			{#each otherCandidates as t (t.id)}
 				<li>
@@ -226,6 +224,14 @@
 				</li>
 			{/each}
 		</ul>
+	{/snippet}
+
+	{@render panel(fromSide, 'From')}
+
+	{#if isOtherOpen && fromSide === 'other'}
+		<!-- Trigger is the From-side: dropdown anchors directly under it,
+		     hiding flip/To-card/CTA. -->
+		{@render dropdown()}
 	{:else}
 		<div class="qs-flip" aria-hidden="false">
 			<button type="button" class="qs-flip-btn" aria-label="Flip swap direction" onclick={flip}>
@@ -237,13 +243,19 @@
 
 		{@render panel(toSide, 'To')}
 
-		<button
-			type="button"
-			class="qs-cta"
-			onclick={() => (wallet.isConnected ? undefined : walletDialog.open('connect'))}
-		>
-			{wallet.isConnected ? 'Swap' : 'Connect Wallet'}
-		</button>
+		{#if isOtherOpen && toSide === 'other'}
+			<!-- Trigger is the To-side: dropdown anchors under To-card,
+			     hiding only the CTA. -->
+			{@render dropdown()}
+		{:else}
+			<button
+				type="button"
+				class="qs-cta"
+				onclick={() => (wallet.isConnected ? undefined : walletDialog.open('connect'))}
+			>
+				{wallet.isConnected ? 'Swap' : 'Connect Wallet'}
+			</button>
+		{/if}
 	{/if}
 </aside>
 
