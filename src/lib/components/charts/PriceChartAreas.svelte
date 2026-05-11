@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { getContext } from 'svelte';
-	import { area, line, curveMonotoneX } from 'd3-shape';
+	import { area, line, curveCatmullRom } from 'd3-shape';
 	import type { Readable } from 'svelte/store';
 	import type { ScaleLinear } from 'd3-scale';
 
@@ -25,19 +25,25 @@
 	// without `<defs>` id collisions (NAV Growth + Price chart on the same screen).
 	const uid = $props.id();
 
+	// Centripetal Catmull-Rom (alpha 0.5) — passes through every data point
+	// like `curveMonotoneX` but rounds the corners between plateaus into
+	// soft S-curves instead of preserving the abrupt slope change. Matches
+	// the Figma macet's "softer" feel without the overshoot or
+	// off-the-points artifacts of `curveBasis` / `curveCardinal`.
+	const SMOOTHING = curveCatmullRom.alpha(0.5);
 	const areaGen = $derived(
 		area<Point>()
 			.x((d) => $xScale(d.x))
 			.y0(() => $height)
 			.y1((d) => $yScale(d.y))
-			.curve(curveMonotoneX)
+			.curve(SMOOTHING)
 	);
 
 	const lineGen = $derived(
 		line<Point>()
 			.x((d) => $xScale(d.x))
 			.y((d) => $yScale(d.y))
-			.curve(curveMonotoneX)
+			.curve(SMOOTHING)
 	);
 
 	// Square grid: derive step from the canvas height so cells stay 1:1
