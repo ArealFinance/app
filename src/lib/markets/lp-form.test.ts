@@ -59,6 +59,8 @@ const mocks = vi.hoisted(() => ({
 	getAccountInfo: vi.fn(),
 	getLatestBlockhash: vi.fn(),
 	confirmTransaction: vi.fn(),
+	getSignatureStatuses: vi.fn(),
+	getBlockHeight: vi.fn(),
 	lpStoreRefresh: vi.fn(),
 	portfolioRefresh: vi.fn(),
 	balancesRefreshAll: vi.fn(),
@@ -88,7 +90,8 @@ vi.mock('@areal/sdk/pda', () => ({
 		0
 	],
 	findDexConfigPda: () => [DEX_CONFIG_PDA, 255],
-	findLpPositionPda: () => [LP_PDA, 255]
+	findLpPositionPda: () => [LP_PDA, 255],
+	findBinArrayPda: () => [new PublicKey(new Uint8Array(32)), 255]
 }));
 
 vi.mock('@areal/sdk/network', () => ({
@@ -119,7 +122,9 @@ vi.mock('$lib/network/network.svelte', () => ({
 			return {
 				getAccountInfo: mocks.getAccountInfo,
 				getLatestBlockhash: mocks.getLatestBlockhash,
-				confirmTransaction: mocks.confirmTransaction
+				confirmTransaction: mocks.confirmTransaction,
+				getSignatureStatuses: mocks.getSignatureStatuses,
+				getBlockHeight: mocks.getBlockHeight
 			};
 		},
 		get endpoint() {
@@ -258,6 +263,13 @@ function setupHappyPath() {
 	});
 	mocks.signAndSendTransaction.mockResolvedValue({ signature: 'SIG_LP_OK' });
 	mocks.confirmTransaction.mockResolvedValue({ value: { err: null } });
+	// `confirmWithTimeout` polls `getSignatureStatuses` + `getBlockHeight`
+	// (the WS-free path). Happy-path: status reports `confirmed` on the
+	// first poll, block-height stays below `lastValidBlockHeight`.
+	mocks.getSignatureStatuses.mockResolvedValue({
+		value: [{ confirmationStatus: 'confirmed', err: null, slot: 1 }]
+	});
+	mocks.getBlockHeight.mockResolvedValue(0);
 
 	mocks.lpStoreRefresh.mockResolvedValue(undefined);
 	mocks.portfolioRefresh.mockResolvedValue(undefined);
@@ -400,7 +412,12 @@ describe('lp-form FSM service', () => {
 
 	it('FA-8 90s confirm timeout: error phase with timeout message', async () => {
 		setupHappyPath();
-		mocks.confirmTransaction.mockReturnValue(new Promise(() => {}));
+		// Polling path: status never reaches `confirmed`, block-height
+		// stays valid — the wall-clock timer is what fires.
+		mocks.getSignatureStatuses.mockResolvedValue({
+			value: [{ confirmationStatus: 'processed', err: null, slot: 1 }]
+		});
+		mocks.getBlockHeight.mockResolvedValue(0);
 
 		const promise = lpForm.startAdd(makeAddIntent());
 		await settle();
@@ -455,19 +472,30 @@ describe('lp-form FSM service', () => {
 
 	it('FA-12 isInFlight reflects in-flight only (not terminal)', async () => {
 		setupHappyPath();
-		let confirmResolve: (v: unknown) => void = () => {};
-		mocks.confirmTransaction.mockReturnValue(
-			new Promise((resolve) => {
-				confirmResolve = resolve;
-			})
-		);
+		// Hold the signature in `processed` (not yet `confirmed`) so the
+		// FSM stays in `confirming` — switch to `confirmed` for the next
+		// poll after we've asserted in-flight.
+		let confirmed = false;
+		mocks.getSignatureStatuses.mockImplementation(async () => ({
+			value: [
+				{
+					confirmationStatus: confirmed ? 'confirmed' : 'processed',
+					err: null,
+					slot: 1
+				}
+			]
+		}));
+		mocks.getBlockHeight.mockResolvedValue(0);
 
 		const promise = lpForm.startAdd(makeAddIntent());
 		await settle();
 
 		expect(lpForm.isInFlight(POOL_PDA_A)).toBe(true);
 
-		confirmResolve({ value: { err: null } });
+		confirmed = true;
+		// Advance through the 1.5s poll interval so the next iteration sees
+		// the `confirmed` status and resolves.
+		await vi.advanceTimersByTimeAsync(1500);
 		await settle();
 		await promise;
 

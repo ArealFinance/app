@@ -88,6 +88,7 @@ import {
 } from '@areal/sdk/tx';
 import {
 	findAssociatedTokenAddressPda,
+	findBinArrayPda,
 	findDexConfigPda,
 	findLpPositionPda
 } from '@areal/sdk/pda';
@@ -229,26 +230,104 @@ function failSilent(key: string, message: string, kind: LpType) {
 	scheduleCleanup(key);
 }
 
+/**
+ * Confirm a signature using `getSignatureStatuses` polling. Avoids
+ * `connection.confirmTransaction()` because web3.js races a signature WS
+ * subscription internally, and our `createConnection` neuters subscriptions
+ * to keep clusters without a public WS port (Testnet over Cloudflared) from
+ * dialling `wss://…` in a loop. The HTTP-poll path is what we actually rely
+ * on; this function makes it explicit.
+ *
+ * Loop strategy: poll every 1.5 s, escalate to giving up either when:
+ *   - the status reports `err` (revert) → throw with the rendered error,
+ *   - the status reaches the desired commitment → resolve,
+ *   - `lastValidBlockHeight` is exceeded → throw "blockhash expired",
+ *   - the wall-clock timeout fires → throw "still pending".
+ *
+ * The blockhash-expiry check matches what `confirmTransaction` does
+ * internally so users on a slow validator don't sit forever on a tx that
+ * the network has already dropped.
+ */
+/**
+ * Confirm a signature using `getSignatureStatuses` polling. Avoids
+ * `connection.confirmTransaction()` because web3.js races a signature WS
+ * subscription internally, and our `createConnection` neuters subscriptions
+ * to keep clusters without a public WS port (Testnet over Cloudflared) from
+ * dialling `wss://…` in a loop.
+ *
+ * Race shape: a polling loop against the wall-clock `CONFIRM_TIMEOUT_MS` —
+ * matches the original `Promise.race` pattern so fake timers in unit tests
+ * advance both sides predictably.
+ *
+ * Loop strategy:
+ *   - poll every 1.5 s,
+ *   - resolve when status reaches `confirmed`/`finalized`,
+ *   - throw when status reports `err` (revert),
+ *   - throw "blockhash expired" once `getBlockHeight` passes `lastValidBlockHeight`,
+ *   - the outer timer throws "still pending" at `CONFIRM_TIMEOUT_MS`.
+ */
 async function confirmWithTimeout(
 	connection: Connection,
 	signature: string,
-	blockhash: string,
+	_blockhash: string,
 	lastValidBlockHeight: number
 ): Promise<void> {
-	const confirmPromise = connection
-		.confirmTransaction(
-			{ signature, blockhash, lastValidBlockHeight },
-			'confirmed'
-		)
-		.then((result) => {
-			if (result.value.err) {
-				throw new Error(
-					typeof result.value.err === 'string'
-						? result.value.err
-						: JSON.stringify(result.value.err)
-				);
+	const POLL_INTERVAL_MS = 1500;
+	let stopped = false;
+
+	const pollLoop = async (): Promise<void> => {
+		while (!stopped) {
+			// 1) Signature status — the authoritative source of truth.
+			try {
+				const { value } = await connection.getSignatureStatuses([signature], {
+					searchTransactionHistory: false
+				});
+				const status = value[0];
+				if (status) {
+					if (status.err) {
+						throw new Error(
+							typeof status.err === 'string'
+								? status.err
+								: JSON.stringify(status.err)
+						);
+					}
+					if (
+						status.confirmationStatus === 'confirmed' ||
+						status.confirmationStatus === 'finalized'
+					) {
+						return;
+					}
+				}
+			} catch (err) {
+				// Rethrow real on-chain errors; swallow transient RPC failures.
+				if (
+					err instanceof Error &&
+					/^[A-Z][a-zA-Z]+(?:Error)?:/.test(err.message)
+				) {
+					throw err;
+				}
 			}
-		});
+
+			// 2) Blockhash-expiry guard.
+			try {
+				const currentHeight = await connection.getBlockHeight('confirmed');
+				if (currentHeight > lastValidBlockHeight) {
+					throw new Error(
+						'Transaction blockhash expired before confirmation. Please retry.'
+					);
+				}
+			} catch (err) {
+				if (
+					err instanceof Error &&
+					err.message.startsWith('Transaction blockhash expired')
+				) {
+					throw err;
+				}
+			}
+
+			await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
+		}
+	};
 
 	let timer: ReturnType<typeof setTimeout> | null = null;
 	const timeout = new Promise<never>((_, reject) => {
@@ -260,8 +339,9 @@ async function confirmWithTimeout(
 	});
 
 	try {
-		await Promise.race([confirmPromise, timeout]);
+		await Promise.race([pollLoop(), timeout]);
 	} finally {
+		stopped = true;
 		if (timer) clearTimeout(timer);
 	}
 }
@@ -406,6 +486,17 @@ async function runAdd(intent: AddLiquidityIntent): Promise<void> {
 			intent.pool.tokenBMint
 		);
 
+		// Concentrated pools require the BinArray PDA as the last
+		// `remaining_account` so the contract can fan the deposit across
+		// active bins (`concentrated::distribute_to_bins`). Standard pools
+		// MUST omit it — the contract gates the BinArray load on
+		// `pool.poolType == POOL_TYPE_CONCENTRATED`. See
+		// `contracts/native-dex/src/instructions/add_liquidity.rs:299-320`.
+		const isConcentrated = intent.pool.poolType === 1;
+		const binArray = isConcentrated
+			? findBinArrayPda(intent.pool.poolAddress, programId)[0]
+			: undefined;
+
 		const ctx: AddLiquidityAccountContext = {
 			dexProgramId: programId,
 			provider: holder,
@@ -415,7 +506,8 @@ async function runAdd(intent: AddLiquidityIntent): Promise<void> {
 			providerTokenB,
 			vaultA: fresh.pool.vaultA,
 			vaultB: fresh.pool.vaultB,
-			dexConfig: dexConfigPda
+			dexConfig: dexConfigPda,
+			binArray
 		};
 
 		const tx: Transaction = await buildAddLiquidityTx({
