@@ -152,20 +152,12 @@
 		xmlns="http://www.w3.org/2000/svg"
 		aria-hidden="true"
 	>
-		<defs>
-			{#each bands as band (band.key)}
-				<linearGradient id="grad-{band.key}" x1="0" x2="1" y1="0" y2="0">
-					<stop offset="0%" stop-color={band.color} stop-opacity="0.9" />
-					<stop offset="100%" stop-color={band.color} stop-opacity="0.55" />
-				</linearGradient>
-			{/each}
-		</defs>
-
-		<!-- Stacked bands. Each is non-overlapping; the gradient gives the
-		     same "flaring on the left, tapering right" feel as the prior
-		     mock without the crisscross. -->
+		<!-- Stacked bands. Figma fill spec (Rectangles 5232/5234) is a
+		     flat solid colour at opacity 0.35 — no gradient. Keeps the
+		     pills + marker visually dominant against the muted band
+		     surface. -->
 		{#each bands as band (band.key)}
-			<path d={pathFor(band)} fill="url(#grad-{band.key})" />
+			<path d={pathFor(band)} fill={band.color} fill-opacity="0.35" />
 		{/each}
 
 		<!-- Start pills: solid bars at x=0, equal-height (one slot per
