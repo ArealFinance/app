@@ -987,6 +987,7 @@
 		display: inline-flex;
 		align-items: baseline;
 		gap: 8px;
+		white-space: nowrap;
 	}
 	.token-name {
 		font-family: 'Onest', var(--font-body);
@@ -994,6 +995,7 @@
 		font-weight: 700;
 		letter-spacing: -0.6px;
 		color: var(--color-text);
+		white-space: nowrap;
 	}
 	.token-sym {
 		font-family: 'Onest', var(--font-body);
@@ -1001,6 +1003,7 @@
 		font-weight: 500;
 		letter-spacing: -0.6px;
 		color: rgba(251, 242, 255, 0.5);
+		white-space: nowrap;
 	}
 	.token-cat {
 		display: inline-flex;
