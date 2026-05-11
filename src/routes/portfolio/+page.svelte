@@ -515,16 +515,19 @@
 							</button>
 						</div>
 
-						<!-- 18px gap-row: outer-mat bg above the crystal + a 74px pill
-						     connector in the centre. Two side anchors carry pseudo-pies
-						     that carve concave fillets into the section material at the
-						     four corners adjacent to the connector (so the section's
-						     bottom edge curves smoothly into the connector's pill
-						     ends rather than meeting them at a 90°). -->
+						<!-- 18px gap-row recreating the Figma boolean Subtract.
+						     Background is section colour (continuous with top + bottom
+						     sections). Two pill-shaped overlays of outer-mat colour
+						     punch the cut windows out: full pill (radius 9 = height/2)
+						     means BOTH ends of each cut are rounded — outer end (toward
+						     section's vertical edge) and inner end (toward connector).
+						     Section material naturally wraps around all four pill ends
+						     via the geometry, producing the four concave fillets seen
+						     in the Figma source. The 74px space between the two cuts
+						     is the visual 'connector' — no separate element needed. -->
 						<div class="claim-gap-row" aria-hidden="true">
-							<span class="claim-fillet claim-fillet-left"></span>
-							<span class="claim-connector"></span>
-							<span class="claim-fillet claim-fillet-right"></span>
+							<span class="claim-cut claim-cut-left"></span>
+							<span class="claim-cut claim-cut-right"></span>
 						</div>
 
 						<!-- BOTTOM section: total value, chart, legend, stats -->
@@ -1125,17 +1128,14 @@
 	}
 
 	/* ---------- Filled aside (claim + KPIs + chart + stats) ----------
-	 * Re-creates the Figma Subtract: two fully-rounded section boxes
-	 * separated by an 18px gap-row, with a 74px section-coloured
-	 * connector bar bridging them through the centre of the gap.
-	 *   - claim-top       → top section, all 4 corners rounded
-	 *   - claim-gap-row   → 18px height, transparent; outer-mat colour
-	 *                       shows through on either side of the connector
-	 *   - claim-connector → 74px bar, section-coloured, centred in gap
-	 *   - claim-bottom    → bottom section, all 4 corners rounded
-	 * Result: two visible outer-mat 'windows' framed by the sections'
-	 * naturally-curved bottom/top edges, exactly matching the boolean
-	 * op in the source file. */
+	 * Re-creates the Figma Subtract: full inner #080A0F minus two 199x18
+	 * strips, leaving a 74px connector bar in the centre. Built with:
+	 *   - claim-top      → top section, flat bottom edge
+	 *   - claim-gap-row  → 18px height, no bg (outer #181A29 shows through)
+	 *   - claim-connector→ 74px bar absolute-pinned to centre of gap, #080A0F
+	 *   - claim-bottom   → bottom section, flat top edge
+	 * Result: two visible windows of outer colour on either side of the bar,
+	 * exactly matching the boolean op in the source file. */
 	.claim-shell {
 		position: relative;
 		margin: 4px;
@@ -1150,13 +1150,20 @@
 		gap: var(--space-5);
 	}
 	.claim-top {
-		/* All four corners rounded — outer top corners visually align with
-		 * the Card's outer rounding; outer bottom corners create the
-		 * filleted curve where the section meets the gap-row. */
-		border-radius: var(--radius-lg);
+		border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+		/* Extend section bg 12px past content (padding 24 → 36), then pull
+		 * the next sibling 18px back up (negative margin). Net: section bg
+		 * covers the full gap-row band from above, while flow stays compact.
+		 * Combined with claim-bottom's mirror trick the gap-row is fully
+		 * blanketed by section material — cut overlays carve outer mat
+		 * cleanly, no separate background needed on gap-row. */
+		padding-bottom: 36px;
+		margin-bottom: -18px;
 	}
 	.claim-bottom {
-		border-radius: var(--radius-lg);
+		border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+		padding-top: 36px;
+		margin-top: -18px;
 	}
 	.claim-section .rewards-block {
 		flex: 1;
@@ -1165,75 +1172,34 @@
 	.claim-gap-row {
 		position: relative;
 		height: 18px;
-		/* Painted with outer-mat colour at z-index above the crystal so the
-		 * cut windows stay visible across the full width (the crystal
-		 * silhouette would otherwise hide the right cut). The connector
-		 * paints section colour as a pill on top. */
-		background-color: var(--color-surface-inset);
+		/* No background — top + bottom sections (with padding/margin tricks)
+		 * cover the gap-row band with section bg from both sides. z-index
+		 * keeps the cut overlays above section bg. */
 		z-index: 9;
 	}
-	.claim-connector {
-		/* 74px section-coloured strip bridging top and bottom sections
-		 * vertically through the gap-row. Centred horizontally. All 4
-		 * corners rounded so the connector reads as a pill nested
-		 * between the sections, with the cut-window's outer-mat colour
-		 * curving smoothly around its left + right ends. */
+	.claim-cut {
 		position: absolute;
 		top: 0;
-		left: calc(50% - 37px);
-		width: 74px;
 		height: 18px;
-		background-color: var(--color-surface);
-		border-radius: 9px;
-	}
-
-	/* Concave fillets at the four section corners adjacent to the connector.
-	 * Each pseudo paints a 9×9 quarter-pie of outer-mat colour with its tip at
-	 * the section's 90° corner and the curve bulging into the section material,
-	 * carving the corner into a smooth fillet curving around the connector. */
-	.claim-fillet {
-		position: absolute;
-		top: 0;
-		width: 0;
-		height: 18px;
-		pointer-events: none;
-	}
-	.claim-fillet-left {
-		left: calc(50% - 37px);
-	}
-	.claim-fillet-right {
-		right: calc(50% - 37px);
-	}
-	.claim-fillet::before,
-	.claim-fillet::after {
-		content: '';
-		position: absolute;
-		width: 9px;
-		height: 9px;
+		/* Outer mat colour (the Card variant="inset" surface) shows through
+		 * each cut. Each cut is rounded ONLY on the centre-facing end (toward
+		 * the connector); the outer end stays flush with the section's outer
+		 * vertical edge. radius=9px = height/2 → full semicircle on the
+		 * inner end. Concave fillets in the section material show only at
+		 * the inner cut ends (around the connector). */
 		background-color: var(--color-surface-inset);
-		pointer-events: none;
 	}
-	/* Left side — pseudos anchor to the right edge (= connector's left edge). */
-	.claim-fillet-left::before {
-		top: -9px;
-		right: 0;
-		border-radius: 9px 0 0 0;
-	}
-	.claim-fillet-left::after {
-		top: 18px;
-		right: 0;
-		border-radius: 0 0 0 9px;
-	}
-	/* Right side — pseudos anchor to the left edge (= connector's right edge). */
-	.claim-fillet-right::before {
-		top: -9px;
+	.claim-cut-left {
 		left: 0;
-		border-radius: 0 9px 0 0;
+		/* 37px = half of 74px connector core. Together both cuts leave a
+		 * 74px section-coloured strip in the centre — the visible connector. */
+		right: calc(50% + 37px);
+		border-radius: 0 9px 9px 0;
 	}
-	.claim-fillet-right::after {
-		top: 18px;
-		left: 0;
-		border-radius: 0 0 9px 0;
+	.claim-cut-right {
+		left: calc(50% + 37px);
+		right: 0;
+		border-radius: 9px 0 0 9px;
 	}
 
 	/* Crystal — fills claim-shell full width with baked-in aurora glow.
