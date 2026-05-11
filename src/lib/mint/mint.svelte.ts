@@ -134,7 +134,14 @@ export interface MintAttempt {
 
 const MINT_KEY = 'mint';
 const CONFIRM_TIMEOUT_MS = 90_000;
-const TERMINAL_CLEANUP_MS = 3_000;
+// FSM cleanup must outlast the MintConfirmModal's success auto-dismiss
+// (3 s in the modal). Otherwise the two timers race: if the FSM drops
+// the attempt first, `currentAttempt` flips to `null` while the modal
+// is still mounted, and Svelte re-renders the modal into its
+// `attempt === null` branch (the pre-confirm "CONFIRM MINT" view).
+// 5 s gives the modal a 2 s safety margin to finish closing. Same
+// pattern as `swap/swap.svelte.ts`.
+const TERMINAL_CLEANUP_MS = 5_000;
 
 /**
  * Reactive store of in-flight + recently-finished mint attempts.
