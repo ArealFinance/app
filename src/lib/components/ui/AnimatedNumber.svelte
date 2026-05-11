@@ -62,13 +62,19 @@
 		// smooth instead of snapping).
 		const target = value;
 
-		// Initial mount: skip the tween and snap directly to the first
-		// rendered value. Without this, a portfolio with `unclaimedRwt =
-		// 60 RWT` linearly counts 0 → 60 over 1500 ms before the user can
-		// read it. Subsequent updates (poll deltas, WS-triggered refetches)
-		// still tween so the value reads as "live ticking" rather than
-		// "snapping between polls".
+		// Initial mount: skip the tween on the first MEANINGFUL value so
+		// the user doesn't watch a slow 0 → 60 count-up on page load.
+		// "Meaningful" = the first non-zero target — early `$effect` runs
+		// often see `0` while async data (portfolio store, proof fetch)
+		// is still in flight, and flipping `firstRun` on those would let
+		// the slow tween kick in once data arrives. Once we've snapped to
+		// a non-zero baseline, subsequent updates (poll deltas, claim,
+		// refetch) keep the tween for the live-ticking feel.
 		if (firstRun) {
+			if (target === 0) {
+				displayed = 0;
+				return;
+			}
 			firstRun = false;
 			displayed = target;
 			return;
