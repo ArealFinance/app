@@ -802,17 +802,12 @@
 		display: inline-flex;
 		align-items: center;
 		justify-content: center;
-		/* Figma swap macet: 40×40 settings square with a 16-radius corner
-		 * (no token equivalent — sits between `--radius-md: 12px` and
-		 * `--radius-lg: 20px`). Inline the raw value rather than minting a
-		 * one-off `--radius-md-lg`; only this button needs the in-between
-		 * curvature. */
-		width: 40px;
-		height: 40px;
+		width: 32px;
+		height: 32px;
 		background-color: var(--color-bg);
 		color: var(--color-text);
 		border: 0;
-		border-radius: 16px;
+		border-radius: var(--radius-md);
 		cursor: pointer;
 		transition: background-color var(--motion-base) var(--ease-out);
 	}
@@ -850,12 +845,6 @@
 	}
 
 	/* ─── From / To rows ─── */
-	/* The Figma macet has the row as a dark `#070C1C` outer block with a
-	 * lighter `#181A29` inset (radius 16) wrapping just the amount area —
-	 * the token chip pops out of that inset against the darker outer
-	 * background. Reproduced here with a `::before` pseudo-element so the
-	 * grid layout stays untouched: the inset sits behind the amount cell,
-	 * offset by the same gap that already separates chip from amount. */
 	.swap-row {
 		position: relative;
 		display: grid;
@@ -869,25 +858,6 @@
 		padding: var(--space-3);
 		background-color: var(--color-bg);
 		border-radius: var(--radius-lg);
-	}
-	.swap-row::before {
-		content: '';
-		position: absolute;
-		/* Span the amount column only (everything to the right of the chip),
-		 * with the same vertical padding as the row so the inset visually
-		 * matches the chip height. */
-		left: calc(var(--space-3) + 44px + var(--space-3));
-		right: var(--space-3);
-		top: var(--space-3);
-		bottom: var(--space-3);
-		background-color: var(--color-surface-inset);
-		border-radius: 16px;
-		pointer-events: none;
-		z-index: 0;
-	}
-	.swap-row > * {
-		position: relative;
-		z-index: 1;
 	}
 	.swap-row.is-open {
 		z-index: 10;
