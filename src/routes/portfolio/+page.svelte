@@ -1184,13 +1184,17 @@
 	}
 	.claim-connector {
 		/* 74px section-coloured strip bridging top and bottom sections
-		 * vertically through the gap-row. Centred horizontally. */
+		 * vertically through the gap-row. Centred horizontally. All 4
+		 * corners rounded so the connector reads as a pill nested
+		 * between the sections, with the cut-window's outer-mat colour
+		 * curving smoothly around its left + right ends. */
 		position: absolute;
 		top: 0;
 		left: calc(50% - 37px);
 		width: 74px;
 		height: 18px;
 		background-color: var(--color-surface);
+		border-radius: 9px;
 	}
 
 	/* Crystal — fills claim-shell full width with baked-in aurora glow.
