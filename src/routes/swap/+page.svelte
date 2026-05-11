@@ -24,7 +24,7 @@
 	 *   - Phase 8 ships USDC↔RWT only. Mainnet shows an empty-state message
 	 *     until R20 lands and KNOWN_POOLS_BY_CLUSTER.mainnet is populated.
 	 */
-	import { onDestroy, onMount } from 'svelte';
+	import { onDestroy, onMount, untrack } from 'svelte';
 	import { PublicKey } from '@solana/web3.js';
 
 	import AppShell from '$lib/components/sections/AppShell.svelte';
@@ -256,9 +256,16 @@
 		}
 	});
 
-	// React to network and wallet changes. We DO NOT recreate the activePool
-	// reference if the user switches network and the same pool exists with
-	// different addresses — instead we reset to the first available pool.
+	// React to network changes only. We must NOT track `activePool` here —
+	// any `activePool = X` assignment from `selectFromToken`/`selectToToken`
+	// would re-run this effect and revert the selection to `pools[0]`,
+	// silently undoing the user's pick (bug: clicking SPRK in the To
+	// dropdown reset the active pool to USDC/RWT, the first entry).
+	//
+	// `untrack(activePool)` on the existing-pool check, network.current as
+	// the sole reactive dep. The effect's job is purely "if the active
+	// pool isn't valid for the new cluster, switch to the first cluster
+	// pool" — selection inside the same cluster stays put.
 	$effect(() => {
 		const cluster = network.current;
 		const pools = KNOWN_POOLS_BY_CLUSTER[cluster];
@@ -267,11 +274,14 @@
 			quote.deactivate();
 			return;
 		}
-		const next = pools[0];
-		if (!activePool || !activePool.poolPda.equals(next.poolPda)) {
-			activePool = next;
-			void quote.activatePool(next);
-		}
+		const current = untrack(() => activePool);
+		const stillValid =
+			current !== null &&
+			pools.some((p) => p.poolPda.equals(current.poolPda));
+		if (stillValid) return;
+		const next = pools[0]!;
+		activePool = next;
+		void quote.activatePool(next);
 	});
 
 	$effect(() => {
