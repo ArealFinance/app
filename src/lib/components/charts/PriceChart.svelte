@@ -14,15 +14,18 @@
 		xLabels?: string[];
 		/**
 		 * Centered rolling-average window applied to `y` values before
-		 * rendering. Defaults to 5, which rounds off the plateau-edge corners
-		 * that show up on sparse Testnet NAV data without flattening the
-		 * trend. Set to `1` to disable smoothing entirely (mock data, dense
+		 * rendering. Defaults to 9, which dissolves the plateau-edge
+		 * corners on sparse Testnet NAV data into gentle slopes without
+		 * flattening the underlying trend. Paired with the `curveBumpX`
+		 * stroke in the renderer, the combination produces the wavy aesthetic
+		 * shown in the Figma macet even on data with abrupt single-tick
+		 * jumps. Set to `1` to bypass smoothing entirely (mock data, dense
 		 * mainnet series).
 		 */
 		smoothingWindow?: number;
 	};
 
-	let { data = generateMockData(), currentPrice, xLabels, smoothingWindow = 5 }: Props = $props();
+	let { data = generateMockData(), currentPrice, xLabels, smoothingWindow = 9 }: Props = $props();
 
 	function generateMockData(): PricePoint[] {
 		// Smooth-ish growth + dip + recovery. Range ~7-15.

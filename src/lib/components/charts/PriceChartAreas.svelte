@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { getContext } from 'svelte';
-	import { area, line, curveCatmullRom } from 'd3-shape';
+	import { area, line, curveBumpX } from 'd3-shape';
 	import type { Readable } from 'svelte/store';
 	import type { ScaleLinear } from 'd3-scale';
 
@@ -25,12 +25,13 @@
 	// without `<defs>` id collisions (NAV Growth + Price chart on the same screen).
 	const uid = $props.id();
 
-	// Centripetal Catmull-Rom (alpha 0.5) — passes through every data point
-	// like `curveMonotoneX` but rounds the corners between plateaus into
-	// soft S-curves instead of preserving the abrupt slope change. Matches
-	// the Figma macet's "softer" feel without the overshoot or
-	// off-the-points artifacts of `curveBasis` / `curveCardinal`.
-	const SMOOTHING = curveCatmullRom.alpha(0.5);
+	// `curveBumpX` — horizontal cubic Bézier between each pair of points.
+	// At every data point the curve is horizontal, then arcs as a smooth
+	// S into the next point. Combined with the rolling-average smoother
+	// in the parent, this turns the Testnet plateau-jump-plateau shape
+	// into a flowing wave instead of the previous near-right-angle
+	// transitions Catmull-Rom couldn't fully iron out.
+	const SMOOTHING = curveBumpX;
 	const areaGen = $derived(
 		area<Point>()
 			.x((d) => $xScale(d.x))
