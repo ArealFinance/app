@@ -387,24 +387,18 @@
 		closeClaimModal();
 	}
 
-	// Lifecycle — stores handle wallet/network re-fires on their own.
-	// `markets.start/stop` is NOT ref-counted, but SvelteKit page instances
-	// don't coexist (each route's onDestroy fires before the next route's
-	// onMount), so it's safe to bracket the lifetime per page. Same pattern
-	// the markets pages already use.
+	// Lifecycle — only `start()` on mount. We do NOT `stop()` on unmount,
+	// because stop() tears the snapshot down to its idle state and the user
+	// would then see a skeleton flash on every return navigation. The stores
+	// are singletons; once started they stay live for the rest of the SPA
+	// session and handle wallet / network re-fires on their own. (The unused
+	// `onDestroy` import is kept in case future cleanup hooks land here.)
 	onMount(() => {
 		portfolio.start();
 		historyStore.start();
 		lpPortfolio.start();
 		markets.start();
 		priceFeed.start();
-	});
-	onDestroy(() => {
-		portfolio.stop();
-		historyStore.stop();
-		lpPortfolio.stop();
-		markets.stop();
-		priceFeed.stop();
 	});
 
 	/*

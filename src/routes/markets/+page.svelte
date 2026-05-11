@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount, onDestroy } from 'svelte';
+	import { onMount } from 'svelte';
 
 	import {
 		AppShell,
@@ -102,8 +102,10 @@
 			stockTokens.length === 0
 	);
 
+	// Singleton markets store stays live across SPA navigations so returning
+	// here renders cached pools/tokens immediately (no skeleton flash).
+	// Network change clears stale data through the store's own effect path.
 	onMount(() => markets.start());
-	onDestroy(() => markets.stop());
 </script>
 
 <svelte:head>

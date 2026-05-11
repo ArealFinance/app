@@ -672,11 +672,13 @@
 		// Idempotent — start() is safe to call across remount.
 		holdersStore.start();
 	});
+	// We only deactivate the pool subscription (per-token state) on unmount;
+	// the singleton snapshot stores intentionally STAY live across SPA
+	// navigations so returning to a token detail page renders cached data
+	// immediately (no skeleton flash). Wallet / network changes still go
+	// through each store's own effect path and clear stale state there.
 	onDestroy(() => {
 		poolStore.deactivate();
-		markets.stop();
-		priceFeed.stop();
-		holdersStore.stop();
 	});
 </script>
 
