@@ -103,6 +103,19 @@ let pendingRefresh: Promise<void> | null = null;
 let cycle: SubscriptionCycle | null = null;
 let wsDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 let stopEffect: (() => void) | null = null;
+let pollTimer: ReturnType<typeof setInterval> | null = null;
+
+/**
+ * Background poll interval. Vesting math (`getHolderPortfolio` →
+ * `computeVestedClaimable`) consumes the on-chain Clock sysvar, so
+ * `claimableNow` ticks upward continuously even without any WS event.
+ * Without a poll the UI only updates on wallet/network switches or
+ * external claim/fund TXs — and the user has to reload to see vesting
+ * progress. 5 s is the sweet spot: smooth enough that the
+ * `AnimatedNumber` count-up reads as live ticking, cheap enough that
+ * we don't spam RPC.
+ */
+const POLL_INTERVAL_MS = 5_000;
 
 function clearDebounce() {
 	if (wsDebounceTimer !== null) {
@@ -288,6 +301,13 @@ function start(): void {
 			effectBody();
 		});
 	});
+	if (pollTimer === null) {
+		pollTimer = setInterval(() => {
+			// Only re-fetch when there's an active holder; the effectBody()
+			// already nulled `activeHolder` if no wallet is connected.
+			if (activeHolder !== null) void refresh();
+		}, POLL_INTERVAL_MS);
+	}
 }
 
 function stop(): void {
@@ -296,6 +316,10 @@ function stop(): void {
 	if (stopEffect) {
 		stopEffect();
 		stopEffect = null;
+	}
+	if (pollTimer !== null) {
+		clearInterval(pollTimer);
+		pollTimer = null;
 	}
 	activeHolder = null;
 	pendingRefresh = null;

@@ -5,7 +5,7 @@
 	import AppShell from '$lib/components/sections/AppShell.svelte';
 	import AssetsDistributionChart from '$lib/components/charts/AssetsDistributionChart.svelte';
 	import TickWheel from '$lib/components/charts/TickWheel.svelte';
-	import { Card, Picture } from '$lib/components/ui';
+	import { AnimatedNumber, Card, Picture } from '$lib/components/ui';
 	import { ArrowUpSmall, Check, Xmark } from '$lib/icons';
 	import { wallet } from '$lib/stores/wallet.svelte';
 	import { auth } from '$lib/auth';
@@ -500,7 +500,10 @@
 										loading="lazy"
 									/>
 									<span class="rewards-amount">
-										{unclaimedDisplay}
+										<AnimatedNumber
+											value={Number(unclaimedRwt) / 10 ** RWT_DECIMALS}
+											decimals={RWT_DECIMALS}
+										/>
 									</span>
 									<span class="rwt-pill">RWT</span>
 								</div>

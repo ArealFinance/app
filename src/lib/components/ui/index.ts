@@ -39,3 +39,5 @@ export type { TokenAvatarSize, TokenAvatarTone } from './TokenAvatar.svelte';
 
 export { default as Picture } from './Picture.svelte';
 export type { PictureLoading, PictureFetchPriority } from './Picture.svelte';
+
+export { default as AnimatedNumber } from './AnimatedNumber.svelte';
