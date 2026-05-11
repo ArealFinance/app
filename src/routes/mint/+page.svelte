@@ -350,7 +350,7 @@
 							settingsOpen = !settingsOpen;
 						}}
 					>
-						<Gear size={16} variant="duotone" />
+						<Gear size={20} variant="duotone" />
 					</button>
 					{#if settingsOpen}
 						<div
@@ -391,46 +391,63 @@
 				</div>
 			{:else}
 				<div class="mint-stack">
-					<!-- ─────── From row (USDC) ─────── -->
+					<!-- ─────── Pay row (USDC, fixed token) ─────── -->
+					<!-- Visually mirrors `.swap-row` from /swap: dark outer pill +
+					     44×44 token logo + lighter inset card with the label-row
+					     (label + symbol + balance) and amount input below. The
+					     mint variant drops the chevron / token-picker affordance
+					     since USDC↔RWT is a fixed pair. -->
 					<div class="mint-row">
-						<div class="row-head">
-							<span class="row-label">Pay</span>
-							{#if usdcBalanceDisplay}
-								<span class="row-balance">{usdcBalanceDisplay} USDC</span>
-							{/if}
+						<span class="mint-token-logo mint-token-logo-usdc" aria-hidden="true">
+							<img src="/images/tokens/usdc.svg" alt="" />
+						</span>
+
+						<div class="mint-row-inset">
+							<div class="row-head">
+								<span class="row-line">
+									<span class="row-label">Pay</span>
+									<span class="mint-token-symbol">USDC</span>
+								</span>
+								{#if usdcBalanceDisplay}
+									<span class="row-balance">{usdcBalanceDisplay}</span>
+								{/if}
+							</div>
+							<input
+								class="mint-amount"
+								type="text"
+								inputmode="decimal"
+								placeholder="0.00"
+								bind:value={amountStr}
+								aria-label="Amount of USDC to deposit"
+							/>
 						</div>
-						<div class="mint-token-chip mint-token-chip-static">
-							<span class="mint-token-symbol">USDC</span>
-						</div>
-						<input
-							class="mint-amount"
-							type="text"
-							inputmode="decimal"
-							placeholder="0.00"
-							bind:value={amountStr}
-							aria-label="Amount of USDC to deposit"
-						/>
 					</div>
 
-					<!-- ─────── To row (RWT, read-only) ─────── -->
+					<!-- ─────── Receive row (RWT, read-only) ─────── -->
 					<div class="mint-row">
-						<div class="row-head">
-							<span class="row-label">Receive</span>
-							{#if rwtBalanceDisplay}
-								<span class="row-balance">{rwtBalanceDisplay} RWT</span>
-							{/if}
+						<span class="mint-token-logo mint-token-logo-rwt" aria-hidden="true">
+							<img src="/images/tokens/rwt-mark.svg" alt="" />
+						</span>
+
+						<div class="mint-row-inset">
+							<div class="row-head">
+								<span class="row-line">
+									<span class="row-label">Receive</span>
+									<span class="mint-token-symbol">RWT</span>
+								</span>
+								{#if rwtBalanceDisplay}
+									<span class="row-balance">{rwtBalanceDisplay}</span>
+								{/if}
+							</div>
+							<input
+								class="mint-amount mint-amount-readonly"
+								type="text"
+								readonly
+								placeholder="0.00"
+								value={toAmountDisplay}
+								aria-label="RWT amount you will receive (computed)"
+							/>
 						</div>
-						<div class="mint-token-chip mint-token-chip-static">
-							<span class="mint-token-symbol">RWT</span>
-						</div>
-						<input
-							class="mint-amount mint-amount-readonly"
-							type="text"
-							readonly
-							placeholder="0.00"
-							value={toAmountDisplay}
-							aria-label="RWT amount you will receive (computed)"
-						/>
 					</div>
 				</div>
 
@@ -574,21 +591,26 @@
 		position: relative;
 	}
 
+	/* 40×40 nut button per Figma macet — same dimensions as /swap's
+	 * settings glyph (radius 16, dark_900 bg, low-opacity glyph). */
 	.mint-settings-btn {
 		display: inline-flex;
 		align-items: center;
 		justify-content: center;
-		width: 32px;
-		height: 32px;
+		width: 40px;
+		height: 40px;
 		background-color: var(--color-bg);
 		color: var(--color-text);
+		opacity: 0.7;
 		border: 0;
-		border-radius: var(--radius-md);
+		border-radius: 16px;
 		cursor: pointer;
-		transition: background-color var(--motion-base) var(--ease-out);
+		transition:
+			opacity var(--motion-base) var(--ease-out),
+			background-color var(--motion-base) var(--ease-out);
 	}
 	.mint-settings-btn:hover {
-		background-color: var(--color-dark-700);
+		opacity: 1;
 	}
 
 	.settings-popover {
@@ -653,77 +675,108 @@
 	}
 
 	/* ─── Pay / Receive rows ─── */
+	/* Mirrors `.swap-row` from /swap/+page.svelte: a dark outer pill with
+	 * the 44×44 token logo on the left and a lighter inset rect on the
+	 * right holding the row-head (label + symbol + balance) and the
+	 * amount input below. The mint variant drops the chevron / picker
+	 * because USDC→RWT is a fixed pair, but spacing and radii match the
+	 * swap design 1:1. */
 	.mint-row {
 		position: relative;
-		display: grid;
-		grid-template-columns: auto 1fr;
-		grid-template-rows: auto 1fr;
-		grid-template-areas:
-			'head head'
-			'chip amount';
+		display: flex;
 		align-items: center;
-		gap: var(--space-2) var(--space-3);
-		padding: var(--space-3);
+		gap: var(--space-2);
+		padding: 4px;
+		padding-left: 12px;
 		background-color: var(--color-bg);
-		border-radius: var(--radius-lg);
+		border-radius: 20px;
+	}
+
+	.mint-token-logo {
+		display: inline-flex;
+		flex: none;
+		align-items: center;
+		justify-content: center;
+		width: 44px;
+		height: 44px;
+		border-radius: 16px;
+		overflow: hidden;
+	}
+	.mint-token-logo img {
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+	}
+	/* Per-token logo backgrounds — same source palette as /swap and
+	 * /markets so the same USDC and RWT marks render with identical chips
+	 * everywhere in the app. */
+	.mint-token-logo-usdc {
+		background: #2775ca;
+	}
+	.mint-token-logo-rwt {
+		background: linear-gradient(135deg, #a56eff 0%, #602fdc 100%);
+	}
+
+	.mint-row-inset {
+		display: flex;
+		flex: 1;
+		flex-direction: column;
+		min-width: 0;
+		min-height: 56px;
+		padding: 4px 12px;
+		background-color: var(--color-surface-inset);
+		border-radius: 16px;
+		justify-content: center;
 	}
 
 	.row-head {
-		grid-area: head;
 		display: flex;
+		align-items: center;
 		justify-content: space-between;
-		align-items: baseline;
 		gap: var(--space-3);
+		font-family: 'Onest', var(--font-body);
+		font-size: 14px;
+		line-height: 1.4;
+		letter-spacing: -0.6px;
+	}
+	.row-line {
+		display: inline-flex;
+		align-items: baseline;
+		gap: 6px;
 	}
 	.row-label {
-		font-family: 'Onest', var(--font-body);
-		font-size: var(--text-xs);
-		font-weight: var(--font-weight-medium);
 		color: var(--color-text-muted);
+		font-weight: 500;
 	}
 	.row-balance {
 		font-family: 'Onest', var(--font-body);
-		font-size: var(--text-xs);
-		font-weight: var(--font-weight-medium);
+		font-size: 12px;
+		font-weight: 500;
 		color: var(--color-text-muted);
-	}
-
-	.mint-token-chip {
-		grid-area: chip;
-		display: inline-flex;
-		align-items: center;
-		gap: var(--space-2);
-		padding: var(--space-2) var(--space-3);
-		background-color: var(--color-surface-inset);
-		border: 0;
-		border-radius: var(--radius-md);
-		color: var(--color-text);
-	}
-	.mint-token-chip-static {
-		cursor: default;
+		white-space: nowrap;
 	}
 
 	.mint-token-symbol {
 		font-family: 'Onest', var(--font-body);
-		font-size: var(--text-base);
-		font-weight: var(--font-weight-medium);
-		letter-spacing: var(--tracking-tight);
+		font-size: 14px;
+		font-weight: 700;
+		letter-spacing: -0.6px;
 		color: var(--color-text);
 	}
 
 	.mint-amount {
-		grid-area: amount;
 		width: 100%;
 		min-width: 0;
 		background: transparent;
 		border: 0;
 		outline: none;
-		padding: 0 var(--space-2);
+		padding: 0;
 		font-family: 'Onest', var(--font-body);
 		font-size: 20px;
-		font-weight: var(--font-weight-medium);
-		letter-spacing: var(--tracking-tight);
-		text-align: right;
+		font-weight: 500;
+		line-height: 1.4;
+		letter-spacing: -0.6px;
+		text-align: left;
 		color: var(--color-text);
 	}
 	.mint-amount::placeholder {
