@@ -984,11 +984,13 @@
 
 				<!-- ========== RIGHT COLUMN: quick swap (current token pinned to From) ========== -->
 				{#if pinnedToken}
-					<QuickSwap
-						pinnedToken={pinnedToken}
-						pinnedSide="from"
-						tokens={quickSwapCounterparts}
-					/>
+					<div class="token-quickswap">
+						<QuickSwap
+							pinnedToken={pinnedToken}
+							pinnedSide="from"
+							tokens={quickSwapCounterparts}
+						/>
+					</div>
 				{/if}
 			</div>
 		{:else}
@@ -1027,6 +1029,13 @@
 		display: flex;
 		flex-direction: column;
 		gap: var(--space-4);
+		position: sticky;
+		top: calc(var(--header-height-desktop) + var(--space-4));
+	}
+	/* ---------- Right column: quick-swap wrapper (sticky on scroll) ---------- */
+	.token-quickswap {
+		position: sticky;
+		top: calc(var(--header-height-desktop) + var(--space-4));
 	}
 	.token-divider {
 		margin: 0;
@@ -1829,6 +1838,13 @@
 		}
 		.stats-grid {
 			grid-template-columns: repeat(4, 1fr);
+		}
+		/* Drop sticky on stacked single-column layout — both sidebars become
+		 * full-width rows and sticky would pin them awkwardly. */
+		.token-aside,
+		.token-quickswap {
+			position: static;
+			top: auto;
 		}
 	}
 	@media (max-width: 640px) {
