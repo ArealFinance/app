@@ -362,6 +362,14 @@
 	function confirmClaim() {
 		if (!modalRow) return;
 		void claims.start(modalRow);
+		// Dismiss the modal immediately on submit. Post-confirm progress
+		// (preparing → awaiting-signature → broadcasting → confirming →
+		// success/error) is surfaced inline on the big "Claim rewards"
+		// CTA via `aggregatePhase`, plus toasts emitted by claims.start
+		// for terminal states. Keeping the modal open used to double up
+		// with the CTA and trap the user behind a blocking overlay while
+		// the tx confirmed (~30 s on Testnet).
+		closeClaimModal();
 	}
 
 	// Lifecycle — stores handle wallet/network re-fires on their own.
