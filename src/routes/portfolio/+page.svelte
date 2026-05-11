@@ -1320,6 +1320,8 @@
 	 *   success                                       — green-bordered outline, white text, green check-circle
 	 *   error / idle-empty                            — outlined, white/muted text, red check-circle (only on error) */
 	.claim-btn {
+		position: relative;
+		z-index: 10;
 		display: inline-flex;
 		align-items: center;
 		justify-content: center;
