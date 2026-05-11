@@ -1192,17 +1192,17 @@
 	}
 	.claim-cut::before,
 	.claim-cut::after {
-		/* Section-coloured convex bulge painted *inside* the gap-row at each
-		 * outer corner of the cut. A 9×9 box of section colour with the
-		 * gap-facing corner rounded 9px creates a quarter-disk bulge whose
-		 * arc tangents the section's outer edge and the gap-row's top/bottom
-		 * edge — so the section material curves smoothly *out into* the gap
-		 * at the corner instead of breaking with a sharp 90°. */
+		/* Outer fillets on the section corners. Each pseudo is a 9×9 box of
+		 * outer-mat colour placed *outside* the gap-row (above for the top
+		 * section, below for the bottom section) with the corner facing the
+		 * section's 90° corner rounded 9px. The rounded corner carves an
+		 * arc through the outer colour that traces the desired filleted
+		 * silhouette of the section material at the gap. */
 		content: '';
 		position: absolute;
 		width: 9px;
 		height: 9px;
-		background-color: var(--color-surface);
+		background-color: var(--color-surface-inset);
 		pointer-events: none;
 	}
 	.claim-cut-left {
@@ -1212,34 +1212,34 @@
 		right: calc(50% + 37px);
 		border-radius: 0 9px 9px 0;
 	}
-	/* Outer bulges for the left cut — top one curves down-right from the
-	 * top-section's outer corner, bottom one curves up-right from the
-	 * bottom-section's outer corner. Both anchored to the cut's left edge. */
+	/* Outer fillets for the left cut — sit just above (::before) and just
+	 * below (::after) the gap-row, anchored to the section's outer-left edge.
+	 * Border-radius on the corner pointing into the section corner. */
 	.claim-cut-left::before {
-		top: 0;
+		top: -9px;
 		left: 0;
-		border-radius: 0 0 9px 0;
+		border-radius: 0 0 0 9px;
 	}
 	.claim-cut-left::after {
-		top: 9px;
+		top: 18px;
 		left: 0;
-		border-radius: 0 9px 0 0;
+		border-radius: 9px 0 0 0;
 	}
 	.claim-cut-right {
 		left: calc(50% + 37px);
 		right: 0;
 		border-radius: 9px 0 0 9px;
 	}
-	/* Mirror of the left bulges, anchored to the cut's right edge. */
+	/* Mirror of the left fillets, anchored to the section's outer-right edge. */
 	.claim-cut-right::before {
-		top: 0;
+		top: -9px;
 		right: 0;
-		border-radius: 0 0 0 9px;
+		border-radius: 0 0 9px 0;
 	}
 	.claim-cut-right::after {
-		top: 9px;
+		top: 18px;
 		right: 0;
-		border-radius: 9px 0 0 0;
+		border-radius: 0 9px 0 0;
 	}
 
 	/* Crystal — fills claim-shell full width with baked-in aurora glow.
