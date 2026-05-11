@@ -515,14 +515,13 @@
 							</button>
 						</div>
 
-						<!-- 18px gap-row with explicit cut overlays + a 74px central
-						     connector. The cuts paint outer-mat colour at a z-level
-						     above the crystal asset so the right cut stays visible
-						     where the crystal silhouette would otherwise hide it. -->
+						<!-- 18px gap-row painted with outer-mat colour at a z-level
+						     above the crystal so the cut windows stay visible across
+						     the entire width (crystal silhouette would otherwise hide
+						     the right cut). A 74px pill connector bridges the
+						     sections vertically through the centre of the gap. -->
 						<div class="claim-gap-row" aria-hidden="true">
-							<span class="claim-cut claim-cut-left"></span>
 							<span class="claim-connector"></span>
-							<span class="claim-cut claim-cut-right"></span>
 						</div>
 
 						<!-- BOTTOM section: total value, chart, legend, stats -->
@@ -1163,24 +1162,12 @@
 	.claim-gap-row {
 		position: relative;
 		height: 18px;
-		/* z-index above the crystal asset so cut overlays + connector
-		 * paint above it (the crystal silhouette would otherwise cover
-		 * the right cut). */
-		z-index: 9;
-	}
-	.claim-cut {
-		position: absolute;
-		top: 0;
-		height: 18px;
+		/* Painted with outer-mat colour at z-index above the crystal so the
+		 * cut windows stay visible across the full width (the crystal
+		 * silhouette would otherwise hide the right cut). The connector
+		 * paints section colour as a pill on top. */
 		background-color: var(--color-surface-inset);
-	}
-	.claim-cut-left {
-		left: 0;
-		right: calc(50% + 37px);
-	}
-	.claim-cut-right {
-		left: calc(50% + 37px);
-		right: 0;
+		z-index: 9;
 	}
 	.claim-connector {
 		/* 74px section-coloured strip bridging top and bottom sections
