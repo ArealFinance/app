@@ -259,10 +259,37 @@
 	// zero rather than ambiguous dash) until then.
 	const change24hDisplay = '0.00%';
 
-	// Backlog — earning rate display (RWT/sec) requires distributor
-	// emission_rate, which the SDK's holder-portfolio reader doesn't
-	// surface. Render '0/sec' until then; do NOT compute snapshot deltas.
-	const earningRateDisplay = '0/sec';
+	// Earning-rate pill — show an estimate of "how fast my unclaimed pile
+	// grows" so the rate-pill isn't a hardcoded "0/sec" placeholder.
+	//
+	// Heuristic (Testnet demo):
+	//   rate = unclaimedRwt / VESTING_PERIOD_SECS
+	// VESTING_PERIOD_SECS matches `bootstrap-yield-distributors.ts`'s
+	// `--vesting 86400` default (1 day). After every `fund_distributor` tx
+	// the merkle-publisher writes a new epoch into `unclaimedRwt`, so the
+	// rate grows in proportion to fund volume.
+	//
+	// Backlog: read `MerkleDistributor.vesting_period_secs` per-row through
+	// the SDK and weight by distributor instead of using a constant. Once
+	// `bootstrap-yield-distributors.ts` supports per-OT vesting overrides
+	// (e.g. 365 days for ARL OT) this constant becomes wrong.
+	const VESTING_PERIOD_SECS = 86_400;
+	const earningRateDisplay = $derived.by((): string => {
+		if (unclaimedRwt === 0n) return '0/sec';
+		// `unclaimedRwt` is a u64 in base units; collapsing to Number is
+		// safe (< 2^53 for realistic Testnet volumes).
+		const rwtPerSec = Number(unclaimedRwt) / 10 ** RWT_DECIMALS / VESTING_PERIOD_SECS;
+		// Tiered formatting:
+		//   ≥ 1 RWT/day  → "X.XX RWT/day"  (most readable for active stakes)
+		//   ≥ 0.001 RWT/hour → "X.XX RWT/hour"
+		//   otherwise      → "Y.YY µRWT/sec"  (compact for tiny rates)
+		const rwtPerDay = rwtPerSec * 86_400;
+		if (rwtPerDay >= 1) return `${rwtPerDay.toFixed(3)} RWT/day`;
+		const rwtPerHour = rwtPerSec * 3_600;
+		if (rwtPerHour >= 0.001) return `${rwtPerHour.toFixed(4)} RWT/hour`;
+		const microRwtPerSec = rwtPerSec * 1_000_000;
+		return `${microRwtPerSec.toFixed(2)} µRWT/sec`;
+	});
 
 	// ── Phase 7: Claim wiring ────────────────────────────────────────────
 	//
