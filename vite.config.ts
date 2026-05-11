@@ -53,11 +53,32 @@ const UPSTREAM_HOST = 'api.areal.finance';
 const UPSTREAM_PROTO = 'https:';
 const MAX_RETRIES = 5;
 /** Paths that should be proxied to the Areal backend. */
-const PROXY_PATHS = ['/auth/', '/portfolio/', '/markets/', '/socket.io/'];
+const PROXY_PATHS = [
+	'/auth/',
+	'/portfolio/',
+	'/markets/',
+	'/transactions/', // history API (`GET /transactions?wallet=…`)
+	'/socket.io/'
+];
 
 function shouldProxy(req: http.IncomingMessage): boolean {
 	const url = req.url ?? '';
-	if (!PROXY_PATHS.some((p) => url === p.slice(0, -1) || url.startsWith(p))) return false;
+	// Match path prefix WITH or WITHOUT the trailing slash, and also when the
+	// caller appends a `?query` directly to the bare path (e.g.
+	// `/transactions?wallet=…`). The old `url === p.slice(0,-1) || url.startsWith(p)`
+	// check missed `/transactions?…` because that path has neither a trailing
+	// slash nor a `?` at the matched position — so it fell through to SvelteKit.
+	if (
+		!PROXY_PATHS.some((p) => {
+			const norm = p.replace(/\/$/, '');
+			return (
+				url === norm ||
+				url.startsWith(norm + '/') ||
+				url.startsWith(norm + '?')
+			);
+		})
+	)
+		return false;
 	// `/markets` and `/portfolio` collide with SvelteKit page routes. When the
 	// browser navigates (Accept: text/html), let SvelteKit serve the page;
 	// fetch/XHR requests carry application/json and fall through to us.
