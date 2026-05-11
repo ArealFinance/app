@@ -216,26 +216,80 @@ function failSilent(key: string, message: string) {
 	scheduleCleanup(key);
 }
 
+/**
+ * Confirm a signature via `getSignatureStatuses` polling. Same rationale
+ * as `portfolio/claim.svelte.ts::confirmWithTimeout`: web3.js's
+ * `connection.confirmTransaction()` races an `onSignature` WS subscription
+ * against block-height polling, and our `createConnection` neuters all
+ * subscriptions (Areal Testnet's cloudflared tunnel doesn't expose port
+ * 8900, so any wss:// dial would loop). The signature subscription never
+ * fires → confirmTransaction sits until `lastValidBlockHeight` expires
+ * (~60 s on Testnet) even though the mint already landed on-chain — the
+ * user sees "Confirming on-chain…" for a full minute while the tokens
+ * are visibly accruing in their wallet on a reload.
+ */
 async function confirmWithTimeout(
 	connection: Connection,
 	signature: string,
-	blockhash: string,
+	_blockhash: string,
 	lastValidBlockHeight: number
 ): Promise<void> {
-	const confirmPromise = connection
-		.confirmTransaction(
-			{ signature, blockhash, lastValidBlockHeight },
-			'confirmed'
-		)
-		.then((result) => {
-			if (result.value.err) {
-				throw new Error(
-					typeof result.value.err === 'string'
-						? result.value.err
-						: JSON.stringify(result.value.err)
-				);
+	const POLL_INTERVAL_MS = 1500;
+	let stopped = false;
+
+	const pollLoop = async (): Promise<void> => {
+		while (!stopped) {
+			try {
+				const { value } = await connection.getSignatureStatuses([signature], {
+					searchTransactionHistory: false
+				});
+				const status = value[0];
+				if (status) {
+					if (status.err) {
+						throw new Error(
+							typeof status.err === 'string'
+								? status.err
+								: JSON.stringify(status.err)
+						);
+					}
+					if (
+						status.confirmationStatus === 'confirmed' ||
+						status.confirmationStatus === 'finalized'
+					) {
+						return;
+					}
+				}
+			} catch (err) {
+				// On-chain failure (status.err) — re-throw so the FSM lands
+				// in error phase. Anything else (transient RPC blip) is
+				// swallowed and the next poll iteration retries.
+				if (
+					err instanceof Error &&
+					/^[A-Z][a-zA-Z]+(?:Error)?:/.test(err.message)
+				) {
+					throw err;
+				}
 			}
-		});
+
+			try {
+				const currentHeight = await connection.getBlockHeight('confirmed');
+				if (currentHeight > lastValidBlockHeight) {
+					throw new Error(
+						'Transaction blockhash expired before confirmation. Please retry.'
+					);
+				}
+			} catch (err) {
+				if (
+					err instanceof Error &&
+					err.message.startsWith('Transaction blockhash expired')
+				) {
+					throw err;
+				}
+			}
+
+			await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
+		}
+	};
 
 	let timer: ReturnType<typeof setTimeout> | null = null;
 	const timeout = new Promise<never>((_, reject) => {
@@ -245,8 +299,9 @@ async function confirmWithTimeout(
 	});
 
 	try {
-		await Promise.race([confirmPromise, timeout]);
+		await Promise.race([pollLoop(), timeout]);
 	} finally {
+		stopped = true;
 		if (timer) clearTimeout(timer);
 	}
 }
