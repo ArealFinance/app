@@ -378,6 +378,7 @@
 	.qs-panel {
 		position: relative;
 		display: flex;
+		flex: none;
 		align-items: center;
 		gap: 8px;
 		padding: 4px;
@@ -480,7 +481,7 @@
 		display: flex;
 		flex-direction: column;
 		gap: 4px;
-		margin: 0;
+		margin: 8px 0 0;
 		padding: 4px;
 		list-style: none;
 		max-height: 280px;
