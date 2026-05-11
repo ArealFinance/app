@@ -511,13 +511,92 @@
 		}
 	});
 
-	const vaultPositions: VaultPosition[] = [
-		{ id: 'sand', symbol: 'SAND', tokens: '82 000,00 tokens', usd: '$565.9k', yieldPct: '3620%', color: '#7D2BF4', bubbleSize: 205 },
-		{ id: 'usdc', symbol: 'USDC', tokens: '90 000,00 tokens', usd: '$101.4k', yieldPct: '1590%', color: '#447AD8', bubbleSize: 169 },
-		{ id: 'sol', symbol: 'SOL', tokens: '50 000,00 tokens', usd: '$90k', yieldPct: '1590%', color: '#44D8BA', bubbleSize: 97 },
-		{ id: 'dot', symbol: 'DOT', tokens: '50 000,00 tokens', usd: '$85.5k', yieldPct: '1590%', color: '#D844C6', bubbleSize: 90 },
-		{ id: 'btc', symbol: 'BTC', tokens: '50 000,00 tokens', usd: '$12.5k', yieldPct: '1590%', color: '#D89D44', bubbleSize: 80 }
+	/**
+	 * RWT vault composition — derived from the live markets snapshot.
+	 *
+	 * Each priceable non-RWT token contributes a bubble sized by its
+	 * "vault-side" USD value, where value = TVL of the deepest pool that
+	 * contains the token (i.e., the on-chain RWA backing depth visible
+	 * to the markets reader). Bubble radius scales linearly with value;
+	 * smallest bubble pinned at 70 px so the dot never collapses to a
+	 * single pixel for low-TVL tokens.
+	 *
+	 * Yield % is the 1-day APY surfaced via `priceFeed.apyForMint`. Falls
+	 * back to '—' when no daily aggregate has landed yet.
+	 *
+	 * Replaces a hardcoded SAND/USDC/SOL/DOT/BTC mock — kept the bubble
+	 * colour palette as fallback for tokens whose category lacks a colour
+	 * assignment.
+	 */
+	const VAULT_COLOR_FALLBACK = [
+		'#7D2BF4',
+		'#447AD8',
+		'#44D8BA',
+		'#D844C6',
+		'#D89D44'
 	];
+	const VAULT_COLOR_BY_CATEGORY: Record<string, string> = {
+		protocol: '#A56EFF',
+		ownership: '#447AD8',
+		stock: '#D844C6'
+	};
+	const vaultPositions = $derived.by<VaultPosition[]>(() => {
+		const rwtMintKey = network.rwtMint.toBase58();
+		const tokens = markets.snapshot?.tokens ?? [];
+		const pools = markets.snapshot?.pools ?? [];
+
+		type Row = {
+			mint: PublicKey;
+			symbol: string;
+			category: string;
+			usd: number;
+		};
+		const rows: Row[] = [];
+		for (const t of tokens) {
+			if (t.mint.toBase58() === rwtMintKey) continue; // RWT itself is the vault asset
+			if (t.priceUsdc === null) continue;
+			let depth = 0;
+			for (const p of pools) {
+				if (
+					p.tvlUsdc !== null &&
+					(p.tokenAMint.equals(t.mint) || p.tokenBMint.equals(t.mint))
+				) {
+					depth = Math.max(depth, p.tvlUsdc);
+				}
+			}
+			if (depth <= 0) continue;
+			rows.push({ mint: t.mint, symbol: t.symbol, category: t.category, usd: depth });
+		}
+		if (rows.length === 0) return [];
+
+		rows.sort((a, b) => b.usd - a.usd);
+		const max = rows[0]!.usd;
+
+		return rows.map((r, i) => {
+			const color =
+				VAULT_COLOR_BY_CATEGORY[r.category] ??
+				VAULT_COLOR_FALLBACK[i % VAULT_COLOR_FALLBACK.length] ??
+				'#7E7190';
+			const usdHuman = formatTvl(r.usd) ?? '—';
+			// Token count display — pool-derived TVL is the "underlying"
+			// USD value; we don't have a clean per-token amount, so show
+			// the value twice (no fake "82,000 tokens"). Backlog: read
+			// mint supply from chain to populate this.
+			const tokensLabel = '—';
+			const apyRatio = priceFeed.apyForMint(r.mint);
+			const yieldLabel =
+				apyRatio === null ? '—' : `${(apyRatio * 100).toFixed(0)}%`;
+			return {
+				id: r.mint.toBase58(),
+				symbol: r.symbol,
+				tokens: tokensLabel,
+				usd: usdHuman,
+				yieldPct: yieldLabel,
+				color,
+				bubbleSize: Math.max(70, 70 + (r.usd / max) * 135)
+			};
+		});
+	});
 
 	// RWA breakdown / multi-asset donut deferred until the
 	// ownership-token program exposes per-asset attribution. One token
@@ -828,7 +907,16 @@
 							<div class="vault-nav-card">
 								<h4 class="vault-nav-title">NAV Growth</h4>
 								<div class="vault-nav-chart">
-									<PriceChart />
+									<!-- NAV history series is a backend follow-up. For now
+									     surface a flat line at the current `navBookValue`
+									     so the chart shape is honest about "no history yet"
+									     instead of the previous fake growth curve. -->
+									<PriceChart
+										data={Array.from({ length: 30 }, (_, i) => ({
+											x: i,
+											y: navBookValueUsdc ?? 0
+										}))}
+									/>
 								</div>
 							</div>
 
