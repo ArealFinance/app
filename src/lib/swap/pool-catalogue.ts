@@ -146,14 +146,19 @@ function buildUsdcRwtEntry(cluster: NetworkId): PoolEntry {
  * on-chain (and `buildSwapTx` would refuse to build it anyway).
  */
 export const KNOWN_POOLS_BY_CLUSTER: Record<NetworkId, PoolEntry[]> = {
+	// Order matters — /swap defaults to `pools[0]` on mount when no
+	// `?from=&to=` deep-link is present. SPRK/RWT is the only fully-
+	// working Testnet pair right now (the USDC/RWT pool is concentrated
+	// and the quote engine doesn't price concentrated pools yet), so it
+	// goes first to give a useful out-of-the-box experience.
 	localnet: [
-		buildUsdcRwtEntry('localnet'),
 		buildOtRwtEntry({
 			cluster: 'localnet',
 			otMint: SPRK_MINT,
 			otSymbol: 'SPRK',
 			otDecimals: SPRK_DECIMALS
-		})
+		}),
+		buildUsdcRwtEntry('localnet')
 	],
 	devnet: [buildUsdcRwtEntry('devnet')],
 	mainnet: []
