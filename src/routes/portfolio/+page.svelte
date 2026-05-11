@@ -295,20 +295,17 @@
 	// (e.g. 365 days for ARL OT) this constant becomes wrong.
 	const VESTING_PERIOD_SECS = 86_400;
 	const earningRateDisplay = $derived.by((): string => {
-		if (unclaimedRwt === 0n) return '0/sec';
+		if (unclaimedRwt === 0n) return '0 RWT/day';
 		// `unclaimedRwt` is a u64 in base units; collapsing to Number is
 		// safe (< 2^53 for realistic Testnet volumes).
 		const rwtPerSec = Number(unclaimedRwt) / 10 ** RWT_DECIMALS / VESTING_PERIOD_SECS;
-		// Tiered formatting:
-		//   ≥ 1 RWT/day  → "X.XX RWT/day"  (most readable for active stakes)
-		//   ≥ 0.001 RWT/hour → "X.XX RWT/hour"
-		//   otherwise      → "Y.YY µRWT/sec"  (compact for tiny rates)
 		const rwtPerDay = rwtPerSec * 86_400;
-		if (rwtPerDay >= 1) return `${rwtPerDay.toFixed(3)} RWT/day`;
-		const rwtPerHour = rwtPerSec * 3_600;
-		if (rwtPerHour >= 0.001) return `${rwtPerHour.toFixed(4)} RWT/hour`;
-		const microRwtPerSec = rwtPerSec * 1_000_000;
-		return `${microRwtPerSec.toFixed(2)} µRWT/sec`;
+		// Keep the unit consistent — "RWT/day" reads cleanly at every
+		// magnitude a user is likely to see (testnet demo deposits trend
+		// around 0.02 RWT/day; mainnet stakes will be ≥1). 4 fraction
+		// digits is enough to keep small Testnet values legible without
+		// stuttering into floating-point noise.
+		return `${rwtPerDay.toFixed(4)} RWT/day`;
 	});
 
 	// ── Phase 7: Claim wiring ────────────────────────────────────────────
