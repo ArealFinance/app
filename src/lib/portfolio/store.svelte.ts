@@ -192,10 +192,20 @@ function subscribeRows(holder: PublicKey, snap: PortfolioSnapshot) {
 }
 
 /**
- * Run a single fetch + state-transition cycle. Late results (after wallet
- * or network switched) are discarded via the `activeHolder` check.
+ * Run a single fetch + state-transition cycle.
+ *
+ * Background polls (`silent=true`) skip the `status='loading'` flip and
+ * the WS subscription rewire — those would cause visible UI churn at the
+ * 1.5 s poll cadence (the page re-evaluates `portfolio.isLoading`-gated
+ * branches, and `subscribeRows` tears down/recreates every row sub on
+ * the same Connection). Foreground refreshes (initial fetch, wallet
+ * switch, retry button) still take the full path so the UI gets a
+ * proper "Loading…" surface when there's no snapshot to show.
+ *
+ * Late results (after wallet or network switched) are discarded via the
+ * `activeHolder` check at the bottom.
  */
-async function doFetch(): Promise<void> {
+async function doFetch(silent = false): Promise<void> {
 	const holder = wallet.publicKey;
 	if (!holder) {
 		// Nothing to fetch — caller should never reach here, but keep the
@@ -210,7 +220,7 @@ async function doFetch(): Promise<void> {
 
 	const holderKey = holder.toBase58();
 	activeHolder = holderKey;
-	status = 'loading';
+	if (!silent) status = 'loading';
 	error = null;
 
 	const conn = network.connection;
@@ -235,12 +245,14 @@ async function doFetch(): Promise<void> {
 		snapshot = snap;
 		status = 'ready';
 		error = null;
-		subscribeRows(holder, snap);
+		// Only (re)wire WS subs on a foreground refresh — silent polls
+		// reuse the existing cycle.
+		if (!silent) subscribeRows(holder, snap);
 	} catch (e) {
 		if (activeHolder !== holderKey) return;
 		const msg = e instanceof Error ? e.message : String(e);
 		error = msg;
-		status = 'error';
+		if (!silent) status = 'error';
 	}
 }
 
@@ -257,6 +269,19 @@ async function doFetch(): Promise<void> {
 function refresh(): Promise<void> {
 	if (pendingRefresh) return pendingRefresh;
 	pendingRefresh = doFetch().finally(() => {
+		pendingRefresh = null;
+	});
+	return pendingRefresh;
+}
+
+/**
+ * Background poll variant — same coalescing as `refresh()` but suppresses
+ * the `status='loading'` flip and the WS subscription rewire so the 1.5 s
+ * tick doesn't cause visible UI churn.
+ */
+function refreshSilent(): Promise<void> {
+	if (pendingRefresh) return pendingRefresh;
+	pendingRefresh = doFetch(true).finally(() => {
 		pendingRefresh = null;
 	});
 	return pendingRefresh;
@@ -308,9 +333,11 @@ function start(): void {
 	});
 	if (pollTimer === null) {
 		pollTimer = setInterval(() => {
-			// Only re-fetch when there's an active holder; the effectBody()
-			// already nulled `activeHolder` if no wallet is connected.
-			if (activeHolder !== null) void refresh();
+			// Silent poll: keeps `status='ready'` and the WS cycle intact so
+			// the UI doesn't churn between the 1.5 s ticks. The new snapshot
+			// still flows through reactively — the AnimatedNumber primitive
+			// retargets on each rebase.
+			if (activeHolder !== null) void refreshSilent();
 		}, POLL_INTERVAL_MS);
 	}
 }
