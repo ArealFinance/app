@@ -77,7 +77,7 @@ import {
 	type QuoteFees
 } from '@areal/sdk/native-dex';
 import { buildSwapTx, type SwapAccountContext } from '@areal/sdk/tx';
-import { findAssociatedTokenAddressPda } from '@areal/sdk/pda';
+import { findAssociatedTokenAddressPda, findBinArrayPda } from '@areal/sdk/pda';
 import { isPlaceholderRwtMint, RWT_MINTS } from '@areal/sdk/network';
 
 import { wallet } from '$lib/stores/wallet.svelte';
@@ -359,6 +359,15 @@ async function runSwap(intent: SwapIntent): Promise<void> {
 			return;
 		}
 
+		// Concentrated pools require the BinArray PDA as a remaining_account
+		// (`["bins", pool_state]`). The contract gates the load on
+		// `pool.poolType == 1`; we derive eagerly only for that branch so
+		// standard pools stay zero-overhead.
+		const isConcentrated = freshPool.poolType === 1;
+		const binArray = isConcentrated
+			? findBinArrayPda(intent.poolEntry.poolPda, programId)[0]
+			: undefined;
+
 		// Resolve pool-side context. `vaultA` / `vaultB` come from
 		// PoolState; `arealFeeAccount` comes from DexConfig.
 		const ctx: SwapAccountContext = {
@@ -371,7 +380,8 @@ async function runSwap(intent: SwapIntent): Promise<void> {
 			arealFeeAccount: freshConfig.arealFeeDestination,
 			otTreasuryFeeDestination: freshPool.hasOtTreasury
 				? freshPool.otTreasuryFeeDestination
-				: undefined
+				: undefined,
+			binArray
 		};
 
 		// User's input/output ATAs — derived deterministically (no RPC).
