@@ -1572,6 +1572,8 @@
 		align-items: center;
 		gap: 16px;
 		padding: 56px 32px;
+		background-color: transparent;
+		border-radius: 0;
 	}
 	.detail-empty-illustrated img {
 		width: 120px;
