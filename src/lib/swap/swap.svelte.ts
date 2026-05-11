@@ -132,7 +132,13 @@ export interface SwapAttempt {
 }
 
 const CONFIRM_TIMEOUT_MS = 90_000;
-const TERMINAL_CLEANUP_MS = 3_000;
+// FSM cleanup must outlast the SwapConfirmModal's success auto-dismiss
+// (also 3 s). Otherwise the two timers race: if the FSM drops the
+// attempt first, `currentAttempt` flips to `null` while the modal is
+// still mounted, and Svelte re-renders the modal into its
+// `attempt === null` branch (the pre-confirm "CONFIRM SWAP" view).
+// 5 s gives the modal a 2 s safety margin to finish closing.
+const TERMINAL_CLEANUP_MS = 5_000;
 
 const attempts = new SvelteMap<string, SwapAttempt>();
 

@@ -428,6 +428,22 @@
 		void swap.start(pendingIntent);
 	}
 
+	// Belt-and-braces close-on-success. The modal already auto-dismisses
+	// 3 s after the `success` phase fires, but if the FSM cleanup races
+	// it and drops the attempt first, the modal re-renders into its
+	// pre-confirm `attempt === null` branch (the "CONFIRM SWAP" view
+	// reappears just before the auto-dismiss timeout). Tracking the
+	// success phase at the page level closes `modalOpen` deterministically.
+	$effect(() => {
+		const att = currentAttempt;
+		if (att?.phase !== 'success') return;
+		if (!modalOpen) return;
+		const t = setTimeout(() => {
+			modalOpen = false;
+		}, 2_500);
+		return () => clearTimeout(t);
+	});
+
 	const currentAttempt = $derived(
 		activePool ? swap.attempts.get(activePool.poolPda.toBase58()) ?? null : null
 	);
