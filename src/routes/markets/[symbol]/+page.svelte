@@ -479,6 +479,24 @@
 		}
 	});
 
+	// Deep-link from /portfolio's "Manage" button — open the pool whose
+	// address the caller passed via `?pool=<base58>` as soon as the
+	// `liquidityPools` derived list contains it. Cleared after consumption
+	// so a subsequent in-page navigation (e.g. Withdraw → close) doesn't
+	// re-pop the modal.
+	let consumedPoolQuery = $state<string | null>(null);
+	$effect(() => {
+		const requested = page.url.searchParams.get('pool');
+		if (!requested) return;
+		if (consumedPoolQuery === requested) return;
+		// Wait for liquidityPools to be populated — pool detail can't open
+		// until the snapshot has resolved.
+		const match = liquidityPools.find((p) => p.id === requested);
+		if (!match) return;
+		openPool(match);
+		consumedPoolQuery = requested;
+	});
+
 	// Re-activate lpStore when the wallet connects/disconnects with the
 	// modal open. Active pool address is preserved in `openPoolId`.
 	$effect(() => {

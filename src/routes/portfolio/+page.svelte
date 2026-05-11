@@ -163,19 +163,20 @@
 	}
 
 	/**
-	 * Manage LP position → jump to the pool detail page for the non-RWT
-	 * side of the pair. /markets/[symbol] resolves the symbol against the
-	 * markets snapshot's tokens list — passing `symbolA` works for RWT/X
-	 * pools (lands on the RWT page where the pair shows up as one of its
-	 * pool rows). Lowercased to match the route's case convention.
+	 * Manage LP position → jump to the pool detail page with the pool's
+	 * Add/Remove modal auto-opened. We pass the pool address via `?pool=`
+	 * so the destination route can pick it out of the URL and pre-select
+	 * the right liquidityPools row.
+	 *
+	 * Route segment is the non-RWT side of the pair (RWT itself is the
+	 * common quote and doesn't make a useful landing token). Falls back
+	 * to symbolA when the pair has no RWT side.
 	 */
 	function manageLp(row: HolderLpRow): void {
-		// Prefer the non-RWT side for the route — the pool detail panel
-		// on /markets/<symbol> drills into that token's view, which is
-		// what "manage this LP" should land on.
 		const sym =
 			row.symbolA.toLowerCase() === 'rwt' ? row.symbolB : row.symbolA;
-		void goto(`/markets/${sym.toLowerCase()}`);
+		const pool = row.poolAddress.toBase58();
+		void goto(`/markets/${sym.toLowerCase()}?pool=${pool}`);
 	}
 
 	function startClaimFees(row: HolderLpRow | null) {
