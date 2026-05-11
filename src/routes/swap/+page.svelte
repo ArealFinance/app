@@ -71,6 +71,29 @@
 	 * entries; when OT and other markets land, this auto-grows.
 	 */
 	type TokenInfo = { mint: PublicKey; symbol: string; decimals: number };
+
+	/**
+	 * Token visual lookup (mirrors `markets/[symbol]/+page.svelte` helpers
+	 * and the inline `DEFAULT_TOKENS` list in `QuickSwap.svelte`). Used to
+	 * paint the 44×44 logo on the left of each swap row. Unknown tokens
+	 * fall back to a muted slate background + the first letter.
+	 */
+	function bgForSymbol(sym: string): string {
+		const upper = sym.toUpperCase();
+		if (upper === 'RWT') return 'linear-gradient(135deg, #a56eff 0%, #602fdc 100%)';
+		if (upper === 'USDC') return '#2775ca';
+		if (upper === 'USDT') return '#009393';
+		if (upper === 'SPRK') return '#4265ff';
+		return 'var(--color-token-logo-fallback-bg)';
+	}
+	function iconSrcForSymbol(sym: string): string | undefined {
+		const upper = sym.toUpperCase();
+		if (upper === 'RWT') return '/images/tokens/rwt-mark.svg';
+		if (upper === 'SPRK') return '/images/tokens/sparkles.svg';
+		if (upper === 'USDC') return '/images/tokens/usdc.svg';
+		if (upper === 'USDT') return '/images/tokens/usdt-t.svg';
+		return undefined;
+	}
 	const availableTokens = $derived.by<TokenInfo[]>(() => {
 		const seen = new Map<string, TokenInfo>();
 		for (const p of poolsForCluster) {
@@ -516,7 +539,7 @@
 							settingsOpen = !settingsOpen;
 						}}
 					>
-						<Gear size={16} variant="duotone" />
+						<Gear size={20} variant="duotone" />
 					</button>
 					{#if settingsOpen}
 						<div
@@ -550,39 +573,49 @@
 				<div class="swap-stack">
 					<!-- ─────── From row (token picker + amount input) ─────── -->
 					<div class="swap-row" class:is-open={fromOpen}>
-						<div class="row-head">
-							<span class="row-label">From</span>
-							{#if fromBalanceDisplay}
-								<span class="row-balance">{fromBalanceDisplay} {fromSymbol}</span>
+						<span class="swap-token-logo" style:background={bgForSymbol(fromSymbol)}>
+							{#if iconSrcForSymbol(fromSymbol)}
+								<img src={iconSrcForSymbol(fromSymbol)} alt="" aria-hidden="true" />
+							{:else if fromSymbol}
+								<span class="swap-token-letter">{fromSymbol[0]}</span>
 							{/if}
+						</span>
+
+						<div class="swap-row-inset">
+							<div class="row-head">
+								<button
+									type="button"
+									class="swap-symbol-trigger"
+									class:is-open={fromOpen}
+									onclick={(e) => {
+										e.stopPropagation();
+										fromOpen = !fromOpen;
+										toOpen = false;
+									}}
+									aria-haspopup="listbox"
+									aria-expanded={fromOpen}
+								>
+									<span class="row-label">From</span>
+									<span class="swap-token-symbol">{fromSymbol}</span>
+									{#if fromOpen}
+										<AngleUpSmall size={16} />
+									{:else}
+										<AngleDownSmall size={16} />
+									{/if}
+								</button>
+								{#if fromBalanceDisplay}
+									<span class="row-balance">Balance: {fromBalanceDisplay} {fromSymbol}</span>
+								{/if}
+							</div>
+							<input
+								class="swap-amount"
+								type="text"
+								inputmode="decimal"
+								placeholder="0.00"
+								bind:value={fromAmountStr}
+								aria-label="Amount to swap from"
+							/>
 						</div>
-						<button
-							type="button"
-							class="swap-token-chip"
-							class:is-open={fromOpen}
-							onclick={(e) => {
-								e.stopPropagation();
-								fromOpen = !fromOpen;
-								toOpen = false;
-							}}
-							aria-haspopup="listbox"
-							aria-expanded={fromOpen}
-						>
-							<span class="swap-token-symbol">{fromSymbol}</span>
-							{#if fromOpen}
-								<AngleUpSmall size={16} />
-							{:else}
-								<AngleDownSmall size={16} />
-							{/if}
-						</button>
-						<input
-							class="swap-amount"
-							type="text"
-							inputmode="decimal"
-							placeholder="0.00"
-							bind:value={fromAmountStr}
-							aria-label="Amount to swap from"
-						/>
 
 						{#if fromOpen}
 							<div
@@ -604,6 +637,16 @@
 										aria-selected={isSelected}
 										onclick={() => selectFromToken(token)}
 									>
+										<span
+											class="swap-option-logo"
+											style:background={bgForSymbol(token.symbol)}
+										>
+											{#if iconSrcForSymbol(token.symbol)}
+												<img src={iconSrcForSymbol(token.symbol)} alt="" aria-hidden="true" />
+											{:else}
+												<span class="swap-token-letter">{token.symbol[0]}</span>
+											{/if}
+										</span>
 										<span class="swap-option-symbol">{token.symbol}</span>
 									</button>
 								{/each}
@@ -613,39 +656,49 @@
 
 					<!-- ─────── To row (token picker; amount read-only) ─────── -->
 					<div class="swap-row" class:is-open={toOpen}>
-						<div class="row-head">
-							<span class="row-label">To</span>
-							{#if toBalanceDisplay}
-								<span class="row-balance">{toBalanceDisplay} {toSymbol}</span>
+						<span class="swap-token-logo" style:background={bgForSymbol(toSymbol)}>
+							{#if iconSrcForSymbol(toSymbol)}
+								<img src={iconSrcForSymbol(toSymbol)} alt="" aria-hidden="true" />
+							{:else if toSymbol}
+								<span class="swap-token-letter">{toSymbol[0]}</span>
 							{/if}
+						</span>
+
+						<div class="swap-row-inset">
+							<div class="row-head">
+								<button
+									type="button"
+									class="swap-symbol-trigger"
+									class:is-open={toOpen}
+									onclick={(e) => {
+										e.stopPropagation();
+										toOpen = !toOpen;
+										fromOpen = false;
+									}}
+									aria-haspopup="listbox"
+									aria-expanded={toOpen}
+								>
+									<span class="row-label">To</span>
+									<span class="swap-token-symbol">{toSymbol}</span>
+									{#if toOpen}
+										<AngleUpSmall size={16} />
+									{:else}
+										<AngleDownSmall size={16} />
+									{/if}
+								</button>
+								{#if toBalanceDisplay}
+									<span class="row-balance">Balance: {toBalanceDisplay} {toSymbol}</span>
+								{/if}
+							</div>
+							<input
+								class="swap-amount swap-amount-readonly"
+								type="text"
+								readonly
+								placeholder="0.00"
+								value={toAmountDisplay}
+								aria-label="Amount to receive (computed)"
+							/>
 						</div>
-						<button
-							type="button"
-							class="swap-token-chip"
-							class:is-open={toOpen}
-							onclick={(e) => {
-								e.stopPropagation();
-								toOpen = !toOpen;
-								fromOpen = false;
-							}}
-							aria-haspopup="listbox"
-							aria-expanded={toOpen}
-						>
-							<span class="swap-token-symbol">{toSymbol}</span>
-							{#if toOpen}
-								<AngleUpSmall size={16} />
-							{:else}
-								<AngleDownSmall size={16} />
-							{/if}
-						</button>
-						<input
-							class="swap-amount swap-amount-readonly"
-							type="text"
-							readonly
-							placeholder="0.00"
-							value={toAmountDisplay}
-							aria-label="Amount to receive (computed)"
-						/>
 
 						{#if toOpen}
 							<div
@@ -667,6 +720,16 @@
 										aria-selected={isSelected}
 										onclick={() => selectToToken(token)}
 									>
+										<span
+											class="swap-option-logo"
+											style:background={bgForSymbol(token.symbol)}
+										>
+											{#if iconSrcForSymbol(token.symbol)}
+												<img src={iconSrcForSymbol(token.symbol)} alt="" aria-hidden="true" />
+											{:else}
+												<span class="swap-token-letter">{token.symbol[0]}</span>
+											{/if}
+										</span>
 										<span class="swap-option-symbol">{token.symbol}</span>
 									</button>
 								{/each}
@@ -802,17 +865,20 @@
 		display: inline-flex;
 		align-items: center;
 		justify-content: center;
-		width: 32px;
-		height: 32px;
+		width: 40px;
+		height: 40px;
 		background-color: var(--color-bg);
 		color: var(--color-text);
+		opacity: 0.7;
 		border: 0;
-		border-radius: var(--radius-md);
+		border-radius: 16px;
 		cursor: pointer;
-		transition: background-color var(--motion-base) var(--ease-out);
+		transition:
+			opacity var(--motion-base) var(--ease-out),
+			background-color var(--motion-base) var(--ease-out);
 	}
 	.swap-settings-btn:hover {
-		background-color: var(--color-dark-700);
+		opacity: 1;
 	}
 
 	.settings-popover {
@@ -845,83 +911,121 @@
 	}
 
 	/* ─── From / To rows ─── */
+	/* Matches QuickSwap layout: dark outer pill with logo on the left and a
+	 * lighter inset rect on the right holding the label-row (label + symbol
+	 * trigger + chevron + balance) and the amount input below. */
 	.swap-row {
 		position: relative;
-		display: grid;
-		grid-template-columns: auto 1fr;
-		grid-template-rows: auto 1fr;
-		grid-template-areas:
-			'head head'
-			'chip amount';
+		display: flex;
 		align-items: center;
-		gap: var(--space-2) var(--space-3);
-		padding: var(--space-3);
+		gap: var(--space-2);
+		padding: 4px;
+		padding-left: 12px;
 		background-color: var(--color-bg);
-		border-radius: var(--radius-lg);
+		border-radius: 20px;
 	}
 	.swap-row.is-open {
 		z-index: 10;
 	}
 
-	.row-head {
-		grid-area: head;
+	.swap-token-logo {
+		display: inline-flex;
+		flex: none;
+		align-items: center;
+		justify-content: center;
+		width: 44px;
+		height: 44px;
+		border-radius: 16px;
+		font-family: var(--font-body);
+		font-weight: 700;
+		font-size: 16px;
+		color: #fff;
+		overflow: hidden;
+	}
+	.swap-token-logo img {
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+	}
+	.swap-token-letter {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 100%;
+		height: 100%;
+		color: #fff;
+	}
+
+	.swap-row-inset {
 		display: flex;
+		flex: 1;
+		flex-direction: column;
+		min-width: 0;
+		min-height: 56px;
+		padding: 4px 12px;
+		background-color: var(--color-surface-inset);
+		border-radius: 16px;
+		justify-content: center;
+	}
+
+	.row-head {
+		display: flex;
+		align-items: center;
 		justify-content: space-between;
-		align-items: baseline;
 		gap: var(--space-3);
+		font-family: 'Onest', var(--font-body);
+		font-size: 14px;
+		line-height: 1.4;
+		letter-spacing: -0.6px;
 	}
 	.row-label {
-		font-family: 'Onest', var(--font-body);
-		font-size: 11px;
-		font-weight: var(--font-weight-medium);
 		color: var(--color-text-muted);
+		font-weight: 500;
 	}
 	.row-balance {
 		font-family: 'Onest', var(--font-body);
-		font-size: 11px;
-		font-weight: var(--font-weight-medium);
+		font-size: 12px;
+		font-weight: 500;
 		color: var(--color-text-muted);
+		white-space: nowrap;
 	}
 
-	.swap-token-chip {
-		grid-area: chip;
+	.swap-symbol-trigger {
 		display: inline-flex;
 		align-items: center;
-		gap: var(--space-2);
-		padding: var(--space-2) var(--space-3);
-		background-color: var(--color-surface-inset);
+		gap: 4px;
+		background: transparent;
 		border: 0;
-		border-radius: var(--radius-md);
+		padding: 0;
 		color: var(--color-text);
 		cursor: pointer;
-		transition: background-color var(--motion-base) var(--ease-out);
+		font-family: inherit;
 	}
-	.swap-token-chip:hover,
-	.swap-token-chip.is-open {
-		background-color: var(--color-dark-700);
-		filter: brightness(1.1);
+	.swap-symbol-trigger.is-open,
+	.swap-symbol-trigger.is-open :global(svg) {
+		color: var(--color-blue-500);
 	}
 	.swap-token-symbol {
 		font-family: 'Onest', var(--font-body);
-		font-size: var(--text-base);
-		font-weight: var(--font-weight-medium);
-		letter-spacing: var(--tracking-tight);
-		color: var(--color-text);
+		font-size: 14px;
+		font-weight: 700;
+		letter-spacing: -0.6px;
+		color: inherit;
 	}
 
 	.swap-amount {
-		grid-area: amount;
 		width: 100%;
 		min-width: 0;
 		background: transparent;
 		border: 0;
 		outline: none;
-		padding: 0 var(--space-2);
+		padding: 0;
 		font-family: 'Onest', var(--font-body);
 		font-size: 20px;
-		font-weight: var(--font-weight-medium);
-		letter-spacing: var(--tracking-tight);
-		text-align: right;
+		font-weight: 500;
+		line-height: 1.4;
+		letter-spacing: -0.6px;
+		text-align: left;
 		color: var(--color-text);
 	}
 	.swap-amount::placeholder {
@@ -969,6 +1073,26 @@
 	}
 	.swap-option.is-selected {
 		border-color: var(--color-purple-300);
+	}
+
+	.swap-option-logo {
+		display: inline-flex;
+		flex: none;
+		align-items: center;
+		justify-content: center;
+		width: 32px;
+		height: 32px;
+		border-radius: 12px;
+		font-family: var(--font-body);
+		font-weight: 700;
+		font-size: 14px;
+		color: #fff;
+		overflow: hidden;
+	}
+	.swap-option-logo img {
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
 	}
 
 	.swap-option-symbol {
