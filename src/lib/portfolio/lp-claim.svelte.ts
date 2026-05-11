@@ -147,24 +147,73 @@ function fail(key: string, err: unknown, programId: PublicKey) {
 	scheduleCleanup(key);
 }
 
-/** Run `connection.confirmTransaction` with a hard 90s ceiling. */
+/**
+ * Confirm via `getSignatureStatuses` polling. Same WS-neuter rationale
+ * as `claim.svelte.ts` / `lp-form.svelte.ts` — see those files for the
+ * full incident write-up. tl;dr: `connection.confirmTransaction()`
+ * resolves on an `onSignature` WS subscription that our Testnet
+ * Connection neuters, so it never returns until `lastValidBlockHeight`
+ * passes and reverts as "block height exceeded".
+ */
 async function confirmWithTimeout(
 	connection: Connection,
 	signature: string,
-	blockhash: string,
+	_blockhash: string,
 	lastValidBlockHeight: number
 ): Promise<void> {
-	const confirmPromise = connection
-		.confirmTransaction({ signature, blockhash, lastValidBlockHeight }, 'confirmed')
-		.then((result) => {
-			if (result.value.err) {
-				throw new Error(
-					typeof result.value.err === 'string'
-						? result.value.err
-						: JSON.stringify(result.value.err)
-				);
+	const POLL_INTERVAL_MS = 1500;
+	let stopped = false;
+
+	const pollLoop = async (): Promise<void> => {
+		while (!stopped) {
+			try {
+				const { value } = await connection.getSignatureStatuses([signature], {
+					searchTransactionHistory: false
+				});
+				const status = value[0];
+				if (status) {
+					if (status.err) {
+						throw new Error(
+							typeof status.err === 'string'
+								? status.err
+								: JSON.stringify(status.err)
+						);
+					}
+					if (
+						status.confirmationStatus === 'confirmed' ||
+						status.confirmationStatus === 'finalized'
+					) {
+						return;
+					}
+				}
+			} catch (err) {
+				if (
+					err instanceof Error &&
+					/^[A-Z][a-zA-Z]+(?:Error)?:/.test(err.message)
+				) {
+					throw err;
+				}
 			}
-		});
+
+			try {
+				const currentHeight = await connection.getBlockHeight('confirmed');
+				if (currentHeight > lastValidBlockHeight) {
+					throw new Error(
+						'Transaction blockhash expired before confirmation. Please retry.'
+					);
+				}
+			} catch (err) {
+				if (
+					err instanceof Error &&
+					err.message.startsWith('Transaction blockhash expired')
+				) {
+					throw err;
+				}
+			}
+
+			await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
+		}
+	};
 
 	let timer: ReturnType<typeof setTimeout> | null = null;
 	const timeout = new Promise<never>((_, reject) => {
@@ -174,8 +223,9 @@ async function confirmWithTimeout(
 	});
 
 	try {
-		await Promise.race([confirmPromise, timeout]);
+		await Promise.race([pollLoop(), timeout]);
 	} finally {
+		stopped = true;
 		if (timer) clearTimeout(timer);
 	}
 }
