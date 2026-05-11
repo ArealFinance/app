@@ -1194,12 +1194,15 @@
 		/* 37px = half of 74px connector core. Together both cuts leave a
 		 * 74px section-coloured strip in the centre — the visible connector. */
 		right: calc(50% + 37px);
-		border-radius: 0 9px 9px 0;
+		/* Full pill: outer rounded end sits flush with section's outer edge —
+		 * the section's own border-radius absorbs the small outer curve so the
+		 * outer cut ends don't read as 90° corners. */
+		border-radius: 9px;
 	}
 	.claim-cut-right {
 		left: calc(50% + 37px);
 		right: 0;
-		border-radius: 9px 0 0 9px;
+		border-radius: 9px;
 	}
 
 	/* Crystal — fills claim-shell full width with baked-in aurora glow.
