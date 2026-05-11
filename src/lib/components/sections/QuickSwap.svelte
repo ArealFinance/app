@@ -496,7 +496,7 @@
 		display: flex;
 		flex-direction: column;
 		gap: 4px;
-		margin: -28px 0 0;
+		margin: -18px 0 0;
 		padding: 4px;
 		list-style: none;
 		max-height: 280px;
