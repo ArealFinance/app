@@ -348,12 +348,6 @@
 				? 'idle-claimable'
 				: 'idle-empty'
 	);
-	const aggregateLabel = $derived(
-		aggregateRow
-			? `Claim ${formatTokenAmount(aggregateRow.claimableNow ?? 0n, RWT_DECIMALS, RWT_DECIMALS)} RWT`
-			: 'Nothing to claim'
-	);
-
 	function openClaimModal(row: PortfolioRow) {
 		modalRow = row;
 		modalOpen = true;
@@ -524,7 +518,10 @@
 
 							<!--
 								Aggregate Claim CTA — 8 visible states keyed off `aggregatePhase`.
-								Disabled while in-flight or when nothing to claim.
+								Disabled while in-flight or when nothing to claim. Visual
+								styling matches Figma: white pill (default), purple pill
+								(hover), green-bordered outline + check-circle (success),
+								pink-bordered outline + xmark-circle (error / invalid).
 							-->
 							<button
 								type="button"
@@ -535,8 +532,7 @@
 								{#if aggregatePhase === 'idle-empty'}
 									<span>Nothing to claim</span>
 								{:else if aggregatePhase === 'idle-claimable'}
-									<Check size={16} />
-									<span>{aggregateLabel}</span>
+									<span>Claim rewards</span>
 								{:else if aggregatePhase === 'preparing'}
 									<span class="btn-spinner" aria-hidden="true"></span>
 									<span>Preparing…</span>
@@ -550,11 +546,15 @@
 									<span class="btn-spinner" aria-hidden="true"></span>
 									<span>Confirming…</span>
 								{:else if aggregatePhase === 'success'}
-									<Check size={16} />
-									<span>Claimed!</span>
+									<span class="claim-btn-status claim-btn-status-success" aria-hidden="true">
+										<Check size={12} />
+									</span>
+									<span>Successful claim</span>
 								{:else if aggregatePhase === 'error'}
-									<Xmark size={16} />
-									<span>Failed</span>
+									<span class="claim-btn-status claim-btn-status-error" aria-hidden="true">
+										<Xmark size={12} />
+									</span>
+									<span>Invalid claim</span>
 								{/if}
 							</button>
 						</div>
@@ -1313,6 +1313,12 @@
 		color: var(--color-green-900);
 	}
 
+	/* Aggregate Claim CTA — Figma defines 4 visual variants keyed off the
+	 * 8-phase state machine:
+	 *   default (idle-claimable + in-flight phases) — white pill, dark text
+	 *   hover (idle-claimable only)                  — purple pill, dark text
+	 *   success                                       — green-bordered outline, white text, green check-circle
+	 *   error / idle-empty                            — outlined, white/muted text, red check-circle (only on error) */
 	.claim-btn {
 		display: inline-flex;
 		align-items: center;
@@ -1321,42 +1327,85 @@
 		height: 48px;
 		width: 100%;
 		max-width: 220px;
-		background: transparent;
-		border: 2px solid var(--color-green-900);
+		padding: 0 24px;
+		background-color: var(--color-text);
+		border: 0;
 		border-radius: var(--radius-lg);
 		font-family: var(--font-sans);
 		font-size: var(--text-base);
 		font-weight: var(--font-weight-bold);
 		letter-spacing: var(--tracking-tight);
 		text-transform: uppercase;
-		color: var(--color-text);
+		color: var(--color-text-inverse);
 		cursor: pointer;
-		transition: background-color var(--motion-base) var(--ease-out);
+		transition:
+			background-color var(--motion-base) var(--ease-out),
+			border-color var(--motion-base) var(--ease-out),
+			color var(--motion-base) var(--ease-out);
 	}
 	.claim-btn:hover:not(:disabled) {
-		background-color: var(--color-success-bg-soft);
+		background-color: var(--color-purple-400);
 	}
 	.claim-btn:disabled {
 		cursor: not-allowed;
 		opacity: 0.7;
 	}
-	.claim-btn :global(svg) {
-		color: var(--color-green-900);
-	}
-	/* Phase-specific accents — keep the green outline as the resting state,
-	 * but recolour for terminal states so the user can read the result at a
-	 * glance without parsing the label. */
+
+	/* idle-empty — disabled, outlined "Nothing to claim" pill. */
 	.claim-btn-idle-empty {
-		border-color: var(--color-border);
+		background-color: transparent;
+		border: 2px solid var(--color-border);
+		color: var(--color-text-muted);
 	}
-	.claim-btn-error {
-		border-color: var(--color-danger);
+	.claim-btn-idle-empty:hover:not(:disabled) {
+		background-color: transparent;
 	}
-	.claim-btn-error :global(svg) {
-		color: var(--color-danger);
-	}
+
+	/* Success — green outline, white text, green check-circle inside. */
 	.claim-btn-success {
-		background-color: var(--color-success-bg-medium);
+		background-color: transparent;
+		border: 2px solid var(--color-green-900);
+		color: var(--color-text);
+	}
+	.claim-btn-success:hover:not(:disabled) {
+		background-color: transparent;
+	}
+
+	/* Error — pink outline, white text, pink xmark-circle inside. */
+	.claim-btn-error {
+		background-color: transparent;
+		border: 2px solid var(--color-pink-900);
+		color: var(--color-text);
+	}
+	.claim-btn-error:hover:not(:disabled) {
+		background-color: transparent;
+	}
+
+	/* Status icon — colored circle with white symbol inside, for success
+	 * (green) and error (pink) terminal phases. */
+	.claim-btn-status {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 20px;
+		height: 20px;
+		border-radius: 50%;
+		flex-shrink: 0;
+	}
+	.claim-btn-status :global(svg) {
+		color: var(--color-text);
+	}
+	.claim-btn-status-success {
+		background-color: var(--color-green-900);
+	}
+	.claim-btn-status-success :global(svg) {
+		color: var(--color-text-inverse);
+	}
+	.claim-btn-status-error {
+		background-color: var(--color-pink-900);
+	}
+	.claim-btn-status-error :global(svg) {
+		color: var(--color-text);
 	}
 
 	/* Inline button spinner — shared by aggregate CTA and per-row buttons. */

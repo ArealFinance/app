@@ -57,6 +57,7 @@
 	--color-blue-500: #6e97ff; /* soft blue — info banners (master-pool guard) */
 	--color-magenta-900: #d844c6;
 	--color-red-900: #d84347; /* danger */
+	--color-pink-900: #ff0088; /* invalid-claim border (Figma red_900 variant) */
 	--color-orange-900: #ff8c00; /* status dot (demo banner) */
 
 	/* ============================================================
