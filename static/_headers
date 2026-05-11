@@ -1,0 +1,36 @@
+# Cloudflare Pages edge response headers
+# (https://developers.cloudflare.com/pages/configuration/headers/)
+#
+# Goal: prevent runtime-config files from being cached as `immutable` by
+# CDN/browser. SvelteKit's `adapter-static` writes two files at the
+# `_app/` root whose contents change per-deploy (they don't carry a
+# content-hash in their filename):
+#
+#   * `_app/env.js`         — `export const env = {...}` from
+#                              `$env/dynamic/public`. Holds runtime URLs
+#                              (PUBLIC_PROOF_STORE_URL, PUBLIC_AUTH_API_URL,
+#                              etc). If this ships with `Cache-Control:
+#                              immutable, max-age=31536000` then a browser
+#                              that ever loaded an EMPTY `env={}` (e.g.
+#                              from a CI build that ran without `.env`)
+#                              never re-fetches it — SDK silently takes
+#                              the no-proofs path, `claimableNow` stays
+#                              `null`, UI shows `0.000000 RWT`.
+#   * `_app/version.json`   — `{"version":"<timestamp>"}` used by the
+#                              client runtime to detect new deploys and
+#                              auto-reload. Same problem if cached
+#                              immutable.
+#
+# Everything under `_app/immutable/` IS content-hashed (e.g.
+# `app.D5z2Glgd.js`) and is safe to cache forever — those filenames
+# change on every meaningful content change, so the long max-age is the
+# point. Keep that rule too, in case the upstream CDN config drifts.
+
+/_app/env.js
+  Cache-Control: public, max-age=0, must-revalidate
+
+/_app/version.json
+  Cache-Control: public, max-age=0, must-revalidate
+
+/_app/immutable/*
+  Cache-Control: public, max-age=31536000, immutable
