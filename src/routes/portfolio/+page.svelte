@@ -81,12 +81,12 @@
 				// human-percent units (5.0 = 5%) for display via `formatPercent`.
 				// `change24h` is already in percent units at the source — do
 				// NOT convert it.
-				apy: formatPercent(apy === null ? null : apy * 100),
+				apy: formatPercent(apy === null ? null : apy * 100, '0.00%'),
 				apyTone: (apy !== null && apy < 0 ? 'danger' : 'success') as Tone,
-				price24h: formatPercent(change),
+				price24h: formatPercent(change, '0.00%'),
 				price24hTone: (change !== null && change < 0 ? 'danger' : 'success') as Tone,
-				price: priceUsdc !== null ? formatUsd(priceUsdc) : '—',
-				value: formatUsd(valueUsdc),
+				price: priceUsdc !== null ? formatUsd(priceUsdc) : '$0.00',
+				value: formatUsd(valueUsdc, '$0.00'),
 				row,
 				canClaim: row.distributor !== null && (row.claimableNow ?? 0n) > 0n
 			};
@@ -249,19 +249,20 @@
 		if (totalWeight === 0) return null;
 		return weightedSum / totalWeight;
 	});
-	const portfolioApyDisplay = $derived(formatPercent(portfolioApy));
+	const portfolioApyDisplay = $derived(formatPercent(portfolioApy, '0.00%'));
 	const dailyIncomeDisplay = $derived(
-		portfolioApy !== null ? formatUsd((totalValueUsd * portfolioApy) / 100 / 365) : '—'
+		portfolioApy !== null ? formatUsd((totalValueUsd * portfolioApy) / 100 / 365) : '$0.00'
 	);
 
 	// Backlog — portfolio-level 24h change requires a snapshot history
-	// series the SDK does not yet surface. Render '—' until then.
-	const change24hDisplay = '—';
+	// series the SDK does not yet surface. Render '0.00%' (concrete
+	// zero rather than ambiguous dash) until then.
+	const change24hDisplay = '0.00%';
 
 	// Backlog — earning rate display (RWT/sec) requires distributor
 	// emission_rate, which the SDK's holder-portfolio reader doesn't
-	// surface. Render '—' until then; do NOT compute snapshot deltas.
-	const earningRateDisplay = '—';
+	// surface. Render '0/sec' until then; do NOT compute snapshot deltas.
+	const earningRateDisplay = '0/sec';
 
 	// ── Phase 7: Claim wiring ────────────────────────────────────────────
 	//
@@ -453,7 +454,7 @@
 										loading="lazy"
 									/>
 									<span class="rewards-amount">
-										{claimableUnknown ? '—' : unclaimedDisplay}
+										{unclaimedDisplay}
 									</span>
 									<span class="rwt-pill">RWT</span>
 								</div>

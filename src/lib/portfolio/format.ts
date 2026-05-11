@@ -43,11 +43,16 @@ export function formatTokenAmount(
  * markets surface rounds to whole dollars. Magnitude bands are otherwise
  * identical.
  *
- * Null / undefined / NaN collapse to em-dash so callers don't have to
- * special-case missing data.
+ * Null / undefined / NaN collapse to `fallback` (default em-dash). Pass
+ * `'$0.00'` (or similar) where the surface should treat "no data" as
+ * "zero" rather than "unknown" — portfolio stats blocks read better as
+ * a concrete zero than as a vague em-dash.
  */
-export function formatUsd(value: number | null | undefined): string {
-	if (value === null || value === undefined || !Number.isFinite(value)) return EM_DASH;
+export function formatUsd(
+	value: number | null | undefined,
+	fallback: string = EM_DASH
+): string {
+	if (value === null || value === undefined || !Number.isFinite(value)) return fallback;
 	const sign = value < 0 ? '-' : '';
 	const abs = Math.abs(value);
 	if (abs >= 999_500) return `${sign}$${(abs / 1_000_000).toFixed(2)}M`;
@@ -63,9 +68,14 @@ export function formatUsd(value: number | null | undefined): string {
  * Two fractional digits; no leading sign for negatives is suppressed —
  * the toFixed default already prints a leading `-` for negatives.
  *
- * Null / undefined / NaN collapse to em-dash.
+ * Null / undefined / NaN collapse to `fallback` (default em-dash). Same
+ * rationale as `formatUsd` — portfolio surfaces pass `'0.00%'` to make
+ * "no APY data" render as a concrete zero instead of an ambiguous dash.
  */
-export function formatPercent(value: number | null | undefined): string {
-	if (value === null || value === undefined || !Number.isFinite(value)) return EM_DASH;
+export function formatPercent(
+	value: number | null | undefined,
+	fallback: string = EM_DASH
+): string {
+	if (value === null || value === undefined || !Number.isFinite(value)) return fallback;
 	return `${value.toFixed(2)}%`;
 }
