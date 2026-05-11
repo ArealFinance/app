@@ -12,9 +12,17 @@
 		currentPrice?: string;
 		/** Optional row of equally-spaced labels rendered under the chart (e.g. dates). */
 		xLabels?: string[];
+		/**
+		 * Centered rolling-average window applied to `y` values before
+		 * rendering. Defaults to 5, which rounds off the plateau-edge corners
+		 * that show up on sparse Testnet NAV data without flattening the
+		 * trend. Set to `1` to disable smoothing entirely (mock data, dense
+		 * mainnet series).
+		 */
+		smoothingWindow?: number;
 	};
 
-	let { data = generateMockData(), currentPrice, xLabels }: Props = $props();
+	let { data = generateMockData(), currentPrice, xLabels, smoothingWindow = 5 }: Props = $props();
 
 	function generateMockData(): PricePoint[] {
 		// Smooth-ish growth + dip + recovery. Range ~7-15.
@@ -27,16 +35,50 @@
 		});
 	}
 
+	/**
+	 * Centered moving-average smoother. Each output `y[i]` is the mean of
+	 * `data[i - half ... i + half]`, clamped at the boundaries so the
+	 * endpoints stay glued to the source values (last-point pill / first
+	 * label keep their real numbers).
+	 *
+	 * Window is forced to an odd integer >= 1 so the "centered" symmetry is
+	 * preserved; an even window biases left or right by half a slot.
+	 */
+	function smoothSeries(input: PricePoint[], window: number): PricePoint[] {
+		if (input.length < 2) return input;
+		const w = Math.max(1, Math.round(window));
+		if (w <= 1) return input;
+		const odd = w % 2 === 0 ? w + 1 : w;
+		const half = (odd - 1) / 2;
+		const last = input.length - 1;
+		return input.map((pt, i) => {
+			// First and last points stay exact — the badge label and the
+			// leftmost gridline label both anchor to those numbers, so any
+			// drift between displayed value and rendered y would read as
+			// a glitch. Interior points smooth with a symmetric window
+			// (shrunk at the boundaries to avoid sampling outside the
+			// series).
+			if (i === 0 || i === last) return pt;
+			const lo = Math.max(0, i - half);
+			const hi = Math.min(last, i + half);
+			let sum = 0;
+			for (let j = lo; j <= hi; j++) sum += input[j]!.y;
+			return { x: pt.x, y: sum / (hi - lo + 1) };
+		});
+	}
+
+	const smoothed = $derived(smoothSeries(data, smoothingWindow));
+
 	const xDomain = $derived<[number, number]>([
-		data[0]?.x ?? 0,
-		data[data.length - 1]?.x ?? 1
+		smoothed[0]?.x ?? 0,
+		smoothed[smoothed.length - 1]?.x ?? 1
 	]);
 </script>
 
 <div class="chart">
 	<div class="chart-canvas">
 		<div class="chart-canvas-inner">
-			<LayerCake padding={{ top: 0, right: 0, bottom: 0, left: 0 }} x="x" y="y" {data} {xDomain}>
+			<LayerCake padding={{ top: 0, right: 0, bottom: 0, left: 0 }} x="x" y="y" data={smoothed} {xDomain}>
 				<Svg pointerEvents={false}>
 					<PriceChartAreas badgeLabel={currentPrice} />
 				</Svg>
