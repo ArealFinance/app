@@ -93,8 +93,29 @@
 	$effect(() => {
 		if (pool.kind === 'Concentrated' && depositMode === 'Zap') {
 			depositMode = 'Standards';
+			depositAmount = '';
 		}
 	});
+
+	/**
+	 * Switch between Zap and Standards deposit modes.
+	 *
+	 * The two modes interpret `depositAmount` differently:
+	 *   - Zap: single-side typed amount, contract auto-balances ~50%.
+	 *   - Standards: typed amount is the primary side, counter side is
+	 *     derived from the reserve ratio at submit time.
+	 *
+	 * Keeping the previous mode's value in the input across a switch is
+	 * misleading — a user who typed 100 USDC in Zap (single-side) and
+	 * flipped to Standards would suddenly need ~100 RWT on the counter
+	 * side too, without realising. Reset on every switch so the form is
+	 * always a fresh entry against the active mode's semantics.
+	 */
+	function setDepositMode(next: DepositMode): void {
+		if (depositMode === next) return;
+		depositMode = next;
+		depositAmount = '';
+	}
 
 	type DepositSide = 'A' | 'B';
 	let depositSide = $state<DepositSide>('B');
@@ -775,7 +796,7 @@
 								type="button"
 								class="mode-pill"
 								class:mode-pill-active={depositMode === 'Zap'}
-								onclick={() => (depositMode = 'Zap')}
+								onclick={() => setDepositMode('Zap')}
 							>
 								<Bolt size={16} />
 								<span>Zap</span>
@@ -785,7 +806,7 @@
 								type="button"
 								class="mode-pill"
 								class:mode-pill-active={depositMode === 'Standards'}
-								onclick={() => (depositMode = 'Standards')}
+								onclick={() => setDepositMode('Standards')}
 							>
 								<Plus size={16} />
 								<span>Standards</span>
