@@ -43,46 +43,52 @@
 	const RIGHT_PAD = 8;
 	const INNER_W = W - LEFT_PAD - RIGHT_PAD;
 
-	// Resolution of the waveform along the X axis. 60 samples is enough to
-	// keep the monotonic-X curve smooth without burning DOM size.
+	// Resolution of the waveform along the X axis. 60 samples keeps the
+	// monotonic-X curve smooth without exploding DOM size.
 	const SAMPLES = 60;
 
-	// Subtle vertical wobble applied to ALL band boundaries equally so the
-	// shape feels alive without ever crossing — adjacent bands share the
-	// same wobbled boundary line.
-	const WOBBLE_AMP = 0.05; // 5% of chart height
-
-	type Sample = { x: number; offset: number };
-	const samples = $derived<Sample[]>(
-		Array.from({ length: SAMPLES }, (_, i) => {
-			const t = i / (SAMPLES - 1);
-			// Two superposed sines + linear taper give a "breathing" wave
-			// that flares wider on the left and tapers right (matches the
-			// old design language but without the crisscross).
-			const wave =
-				Math.sin(t * Math.PI * 2.2) * 0.6 + Math.sin(t * Math.PI * 4.8) * 0.4;
-			const taper = 1 - t * 0.55; // narrows toward the right
-			return {
-				x: LEFT_PAD + t * INNER_W,
-				offset: wave * WOBBLE_AMP * taper
-			};
-		})
-	);
-
-	// Pre-compute the cumulative fraction at which each band STARTS (top
-	// edge) — these are the at-rest boundaries. The wobble shifts every
-	// boundary together so the bands stay non-overlapping.
-	type Band = AssetsDistributionBucket & { top: number; bot: number };
+	// Two per-band fractions:
+	//   leftPct  = 1/N for every band  (each source is one slot at the
+	//             left — "I exist", regardless of yield)
+	//   rightPct = bucket.pct          (its share of total VALUE on the
+	//             right — proportional flow)
+	// The band's top/bot edges lerp between these two distributions
+	// across X so the shape READS as "equal sources → proportional
+	// outcomes". Adjacent bands share the same boundary at every X so
+	// they never overlap and never gap.
+	type Band = AssetsDistributionBucket & {
+		leftTop: number;
+		leftBot: number;
+		rightTop: number;
+		rightBot: number;
+	};
 	const bands = $derived.by<Band[]>(() => {
+		const N = Math.max(1, buckets.length);
+		const left = 1 / N;
 		const out: Band[] = [];
-		let acc = 0;
+		let leftAcc = 0;
+		let rightAcc = 0;
 		for (const b of buckets) {
-			const next = acc + Math.max(0, b.pct);
-			out.push({ ...b, top: acc, bot: next });
-			acc = next;
+			const leftNext = leftAcc + left;
+			const rightNext = rightAcc + Math.max(0, b.pct);
+			out.push({
+				...b,
+				leftTop: leftAcc,
+				leftBot: leftNext,
+				rightTop: rightAcc,
+				rightBot: rightNext
+			});
+			leftAcc = leftNext;
+			rightAcc = rightNext;
 		}
 		return out;
 	});
+
+	// Smoothstep so the lerp accelerates then decelerates — looks more
+	// "fluid" than a linear shift between left and right distributions.
+	function smoothstep(t: number): number {
+		return t * t * (3 - 2 * t);
+	}
 
 	const areaGen = $derived(
 		area<{ x: number; y0: number; y1: number }>()
@@ -93,24 +99,27 @@
 	);
 
 	function pathFor(band: Band): string {
-		// Center the wobble between the band's top/bot anchors. A single
-		// shared offset per sample keeps neighbouring bands sealed
-		// against each other — no gap, no overlap.
-		const pts = samples.map((s) => ({
-			x: s.x,
-			y0: H * (band.top + s.offset),
-			y1: H * (band.bot + s.offset)
-		}));
+		const pts = Array.from({ length: SAMPLES }, (_, i) => {
+			const t = i / (SAMPLES - 1);
+			const e = smoothstep(t);
+			const top = band.leftTop + (band.rightTop - band.leftTop) * e;
+			const bot = band.leftBot + (band.rightBot - band.leftBot) * e;
+			return {
+				x: LEFT_PAD + t * INNER_W,
+				y0: H * top,
+				y1: H * bot
+			};
+		});
 		return areaGen(pts) ?? '';
 	}
 
-	// Start-pill geometry: thin vertical bars hugged to x=0, height
-	// proportional to band's pct (so a 5/6 — 1/6 split makes the purple
-	// pill clearly taller than the pink one).
+	// Start-pill geometry: equal-height bars at x=0 (one slot per source,
+	// matching the LEFT edge of the chart where every band has the same
+	// share). 4% inset top/bot for breathing room.
 	function pillY(band: Band): { y: number; h: number } {
-		const padding = 0.04; // 4% breathing room
-		const top = H * (band.top + padding);
-		const bot = H * (band.bot - padding);
+		const padding = 0.04;
+		const top = H * (band.leftTop + padding);
+		const bot = H * (band.leftBot - padding);
 		return { y: top, h: Math.max(2, bot - top) };
 	}
 
