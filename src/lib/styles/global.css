@@ -27,43 +27,20 @@ body {
 	min-height: 100dvh;
 	position: relative;
 	overflow-x: hidden;
-	/* Two aurora layers — header bloom at the top and footer bloom at
-	 * the bottom — sized to full viewport width and pinned to opposite
-	 * edges. The Figma exports are 2880×~2000 PNGs at ~4 MB each;
-	 * `_optimize-blurs.mjs` (ad-hoc, not checked in) downsamples to
-	 * 1920 px wide and re-encodes through sharp at:
-	 *   AVIF q55  ~150-285 KB  (modern Chromium/Safari/Firefox)
-	 *   WebP q78  ~360-530 KB  (older browsers)
-	 *   PNG q9 palette64 1440w ~100-130 KB  (legacy fallback)
-	 *
-	 * Stacking matters: header listed first, footer second, so the
-	 * `background-position` pair maps in the same order. */
+	/* Footer aurora only — sticks to every route. The header bloom is
+	 * page-conditional and rendered as a separate `.header-aurora` div
+	 * in `+layout.svelte` so it can be animated in/out independently. */
 	background-color: var(--color-bg);
 	/* PNG fallback for browsers without image-set() support. */
-	background-image:
-		url('/images/aurora/header-bg.png'),
-		url('/images/aurora/footer-bg.png');
-	/* Modern browsers pick AVIF/WebP via image-set type negotiation. */
-	background-image:
-		image-set(
-			url('/images/aurora/header-bg.avif') type('image/avif'),
-			url('/images/aurora/header-bg.webp') type('image/webp'),
-			url('/images/aurora/header-bg.png') type('image/png')
-		),
-		image-set(
-			url('/images/aurora/footer-bg.avif') type('image/avif'),
-			url('/images/aurora/footer-bg.webp') type('image/webp'),
-			url('/images/aurora/footer-bg.png') type('image/png')
-		);
-	background-position:
-		top center,
-		bottom center;
-	background-size:
-		100% auto,
-		100% auto;
-	background-repeat:
-		no-repeat,
-		no-repeat;
+	background-image: url('/images/aurora/footer-bg.png');
+	background-image: image-set(
+		url('/images/aurora/footer-bg.avif') type('image/avif'),
+		url('/images/aurora/footer-bg.webp') type('image/webp'),
+		url('/images/aurora/footer-bg.png') type('image/png')
+	);
+	background-position: bottom center;
+	background-size: 100% auto;
+	background-repeat: no-repeat;
 }
 
 body > * {
@@ -71,13 +48,92 @@ body > * {
 	z-index: 1;
 }
 
-/* 404 / error pages now inherit the same header+footer aurora pair as
- * every other route — the previous override is no longer needed.
- * Kept here as documentation in case a different macet ships for
- * `/error` later; remove the rule entirely once the design is final.
+/* Header aurora — anchored to the top of the document (NOT the
+ * viewport) so it scrolls away naturally as the user moves down the
+ * page; the bloom is decorative for the hero section, not a sticky
+ * decoration on every fold. The element is always present so the
+ * slide animation can fire on every route change; visibility is
+ * toggled via the `.is-hidden` class on the same element.
  *
- * Note `+error.svelte` still adds `route-error` to `<body>` for any
- * page-specific tweaks (currently none). */
+ * `pointer-events: none` keeps it out of the hit-test,
+ * `will-change: transform` opts into a compositor layer so the slide
+ * stays cheap. `aspect-ratio` matches the source PNG (2880 × 2076 ≈
+ * 1.387 : 1) so the bloom keeps its proportions on any viewport
+ * width without baking in a fixed pixel height that would clip on
+ * mobile or leave dead space on ultrawide.
+ */
+.header-aurora {
+	position: absolute;
+	top: 0;
+	left: 0;
+	width: 100%;
+	/* Keep the bloom's natural aspect (source PNG is 2880 × 2076 ≈
+	 * 1.387 : 1). A vh-bounded height crops the gradient ugly on short
+	 * viewports; we don't have pages short enough that the absolute
+	 * child would extend scroll past the content, so let the bloom
+	 * size itself proportionally to whatever width the viewport gives. */
+	aspect-ratio: 2880 / 2076;
+	pointer-events: none;
+	/* ABOVE content — z-index 2 lifts it past `body > *` (which gets
+	 * z-index 1 from the rule earlier in this file). With z-index 0
+	 * the slide-out animation was invisible: the new page's hero would
+	 * mount at the top of the viewport and cover the aurora before the
+	 * transform animation had a chance to play. `pointer-events: none`
+	 * keeps clicks falling through to whatever is below. */
+	z-index: 2;
+	/* `screen` mix-blend keeps only the bloom (bright purple/violet)
+	 * visible; the dark areas of the PNG blend into whatever is below
+	 * so the aurora doesn't occlude real content. Net effect: the
+	 * glow reads as a light source layered on top of the page, exactly
+	 * like the Figma macet, and the slide animation is fully visible
+	 * because the layer is in front. */
+	mix-blend-mode: screen;
+	/* Browsers need both transition endpoints defined for the FIRST
+	 * animation to interpolate (a `transform: none` → `translateY(-X)`
+	 * transition snaps because `none` isn't an interpolatable starting
+	 * value). Pin both endpoints explicitly.
+	 *
+	 * Asymmetric timings: the transition that fires depends on which
+	 * state we're moving TO. The base state owns the appear duration
+	 * (2 s — fast enough to feel responsive when landing on
+	 * /markets); the `.is-hidden` state below owns the leave duration
+	 * (6 s — long enough to read as a slow drift up rather than a
+	 * snap).
+	 *
+	 * Opacity is back in the mix now that the duration is generous —
+	 * at 600 ms it read as instant because `mix-blend-mode: screen`
+	 * already makes mid-opacity values look "almost invisible". With
+	 * 2-6 s curves the perceptual taper has room to breathe. */
+	transform: translateY(0);
+	opacity: 1;
+	transition:
+		transform 2000ms cubic-bezier(0.22, 1, 0.36, 1),
+		opacity 2000ms cubic-bezier(0.22, 1, 0.36, 1);
+	will-change: transform, opacity;
+	background-image: url('/images/aurora/header-bg.png');
+	background-image: image-set(
+		url('/images/aurora/header-bg.avif') type('image/avif'),
+		url('/images/aurora/header-bg.webp') type('image/webp'),
+		url('/images/aurora/header-bg.png') type('image/png')
+	);
+	background-position: top center;
+	background-size: 100% auto;
+	background-repeat: no-repeat;
+}
+
+.header-aurora.is-hidden {
+	transform: translateY(-1000px);
+	opacity: 0;
+	transition:
+		transform 8000ms cubic-bezier(0.22, 1, 0.36, 1),
+		opacity 8000ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.header-aurora {
+		transition: none;
+	}
+}
 
 a {
 	color: inherit;

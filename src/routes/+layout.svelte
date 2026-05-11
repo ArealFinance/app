@@ -13,10 +13,28 @@
 	// the assignment here guarantees execution before any user route loads.
 	import '$lib/runtime/browser-globals';
 	import { dev } from '$app/environment';
+	import { page } from '$app/state';
 	import favicon from '$lib/assets/favicon.svg';
 	import { Toaster } from '$lib/components/ui';
 
 	let { children } = $props();
+
+	/*
+	 * Header aurora only shows on `/markets` (and its sub-routes) and on the
+	 * error / 404 page. Every other route slides the bloom out of view via a
+	 * `transform: translateY(-1000px)` transition (defined on `.header-aurora`
+	 * in `global.css`), so navigating to a non-markets page animates the bloom
+	 * up off-screen and navigating back drops it down. The footer bloom is
+	 * page-agnostic and lives on `<body>` directly.
+	 */
+	const showHeaderAurora = $derived.by(() => {
+		const path = page.url?.pathname ?? '/';
+		if (path === '/markets' || path.startsWith('/markets/')) return true;
+		// `+error.svelte` mounts for any non-matched route; the page store's
+		// `route.id` is null in that case. Treat null route as "error/404".
+		if (page.route?.id === null) return true;
+		return false;
+	});
 
 	/*
 	 * DebugStrip pulls `$lib/sdk/reads.ts` → `@areal/sdk/rwt-engine` →
@@ -41,6 +59,17 @@
 <svelte:head>
 	<link rel="icon" href={favicon} />
 </svelte:head>
+
+<!-- Header aurora — always in the DOM (one element, lifetime ==
+  layout). Visibility is driven by a `.is-hidden` class that toggles
+  a CSS transform/opacity transition. The element sits ABOVE the
+  page content (z-index 2) with `pointer-events: none` and
+  `mix-blend-mode: screen` so the dark parts of the bloom blend
+  into the page below instead of occluding it — only the purple
+  glow shows. This is the key trick that makes the slide-out
+  visible: with z-index below content, the new page's hero would
+  cover the aurora before the transform animation could play. -->
+<div class="header-aurora" class:is-hidden={!showHeaderAurora} aria-hidden="true"></div>
 
 {@render children()}
 

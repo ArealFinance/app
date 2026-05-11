@@ -132,6 +132,12 @@
 		display: flex;
 		justify-content: center;
 		padding: var(--space-4) var(--space-4) 0;
+		/* Lift above `.header-aurora` (z-index 2 on `<body>`). The aurora
+		 * is intentionally on top of page content so its slide animation
+		 * stays visible during route changes; the nav has to sit higher
+		 * still or the bloom paints over the logo / pill nav. */
+		position: relative;
+		z-index: 3;
 	}
 
 	.header-inner {
