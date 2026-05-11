@@ -796,7 +796,7 @@
 							</div>
 							{#if isConnected && lpPortfolio.isReady && lpRows.length > 0}
 								<span class="section-total"
-									>~ {lpPortfolio.totalUsdc !== null ? formatUsd(lpPortfolio.totalUsdc) : '—'}</span
+									>~ {formatUsd(lpPortfolio.totalUsdc, '$0.00')}</span
 								>
 							{/if}
 						</header>
@@ -885,7 +885,7 @@
 														>
 													{/if}
 												{/if}
-												{formatPercent(apy)}
+												{formatPercent(apy, '0.00%')}
 											</span>
 										</button>
 									{/each}
@@ -944,9 +944,7 @@
 													>
 												</span>
 												<span class="lp-detail-pill lp-pill-purple"
-													>{selectedLpRow.valuation.pctA !== null
-														? `${(selectedLpRow.valuation.pctA * 100).toFixed(0)}%`
-														: '—'}</span
+													>{`${((selectedLpRow.valuation.pctA ?? 0) * 100).toFixed(0)}%`}</span
 												>
 											</div>
 											<div class="lp-detail-row">
@@ -965,9 +963,7 @@
 													>
 												</span>
 												<span class="lp-detail-pill lp-pill-teal"
-													>{selectedLpRow.valuation.pctB !== null
-														? `${(selectedLpRow.valuation.pctB * 100).toFixed(0)}%`
-														: '—'}</span
+													>{`${((selectedLpRow.valuation.pctB ?? 0) * 100).toFixed(0)}%`}</span
 												>
 											</div>
 										</div>
