@@ -36,12 +36,27 @@
 		height = 140
 	}: Props = $props();
 
-	// Internal SVG viewBox — pixel-agnostic; CSS scales to fit the wrapper.
-	const W = 600;
-	const H = 140;
-	const LEFT_PAD = 14; // px reserved for the start pills on the left edge
-	const RIGHT_PAD = 8;
+	// Internal SVG viewBox — sized to the Figma frame (420 × 239) so the
+	// pill/marker pixel measurements transfer 1:1. CSS scales the whole
+	// thing to whatever wrapper width the page provides.
+	const W = 420;
+	const H = 239;
+
+	// Figma anchors (Group 2087330682 → Rectangles 5218/5220/5223):
+	//   - Two left pills: 13×88 px, color #A56EFF / #D844C6, top 21 + 113
+	//   - Right marker: 2×180 px, color #FBF2FF, top 21, at right edge
+	//   - Bands occupy x = 15.58 → 417.58 (≈ 402 px inner width)
+	const LEFT_PAD = 15.58;
+	const RIGHT_PAD = W - 417.58; // ≈ 2.42 px so marker sits at x=418
 	const INNER_W = W - LEFT_PAD - RIGHT_PAD;
+	const PILL_W = 13;
+	const PILL_RADIUS = 2.5974;
+	const MARKER_W = 2;
+	const MARKER_H = 180;
+	const MARKER_TOP = 21;
+	const PILL_H = 88;
+	const PILL_TOP = 21;
+	const PILL_GAP = 4; // distance between the two pills (113 - (21+88))
 
 	// Resolution of the waveform along the X axis. 60 samples keeps the
 	// monotonic-X curve smooth without exploding DOM size.
@@ -113,17 +128,21 @@
 		return areaGen(pts) ?? '';
 	}
 
-	// Start-pill geometry: equal-height bars at x=0 (one slot per source,
-	// matching the LEFT edge of the chart where every band has the same
-	// share). 4% inset top/bot for breathing room.
-	function pillY(band: Band): { y: number; h: number } {
-		const padding = 0.04;
-		const top = H * (band.leftTop + padding);
-		const bot = H * (band.leftBot - padding);
-		return { y: top, h: Math.max(2, bot - top) };
+	// Start-pill geometry — exact Figma values when there are 2 sources.
+	// For N > 2 (rare in current data shape) we distribute the same total
+	// pill block evenly, preserving the equal-share-per-source semantics
+	// the left edge represents.
+	function pillY(_band: Band, index: number, total: number): { y: number; h: number } {
+		const blockTop = PILL_TOP;
+		const blockH = total * PILL_H + (total - 1) * PILL_GAP;
+		const slotH = (blockH - (total - 1) * PILL_GAP) / total;
+		return {
+			y: blockTop + index * (slotH + PILL_GAP),
+			h: slotH
+		};
 	}
 
-	const markerX = W - RIGHT_PAD / 2;
+	const markerX = W - RIGHT_PAD - MARKER_W / 2;
 </script>
 
 <div class="chart" style:--h="{height}px">
@@ -149,21 +168,31 @@
 			<path d={pathFor(band)} fill="url(#grad-{band.key})" />
 		{/each}
 
-		<!-- Start pills: solid bars at x=0, proportional to each band. -->
-		{#each bands as band (band.key)}
-			{@const p = pillY(band)}
-			<rect x="0" y={p.y} width="6" height={p.h} rx="3" fill={band.color} />
+		<!-- Start pills: solid bars at x=0, equal-height (one slot per
+		     source). Figma Group 2087330682 → Rectangles 5218/5220 spec:
+		     13 × 88 px, radius 2.5974. -->
+		{#each bands as band, i (band.key)}
+			{@const p = pillY(band, i, bands.length)}
+			<rect
+				x="0"
+				y={p.y}
+				width={PILL_W}
+				height={p.h}
+				rx={PILL_RADIUS}
+				fill={band.color}
+			/>
 		{/each}
 
 		{#if showMarker}
-			<line
-				x1={markerX}
-				x2={markerX}
-				y1={H * 0.06}
-				y2={H * 0.94}
-				stroke="rgba(255, 255, 255, 0.85)"
-				stroke-width="1.5"
-				stroke-linecap="round"
+			<!-- Right marker: solid 2×180 px white_900 rectangle (Figma
+			     Rectangle 5223). -->
+			<rect
+				x={markerX - MARKER_W / 2}
+				y={MARKER_TOP}
+				width={MARKER_W}
+				height={MARKER_H}
+				rx={PILL_RADIUS}
+				fill="#FBF2FF"
 			/>
 		{/if}
 	</svg>
