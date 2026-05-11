@@ -180,17 +180,25 @@
 		expectedOut !== null ? applySlippage(expectedOut, slippageBps) : null
 	);
 
-	const usdcBalance = $derived(userBalances.usdc);
-	const rwtBalance = $derived(userBalances.rwt);
+	// Generic per-mint balance lookup — works for USDC, RWT, SPRK, and any
+	// future OT registered in `KNOWN_POOLS_BY_CLUSTER`. The previous
+	// `fromSymbol === 'USDC' ? usdc : rwt` shortcut silently returned the
+	// RWT balance for SPRK and any other token, surfacing wrong "Balance:"
+	// numbers in the chip.
+	const fromBalance = $derived<bigint | null>(
+		fromMint ? userBalances.forMint(fromMint) : null
+	);
+	const toBalance = $derived<bigint | null>(
+		toMint ? userBalances.forMint(toMint) : null
+	);
 
-	const fromBalance = $derived.by<bigint | null>(() => {
-		if (!activePool) return null;
-		// Decide which symbol corresponds to the From side.
-		return fromSymbol === 'USDC' ? usdcBalance : rwtBalance;
-	});
-	const toBalance = $derived.by<bigint | null>(() => {
-		if (!activePool) return null;
-		return toSymbol === 'USDC' ? usdcBalance : rwtBalance;
+	// Whenever the active pair changes, kick off a balance refresh for
+	// both sides. `refreshMint` is a no-op for the wallet-disconnected
+	// case (clears the map entry instead).
+	$effect(() => {
+		if (!wallet.publicKey) return;
+		if (fromMint) void userBalances.refreshMint(fromMint);
+		if (toMint) void userBalances.refreshMint(toMint);
 	});
 
 	const fromBalanceDisplay = $derived(
