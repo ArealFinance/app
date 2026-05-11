@@ -111,11 +111,16 @@ let pollTimer: ReturnType<typeof setInterval> | null = null;
  * `claimableNow` ticks upward continuously even without any WS event.
  * Without a poll the UI only updates on wallet/network switches or
  * external claim/fund TXs — and the user has to reload to see vesting
- * progress. 5 s is the sweet spot: smooth enough that the
- * `AnimatedNumber` count-up reads as live ticking, cheap enough that
- * we don't spam RPC.
+ * progress.
+ *
+ * 1.5 s is the sweet spot: paired with a 1.5 s linear tween in the
+ * AnimatedNumber primitive, the displayed value moves at a constant
+ * velocity from poll-to-poll instead of stepping abruptly then easing
+ * — feels truly "live" rather than "snap-to-new-value-then-rest". On
+ * mainnet we'll bump this back up (e.g. 5 s) once volumes don't make
+ * a per-second tick visually interesting.
  */
-const POLL_INTERVAL_MS = 5_000;
+const POLL_INTERVAL_MS = 1_500;
 
 function clearDebounce() {
 	if (wsDebounceTimer !== null) {
