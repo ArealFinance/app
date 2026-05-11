@@ -858,6 +858,18 @@
 									</li>
 								{/each}
 							</ul>
+						{:else if activeDetailTab === 'Governance'}
+							<div class="detail-empty detail-empty-illustrated">
+								<img
+									src="/images/empty-state/governance.svg"
+									alt=""
+									aria-hidden="true"
+									width="120"
+									height="84"
+								/>
+								<h3 class="detail-empty-title">Governance</h3>
+								<p class="detail-empty-text">Will be included in the next version</p>
+							</div>
 						{:else}
 							<div class="detail-empty">Coming soon.</div>
 						{/if}
@@ -1552,6 +1564,33 @@
 		text-align: center;
 		font-family: var(--font-body);
 		font-size: 14px;
+		color: var(--color-text-muted);
+	}
+	.detail-empty-illustrated {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 16px;
+		padding: 56px 32px;
+	}
+	.detail-empty-illustrated img {
+		width: 120px;
+		height: 84px;
+		display: block;
+	}
+	.detail-empty-title {
+		margin: 0;
+		font-family: var(--font-sans);
+		font-size: 16px;
+		font-weight: 700;
+		letter-spacing: -0.6px;
+		color: var(--color-text);
+	}
+	.detail-empty-text {
+		margin: -8px 0 0;
+		font-family: var(--font-body);
+		font-size: 14px;
+		letter-spacing: -0.6px;
 		color: var(--color-text-muted);
 	}
 
