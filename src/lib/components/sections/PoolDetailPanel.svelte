@@ -83,6 +83,19 @@
 	type DepositMode = 'Zap' | 'Standards';
 	let depositMode = $state<DepositMode>('Zap');
 
+	// Zap is unsupported on concentrated pools: the on-chain
+	// `zap_liquidity` handler short-circuits with `InvalidPoolType`
+	// (see contracts/native-dex/src/instructions/zap_liquidity.rs:144),
+	// because zap relies on the constant-product invariant which is
+	// incorrect for bin-based pools. Force Standards mode whenever the
+	// active pool is concentrated, and re-evaluate on every pool switch
+	// so opening another concentrated pool keeps us on Standards.
+	$effect(() => {
+		if (pool.kind === 'Concentrated' && depositMode === 'Zap') {
+			depositMode = 'Standards';
+		}
+	});
+
 	type DepositSide = 'A' | 'B';
 	let depositSide = $state<DepositSide>('B');
 	// Empty by default. The original Figma mockup shipped with '899'
@@ -756,28 +769,30 @@
 				</div>
 
 				{#if modeTab === 'Add Liquidity'}
-					<div class="add-mode">
-						<button
-							type="button"
-							class="mode-pill"
-							class:mode-pill-active={depositMode === 'Zap'}
-							onclick={() => (depositMode = 'Zap')}
-						>
-							<Bolt size={16} />
-							<span>Zap</span>
-							<span class="mode-pill-count">1 token</span>
-						</button>
-						<button
-							type="button"
-							class="mode-pill"
-							class:mode-pill-active={depositMode === 'Standards'}
-							onclick={() => (depositMode = 'Standards')}
-						>
-							<Plus size={16} />
-							<span>Standards</span>
-							<span class="mode-pill-count mode-pill-count-muted">2 tokens</span>
-						</button>
-					</div>
+					{#if !isConcentrated}
+						<div class="add-mode">
+							<button
+								type="button"
+								class="mode-pill"
+								class:mode-pill-active={depositMode === 'Zap'}
+								onclick={() => (depositMode = 'Zap')}
+							>
+								<Bolt size={16} />
+								<span>Zap</span>
+								<span class="mode-pill-count">1 token</span>
+							</button>
+							<button
+								type="button"
+								class="mode-pill"
+								class:mode-pill-active={depositMode === 'Standards'}
+								onclick={() => (depositMode = 'Standards')}
+							>
+								<Plus size={16} />
+								<span>Standards</span>
+								<span class="mode-pill-count mode-pill-count-muted">2 tokens</span>
+							</button>
+						</div>
+					{/if}
 
 					{#if depositMode === 'Zap'}
 						<div class="add-alert">
