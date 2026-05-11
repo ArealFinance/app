@@ -559,21 +559,24 @@
 
 		// USDC backing — the stablecoin the vault holds as protocol capital
 		// against outstanding RWT. Not present in `markets.snapshot.tokens`
-		// (that list only carries RWT + OT-tokens), so we synthesise it from
-		// `rwtVault.navBookValue`. Skipped on non-vault token pages and
-		// when the vault read returned null (e.g. cluster without RWT
-		// Engine deployed).
+		// (that list only carries RWT + OT-tokens), so we synthesise it
+		// from the vault's `totalInvestedCapital` field. NOT `navBookValue`
+		// — that's NAV PER RWT ($1 launch value), not the total USDC
+		// position. Skipped on non-vault token pages and when the vault
+		// read returned null (e.g. cluster without RWT Engine deployed).
 		const vault = markets.rwtVault;
-		if (vault && vault.navBookValue > 0n) {
+		if (vault && vault.totalInvestedCapital > 0n) {
 			rows.push({
 				mint: network.usdcMint,
 				symbol: 'USDC',
 				category: 'stable',
-				// `navBookValue` has 6 decimals (USDC's native scale). Casting
-				// to Number is safe — a 64-bit USDC amount only overflows JS
-				// floats past ~9 × 10^9 USDC ($9 B), well beyond Testnet/early
-				// mainnet scale.
-				usd: Number(vault.navBookValue) / 1_000_000
+				// `totalInvestedCapital` is a u128 in USDC base units (6
+				// decimals). u128 → Number can lose precision past 2^53
+				// (~9 × 10^15 ≈ $9 quadrillion USDC). Even on optimistic
+				// mainnet scenarios that's wildly out of reach, so the
+				// cast is safe here. If/when vault TVL approaches that
+				// threshold, switch to BigInt-aware bubble-size math.
+				usd: Number(vault.totalInvestedCapital) / 1_000_000
 			});
 		}
 

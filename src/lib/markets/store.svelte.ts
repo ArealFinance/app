@@ -315,7 +315,11 @@ export const markets = {
 	get pools(): EnrichedPoolRow[] {
 		return enrichedPools;
 	},
-	get rwtVault(): { navBookValue: bigint; totalRwtSupply: bigint } | null {
+	get rwtVault(): {
+		navBookValue: bigint;
+		totalRwtSupply: bigint;
+		totalInvestedCapital: bigint;
+	} | null {
 		return snapshot?.rwtVault ?? null;
 	},
 	get error(): string | null {

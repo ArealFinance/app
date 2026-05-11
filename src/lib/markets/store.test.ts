@@ -155,7 +155,11 @@ function makeSnapshot(slot = 100) {
 				rawPool: {} as never
 			}
 		],
-		rwtVault: { navBookValue: 100_000_000n, totalRwtSupply: 100_000_000n }
+		rwtVault: {
+			navBookValue: 100_000_000n,
+			totalRwtSupply: 100_000_000n,
+			totalInvestedCapital: 100_000_000n
+		}
 	};
 }
 
