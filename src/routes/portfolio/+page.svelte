@@ -1192,17 +1192,17 @@
 	}
 	.claim-cut::before,
 	.claim-cut::after {
-		/* Quarter-pie of outer-mat colour, painted *into* the section material
-		 * at the section's outer-bottom (top section) and outer-top (bottom
-		 * section) corner at the gap-row. Border-radius on the diagonally
-		 * opposite corner of the 9×9 box turns the pseudo into a pie whose
-		 * tip sits exactly at the section's 90° corner — carving it into a
-		 * concave fillet curving 9px into the section material. */
+		/* Section-coloured convex bulge painted *inside* the gap-row at each
+		 * outer corner of the cut. A 9×9 box of section colour with the
+		 * gap-facing corner rounded 9px creates a quarter-disk bulge whose
+		 * arc tangents the section's outer edge and the gap-row's top/bottom
+		 * edge — so the section material curves smoothly *out into* the gap
+		 * at the corner instead of breaking with a sharp 90°. */
 		content: '';
 		position: absolute;
 		width: 9px;
 		height: 9px;
-		background-color: var(--color-surface-inset);
+		background-color: var(--color-surface);
 		pointer-events: none;
 	}
 	.claim-cut-left {
@@ -1212,32 +1212,34 @@
 		right: calc(50% + 37px);
 		border-radius: 0 9px 9px 0;
 	}
-	/* Outer fillets for the left cut — flush with the section's outer-left edge. */
+	/* Outer bulges for the left cut — top one curves down-right from the
+	 * top-section's outer corner, bottom one curves up-right from the
+	 * bottom-section's outer corner. Both anchored to the cut's left edge. */
 	.claim-cut-left::before {
-		top: -9px;
-		left: 0;
-		border-radius: 0 9px 0 0;
-	}
-	.claim-cut-left::after {
-		top: 18px;
+		top: 0;
 		left: 0;
 		border-radius: 0 0 9px 0;
+	}
+	.claim-cut-left::after {
+		top: 9px;
+		left: 0;
+		border-radius: 0 9px 0 0;
 	}
 	.claim-cut-right {
 		left: calc(50% + 37px);
 		right: 0;
 		border-radius: 9px 0 0 9px;
 	}
-	/* Outer fillets for the right cut — flush with the section's outer-right edge. */
+	/* Mirror of the left bulges, anchored to the cut's right edge. */
 	.claim-cut-right::before {
-		top: -9px;
-		right: 0;
-		border-radius: 9px 0 0 0;
-	}
-	.claim-cut-right::after {
-		top: 18px;
+		top: 0;
 		right: 0;
 		border-radius: 0 0 0 9px;
+	}
+	.claim-cut-right::after {
+		top: 9px;
+		right: 0;
+		border-radius: 9px 0 0 0;
 	}
 
 	/* Crystal — fills claim-shell full width with baked-in aurora glow.
