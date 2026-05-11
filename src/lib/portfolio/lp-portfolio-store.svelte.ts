@@ -201,7 +201,14 @@ async function doFetch(): Promise<void> {
 			nativeDexProgramId: programIds.nativeDex,
 			ownershipTokenProgramId: programIds.ownershipToken,
 			cluster,
-			liquidityNexus
+			liquidityNexus,
+			// Testnet (`localnet` cluster) uses its own USDC + RWT mints
+			// (bootstrap-init.ts → endpoints.ts overrides), so the SDK's
+			// per-cluster defaults would mis-resolve symbols ("F9NV", "3pBt")
+			// and price LP positions at 0. network.{usdcMint,rwtMint} returns
+			// the override when set, else the canonical SDK mint.
+			usdcMint: network.usdcMint,
+			rwtMint: network.rwtMint
 		});
 
 		// Late-response guard. If the holder changed (wallet switch /
