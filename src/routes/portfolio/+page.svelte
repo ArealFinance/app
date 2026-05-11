@@ -1181,28 +1181,63 @@
 		position: absolute;
 		top: 0;
 		height: 18px;
-		/* Outer mat colour (the Card variant="inset" surface) shows through
-		 * each cut. Each cut is rounded ONLY on the centre-facing end (toward
-		 * the connector); the outer end stays flush with the section's outer
-		 * vertical edge. radius=9px = height/2 → full semicircle on the
-		 * inner end. Concave fillets in the section material show only at
-		 * the inner cut ends (around the connector). */
+		/* Outer mat colour shows through each cut. The cut itself is rounded
+		 * only on the inner (connector-facing) end. The outer end stays flush
+		 * with the section's vertical edge; concave fillets at the section's
+		 * outer corner are painted by 9×9 pseudo-elements (see ::before /
+		 * ::after below) that extend into the section material above/below
+		 * the gap-row. Net result: 4 concave fillets — 2 inner (handled by
+		 * the cut's border-radius) + 2 outer (handled by the pseudos). */
 		background-color: var(--color-surface-inset);
+	}
+	.claim-cut::before,
+	.claim-cut::after {
+		/* Quarter-pie of outer-mat colour, painted *into* the section material
+		 * at the section's outer-bottom (top section) and outer-top (bottom
+		 * section) corner at the gap-row. Border-radius on the diagonally
+		 * opposite corner of the 9×9 box turns the pseudo into a pie whose
+		 * tip sits exactly at the section's 90° corner — carving it into a
+		 * concave fillet curving 9px into the section material. */
+		content: '';
+		position: absolute;
+		width: 9px;
+		height: 9px;
+		background-color: var(--color-surface-inset);
+		pointer-events: none;
 	}
 	.claim-cut-left {
 		left: 0;
 		/* 37px = half of 74px connector core. Together both cuts leave a
 		 * 74px section-coloured strip in the centre — the visible connector. */
 		right: calc(50% + 37px);
-		/* Full pill: outer rounded end sits flush with section's outer edge —
-		 * the section's own border-radius absorbs the small outer curve so the
-		 * outer cut ends don't read as 90° corners. */
-		border-radius: 9px;
+		border-radius: 0 9px 9px 0;
+	}
+	/* Outer fillets for the left cut — flush with the section's outer-left edge. */
+	.claim-cut-left::before {
+		top: -9px;
+		left: 0;
+		border-radius: 0 9px 0 0;
+	}
+	.claim-cut-left::after {
+		top: 18px;
+		left: 0;
+		border-radius: 0 0 9px 0;
 	}
 	.claim-cut-right {
 		left: calc(50% + 37px);
 		right: 0;
-		border-radius: 9px;
+		border-radius: 9px 0 0 9px;
+	}
+	/* Outer fillets for the right cut — flush with the section's outer-right edge. */
+	.claim-cut-right::before {
+		top: -9px;
+		right: 0;
+		border-radius: 9px 0 0 0;
+	}
+	.claim-cut-right::after {
+		top: 18px;
+		right: 0;
+		border-radius: 0 0 0 9px;
 	}
 
 	/* Crystal — fills claim-shell full width with baked-in aurora glow.
