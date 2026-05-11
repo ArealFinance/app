@@ -80,7 +80,6 @@ import {
 
 import { buildClaimTx } from '@areal/sdk/tx';
 import { fetchMerkleProof } from '@areal/sdk/portfolio';
-import { RWT_MINTS } from '@areal/sdk/network';
 import { parseMerkleDistributor } from '@areal/sdk/yield-distribution';
 import type { PortfolioRow } from '@areal/sdk/portfolio';
 import { env as publicEnv } from '$env/dynamic/public';
@@ -314,7 +313,15 @@ async function runClaim(row: PortfolioRow): Promise<void> {
 		const rewardVault = distributor.rewardVault;
 
 		const cumulativeAmount = BigInt(proof.cumulativeAmount);
-		const rwtMint = RWT_MINTS[network.current];
+		// Use the network store's override-aware mint resolver instead of
+		// SDK's per-cluster default. Areal Testnet (`localnet` cluster id)
+		// uses a non-canonical RWT mint created by bootstrap-init.ts; the
+		// SDK default is the R20 placeholder and the resulting ATA would
+		// be derived against the wrong mint — `CreateIdempotent` then CPIs
+		// into SPL Token::GetAccountDataSize, which sees a placeholder
+		// account that isn't owned by SPL Token, and reverts with
+		// `IncorrectProgramId`.
+		const rwtMint = network.rwtMint;
 
 		const tx: Transaction = await buildClaimTx({
 			connection,
