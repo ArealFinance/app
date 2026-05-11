@@ -21,6 +21,7 @@
 		cumulativeAmount: 12_500_000n,
 		claimedAmount: 0n,
 		claimableNow: 12_500_000n,
+		vestingRatePerSec: 0n,
 		ataAddress: FAKE_ATA
 	};
 

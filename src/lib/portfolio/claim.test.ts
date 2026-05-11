@@ -147,6 +147,7 @@ function makeRow(
 		cumulativeAmount: 100n as bigint | null,
 		claimedAmount: 30n,
 		claimableNow: 70n as bigint | null,
+		vestingRatePerSec: 0n as bigint | null,
 		ataAddress: ATA_A
 	};
 }

@@ -297,32 +297,29 @@
 	// zero rather than ambiguous dash) until then.
 	const change24hDisplay = '0.00%';
 
-	// Earning-rate pill — show an estimate of "how fast my unclaimed pile
-	// grows" so the rate-pill isn't a hardcoded "0/sec" placeholder.
+	// Earning-rate pill — actual per-day emission summed across distributors.
 	//
-	// Heuristic (Testnet demo):
-	//   rate = unclaimedRwt / VESTING_PERIOD_SECS
-	// VESTING_PERIOD_SECS matches `bootstrap-yield-distributors.ts`'s
-	// `--vesting 86400` default (1 day). After every `fund_distributor` tx
-	// the merkle-publisher writes a new epoch into `unclaimedRwt`, so the
-	// rate grows in proportion to fund volume.
+	// Each row carries `vestingRatePerSec` (base units / sec) from the SDK:
+	//   `(total_funded - locked_vested) × cumulative / max_total_claim
+	//    / vesting_period_secs`
+	// which is 0 once the current fund's vesting window elapses. Summing
+	// across rows gives the user's instantaneous emission, scaled to a day
+	// for the pill display.
 	//
-	// Backlog: read `MerkleDistributor.vesting_period_secs` per-row through
-	// the SDK and weight by distributor instead of using a constant. Once
-	// `bootstrap-yield-distributors.ts` supports per-OT vesting overrides
-	// (e.g. 365 days for ARL OT) this constant becomes wrong.
-	const VESTING_PERIOD_SECS = 86_400;
+	// Previous version divided `unclaimedRwt` by `VESTING_PERIOD_SECS` and
+	// multiplied back by 86_400 — algebraically a no-op, so the pill just
+	// re-printed the unclaimed amount.
+	const SECS_PER_DAY = 86_400;
 	const earningRateDisplay = $derived.by((): string => {
-		if (unclaimedRwt === 0n) return '0 RWT/day';
-		// `unclaimedRwt` is a u64 in base units; collapsing to Number is
-		// safe (< 2^53 for realistic Testnet volumes).
-		const rwtPerSec = Number(unclaimedRwt) / 10 ** RWT_DECIMALS / VESTING_PERIOD_SECS;
-		const rwtPerDay = rwtPerSec * 86_400;
-		// Keep the unit consistent — "RWT/day" reads cleanly at every
-		// magnitude a user is likely to see (testnet demo deposits trend
-		// around 0.02 RWT/day; mainnet stakes will be ≥1). 4 fraction
-		// digits is enough to keep small Testnet values legible without
-		// stuttering into floating-point noise.
+		const ratePerSec = portfolio.rows.reduce(
+			(sum, r) => sum + (r.vestingRatePerSec ?? 0n),
+			0n,
+		);
+		if (ratePerSec === 0n) return '0 RWT/day';
+		// bigint × 86_400 stays bigint; collapse to Number AFTER scaling
+		// to RWT decimals so we keep small testnet rates legible without
+		// underflowing to 0.
+		const rwtPerDay = Number(ratePerSec * BigInt(SECS_PER_DAY)) / 10 ** RWT_DECIMALS;
 		return `${rwtPerDay.toFixed(4)} RWT/day`;
 	});
 

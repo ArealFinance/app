@@ -135,6 +135,7 @@ function makeSnapshot(holder: PublicKey) {
 				cumulativeAmount: 100n,
 				claimedAmount: 30n,
 				claimableNow: 70n,
+				vestingRatePerSec: 0n,
 				ataAddress: ATA_A
 			}
 		]
