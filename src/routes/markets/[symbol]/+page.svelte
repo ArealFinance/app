@@ -538,7 +538,11 @@
 	const VAULT_COLOR_BY_CATEGORY: Record<string, string> = {
 		protocol: '#A56EFF',
 		ownership: '#447AD8',
-		stock: '#D844C6'
+		stock: '#D844C6',
+		// USDC bubble — official USDC brand blue. The "stable" pseudo-
+		// category is invented client-side (no OT carries it); it exists
+		// purely to colour-key the USDC bubble we inject below.
+		stable: '#2775CA'
 	};
 	const vaultPositions = $derived.by<VaultPosition[]>(() => {
 		const rwtMintKey = network.rwtMint.toBase58();
@@ -552,6 +556,27 @@
 			usd: number;
 		};
 		const rows: Row[] = [];
+
+		// USDC backing — the stablecoin the vault holds as protocol capital
+		// against outstanding RWT. Not present in `markets.snapshot.tokens`
+		// (that list only carries RWT + OT-tokens), so we synthesise it from
+		// `rwtVault.navBookValue`. Skipped on non-vault token pages and
+		// when the vault read returned null (e.g. cluster without RWT
+		// Engine deployed).
+		const vault = markets.rwtVault;
+		if (vault && vault.navBookValue > 0n) {
+			rows.push({
+				mint: network.usdcMint,
+				symbol: 'USDC',
+				category: 'stable',
+				// `navBookValue` has 6 decimals (USDC's native scale). Casting
+				// to Number is safe — a 64-bit USDC amount only overflows JS
+				// floats past ~9 × 10^9 USDC ($9 B), well beyond Testnet/early
+				// mainnet scale.
+				usd: Number(vault.navBookValue) / 1_000_000
+			});
+		}
+
 		for (const t of tokens) {
 			if (t.mint.toBase58() === rwtMintKey) continue; // RWT itself is the vault asset
 			if (t.priceUsdc === null) continue;
