@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
+	import { PublicKey } from '@solana/web3.js';
 	import { Rooms } from '@areal/sdk/realtime';
 	import AppShell from '$lib/components/sections/AppShell.svelte';
 	import AssetsDistributionChart from '$lib/components/charts/AssetsDistributionChart.svelte';
@@ -114,7 +115,26 @@
 	);
 
 	// Phase 3 — LP positions come from `lpPortfolio` store (on-chain).
-	const lpRows = $derived(lpPortfolio.rows);
+	// The SDK only knows about USDC / RWT via its hardcoded `USDC_MINTS`
+	// and `RWT_MINTS` per cluster. On Testnet the validator runs with
+	// override mints (see `endpoints.ts`), so the SDK falls back to the
+	// 4-char base58 prefix for both. We re-resolve symbols here against
+	// (1) the cluster endpoint overrides, (2) the markets snapshot's
+	// enumerated tokens, then fall back to the SDK's prefix label.
+	function resolveLpSymbol(mint: PublicKey, fallback: string): string {
+		if (mint.equals(network.usdcMint)) return 'USDC';
+		if (mint.equals(network.rwtMint)) return 'RWT';
+		const known = markets.snapshot?.tokens.find((t) => t.mint.equals(mint));
+		if (known) return known.symbol;
+		return fallback;
+	}
+	const lpRows = $derived(
+		lpPortfolio.rows.map((r) => ({
+			...r,
+			symbolA: resolveLpSymbol(r.pool.tokenAMint, r.symbolA),
+			symbolB: resolveLpSymbol(r.pool.tokenBMint, r.symbolB)
+		}))
+	);
 
 	// Selection lives by base58 string so the value survives row re-orders
 	// (Svelte uses object identity for selection bindings; bigints in the
