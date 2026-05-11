@@ -70,6 +70,42 @@ export function canonicalMintOrder(
 	return cmp < 0 ? { mintA: a, mintB: b } : { mintA: b, mintB: a };
 }
 
+/**
+ * Generic OT↔RWT pool builder. Both `create-sparkles-ot.ts` and the
+ * Testnet bootstrap pair every OT against RWT (the native DEX requires
+ * one side to be the RWT mint via `0x1781 — Neither token is RWT_MINT`),
+ * so the only varying input is the OT mint + its label + decimals.
+ */
+function buildOtRwtEntry(opts: {
+	cluster: NetworkId;
+	otMint: PublicKey;
+	otSymbol: string;
+	otDecimals: number;
+	otLabel?: string;
+}): PoolEntry {
+	const ep = ENDPOINTS[opts.cluster];
+	const rwt = ep.rwtMint ?? RWT_MINTS[opts.cluster];
+	const { mintA, mintB } = canonicalMintOrder(opts.otMint, rwt);
+	const otIsA = mintA.equals(opts.otMint);
+	const [poolPda] = findPoolStatePda(mintA, mintB, PROGRAM_IDS.nativeDex);
+	const [dexConfigPda] = findDexConfigPda(PROGRAM_IDS.nativeDex);
+	return {
+		label: opts.otLabel ?? `${opts.otSymbol} / RWT`,
+		mintA,
+		mintB,
+		symbolA: otIsA ? opts.otSymbol : 'RWT',
+		symbolB: otIsA ? 'RWT' : opts.otSymbol,
+		decimalsA: otIsA ? opts.otDecimals : RWT_DECIMALS,
+		decimalsB: otIsA ? RWT_DECIMALS : opts.otDecimals,
+		poolPda,
+		dexConfigPda
+	};
+}
+
+/** SPRK mint (Sparkles OT) created by `scripts/lib/create-sparkles-ot.ts`. */
+const SPRK_MINT = new PublicKey('3xWNZFsPKNmmeQHTo1HDxQK6EGutZHadnGQZBrmd8RYQ');
+const SPRK_DECIMALS = 6;
+
 /** Build a USDC↔RWT pool entry for a given cluster.
  *
  * Honours `ENDPOINTS[cluster].{usdcMint,rwtMint}` overrides (set on
@@ -110,7 +146,15 @@ function buildUsdcRwtEntry(cluster: NetworkId): PoolEntry {
  * on-chain (and `buildSwapTx` would refuse to build it anyway).
  */
 export const KNOWN_POOLS_BY_CLUSTER: Record<NetworkId, PoolEntry[]> = {
-	localnet: [buildUsdcRwtEntry('localnet')],
+	localnet: [
+		buildUsdcRwtEntry('localnet'),
+		buildOtRwtEntry({
+			cluster: 'localnet',
+			otMint: SPRK_MINT,
+			otSymbol: 'SPRK',
+			otDecimals: SPRK_DECIMALS
+		})
+	],
 	devnet: [buildUsdcRwtEntry('devnet')],
 	mainnet: []
 };
