@@ -42,6 +42,7 @@
 		type SwapIntent
 	} from '$lib/swap';
 	import { applySlippage } from '@areal/sdk/native-dex';
+	import { page } from '$app/state';
 	import { formatTokenAmount } from '$lib/portfolio/format';
 	import {
 		AngleDownSmall,
@@ -204,10 +205,43 @@
 	// ──────────────────── lifecycle ───────────────────────────────────────
 
 	onMount(() => {
-		const first = poolsForCluster[0];
+		// Deep-link support — `/swap?from=<sym>&to=<sym>` selects the pool
+		// matching the requested pair and orients aToB so `from` is the
+		// pay side. Used by the QuickSwap widget on /markets/[symbol]
+		// when the user clicks its SWAP button. Falls through to the
+		// default "first pool for cluster" when the params are missing
+		// or the pair isn't deployed on this cluster.
+		const params = page.url.searchParams;
+		const fromSym = params.get('from')?.toUpperCase();
+		const toSym = params.get('to')?.toUpperCase();
+		let initial: PoolEntry | null = null;
+		let initialAToB = true;
+		if (fromSym && toSym) {
+			for (const p of poolsForCluster) {
+				if (p.symbolA === fromSym && p.symbolB === toSym) {
+					initial = p;
+					initialAToB = true;
+					break;
+				}
+				if (p.symbolB === fromSym && p.symbolA === toSym) {
+					initial = p;
+					initialAToB = false;
+					break;
+				}
+			}
+		}
+		const first = initial ?? poolsForCluster[0] ?? null;
 		if (first) {
 			activePool = first;
+			aToB = initialAToB;
 			void quote.activatePool(first);
+		}
+		// Prefill amount when caller provided it. Validation (parseAmount)
+		// happens downstream — passing a bad string just won't trigger
+		// the swap CTA's enable state.
+		const amountParam = params.get('amount');
+		if (amountParam && /^\d*\.?\d+$/.test(amountParam)) {
+			fromAmountStr = amountParam;
 		}
 		if (wallet.publicKey) {
 			void userBalances.refreshAll();

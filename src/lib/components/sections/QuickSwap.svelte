@@ -12,6 +12,7 @@
 
 <script lang="ts">
 	import { untrack } from 'svelte';
+	import { goto } from '$app/navigation';
 	import { wallet } from '$lib/stores/wallet.svelte';
 	import { walletDialog } from '$lib/stores/walletDialog.svelte';
 	import { AngleDownSmall, AngleUpSmall, ArrowUpDownSimple, Gear } from '$lib/icons';
@@ -86,6 +87,34 @@
 
 	const fromSide = $derived(pinnedSide === 'from' ? 'pinned' : 'other');
 	const toSide = $derived(pinnedSide === 'from' ? 'other' : 'pinned');
+
+	const fromToken = $derived(pinnedSide === 'from' ? pinnedToken : other);
+	const toToken = $derived(pinnedSide === 'from' ? other : pinnedToken);
+	const fromAmount = $derived(pinnedSide === 'from' ? pinnedAmount : otherAmount);
+
+	/**
+	 * Handle the Swap CTA. Two paths:
+	 *   1. Wallet not connected → open the wallet dialog.
+	 *   2. Wallet connected → navigate to the full /swap page with the
+	 *      pair (and amount when present) pre-filled via query params.
+	 *      The full page hosts the real FSM (quote → preview → submit);
+	 *      this widget is intentionally a launcher, not a duplicate of
+	 *      that flow.
+	 */
+	function onSwapClick(): void {
+		if (!wallet.isConnected) {
+			walletDialog.open('connect');
+			return;
+		}
+		const params = new URLSearchParams();
+		params.set('from', fromToken.symbol);
+		params.set('to', toToken.symbol);
+		const trimmed = fromAmount.trim();
+		if (trimmed.length > 0 && Number(trimmed) > 0) {
+			params.set('amount', trimmed);
+		}
+		void goto(`/swap?${params.toString()}`);
+	}
 
 	// Settings panel
 	const SLIPPAGE_PRESETS = [0.1, 0.5, 1] as const;
@@ -251,7 +280,7 @@
 			<button
 				type="button"
 				class="qs-cta"
-				onclick={() => (wallet.isConnected ? undefined : walletDialog.open('connect'))}
+				onclick={onSwapClick}
 			>
 				{wallet.isConnected ? 'Swap' : 'Connect Wallet'}
 			</button>
