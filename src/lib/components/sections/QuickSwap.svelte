@@ -14,7 +14,7 @@
 	import { untrack } from 'svelte';
 	import { wallet } from '$lib/stores/wallet.svelte';
 	import { walletDialog } from '$lib/stores/walletDialog.svelte';
-	import { AngleDownSmall, ArrowUpDownSimple, Gear } from '$lib/icons';
+	import { AngleDownSmall, AngleUpSmall, ArrowUpDownSimple, Gear } from '$lib/icons';
 
 	type Props = {
 		/** Token pinned to one side (e.g. the current token on a /markets/[symbol] page). */
@@ -152,7 +152,7 @@
 		{@const token = side === 'pinned' ? pinnedToken : other}
 		{@const amount = side === 'pinned' ? pinnedAmount : otherAmount}
 		<div class="qs-panel">
-			<span class="qs-token-logo" style:background={token.iconSrc ? token.bg : token.bg}>
+			<span class="qs-token-logo" style:background={token.bg}>
 				{#if token.iconSrc}
 					<img src={token.iconSrc} alt="" aria-hidden="true" />
 				{:else}
@@ -169,79 +169,84 @@
 						<button
 							type="button"
 							class="qs-symbol qs-symbol-trigger"
+							class:qs-symbol-open={isOtherOpen}
 							onclick={toggleOtherDropdown}
 							aria-haspopup="listbox"
 							aria-expanded={isOtherOpen}
 						>
 							{token.symbol}
-							<AngleDownSmall size={16} />
+							{#if isOtherOpen}
+								<AngleUpSmall size={16} />
+							{:else}
+								<AngleDownSmall size={16} />
+							{/if}
 						</button>
 					{/if}
 				</div>
-				<input
-					class="qs-input"
-					type="text"
-					inputmode="decimal"
-					placeholder="0.00"
-					bind:value={
-						() => amount,
-						(v) => {
-							if (side === 'pinned') pinnedAmount = v;
-							else otherAmount = v;
+				{#if !isOtherOpen}
+					<input
+						class="qs-input"
+						type="text"
+						inputmode="decimal"
+						placeholder="0.00"
+						bind:value={
+							() => amount,
+							(v) => {
+								if (side === 'pinned') pinnedAmount = v;
+								else otherAmount = v;
+							}
 						}
-					}
-				/>
+					/>
+				{/if}
 			</div>
-
-			{#if side !== 'pinned' && isOtherOpen}
-				<ul class="qs-dropdown" role="listbox">
-					{#each otherCandidates as t (t.id)}
-						<li>
-							<button
-								type="button"
-								class="qs-option"
-								role="option"
-								aria-selected={t.id === other.id}
-								onclick={() => pickOther(t)}
-							>
-								<span
-									class="qs-token-logo qs-token-logo-sm"
-									style:background={t.iconSrc ? t.bg : t.bg}
-								>
-									{#if t.iconSrc}
-										<img src={t.iconSrc} alt="" aria-hidden="true" />
-									{:else}
-										<span class="qs-token-letter">{t.iconLetter ?? t.symbol[0]}</span>
-									{/if}
-								</span>
-								<span class="qs-option-symbol">{t.symbol}</span>
-							</button>
-						</li>
-					{/each}
-				</ul>
-			{/if}
 		</div>
 	{/snippet}
 
 	{@render panel(fromSide, 'From')}
 
-	<div class="qs-flip" aria-hidden="false">
-		<button type="button" class="qs-flip-btn" aria-label="Flip swap direction" onclick={flip}>
-			<span class="qs-flip-outer"></span>
-			<span class="qs-flip-inner"></span>
-			<span class="qs-flip-icon"><ArrowUpDownSimple size={16} /></span>
+	{#if isOtherOpen}
+		<ul class="qs-dropdown" role="listbox">
+			{#each otherCandidates as t (t.id)}
+				<li>
+					<button
+						type="button"
+						class="qs-option"
+						class:qs-option-selected={t.id === other.id}
+						role="option"
+						aria-selected={t.id === other.id}
+						onclick={() => pickOther(t)}
+					>
+						<span class="qs-option-logo" style:background={t.bg}>
+							{#if t.iconSrc}
+								<img src={t.iconSrc} alt="" aria-hidden="true" />
+							{:else}
+								<span class="qs-token-letter">{t.iconLetter ?? t.symbol[0]}</span>
+							{/if}
+						</span>
+						<span class="qs-option-symbol">{t.symbol}</span>
+					</button>
+				</li>
+			{/each}
+		</ul>
+	{:else}
+		<div class="qs-flip" aria-hidden="false">
+			<button type="button" class="qs-flip-btn" aria-label="Flip swap direction" onclick={flip}>
+				<span class="qs-flip-outer"></span>
+				<span class="qs-flip-inner"></span>
+				<span class="qs-flip-icon"><ArrowUpDownSimple size={16} /></span>
+			</button>
+		</div>
+
+		{@render panel(toSide, 'To')}
+
+		<button
+			type="button"
+			class="qs-cta"
+			onclick={() => (wallet.isConnected ? undefined : walletDialog.open('connect'))}
+		>
+			{wallet.isConnected ? 'Swap' : 'Connect Wallet'}
 		</button>
-	</div>
-
-	{@render panel(toSide, 'To')}
-
-	<button
-		type="button"
-		class="qs-cta"
-		onclick={() => (wallet.isConnected ? undefined : walletDialog.open('connect'))}
-	>
-		{wallet.isConnected ? 'Swap' : 'Connect Wallet'}
-	</button>
+	{/if}
 </aside>
 
 <style>
@@ -401,13 +406,6 @@
 		height: 100%;
 		object-fit: cover;
 	}
-	.qs-token-logo-sm {
-		width: 24px;
-		height: 24px;
-		border-radius: 8px;
-		font-size: 12px;
-	}
-
 	.qs-amount {
 		display: flex;
 		flex: 1;
@@ -471,31 +469,51 @@
 		color: var(--color-text-muted);
 	}
 
+	/* Open-trigger affordances on the panel header */
+	.qs-symbol-open,
+	.qs-symbol-open :global(svg) {
+		color: var(--color-blue-500);
+	}
+
+	/* Dropdown — replaces flip/other-card/CTA when open; scrollable list with fade. */
 	.qs-dropdown {
-		position: absolute;
-		top: calc(100% + 4px);
-		left: 12px;
-		z-index: 10;
+		position: relative;
+		flex: 1;
 		display: flex;
 		flex-direction: column;
-		gap: 2px;
+		gap: 4px;
 		margin: 0;
 		padding: 4px;
 		list-style: none;
-		background-color: var(--color-surface-inset);
-		border-radius: 16px;
-		box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
-		min-width: 140px;
+		max-height: 280px;
+		overflow-y: auto;
+		overflow-x: hidden;
+		mask-image: linear-gradient(180deg, #000 0%, #000 78%, transparent 100%);
+		-webkit-mask-image: linear-gradient(180deg, #000 0%, #000 78%, transparent 100%);
+		/* Custom scrollbar to match the Figma slate thumb */
+		scrollbar-width: thin;
+		scrollbar-color: rgba(64, 71, 96, 0.6) transparent;
+	}
+	.qs-dropdown::-webkit-scrollbar {
+		width: 6px;
+	}
+	.qs-dropdown::-webkit-scrollbar-track {
+		background: transparent;
+	}
+	.qs-dropdown::-webkit-scrollbar-thumb {
+		background-color: rgba(64, 71, 96, 0.6);
+		border-radius: 12px;
 	}
 	.qs-option {
 		display: flex;
 		align-items: center;
-		gap: 8px;
+		gap: 12px;
 		width: 100%;
-		padding: 8px 12px;
-		background: transparent;
-		border: 0;
-		border-radius: 12px;
+		height: 56px;
+		padding: 12px;
+		background-color: var(--color-surface);
+		border: 1px solid transparent;
+		border-radius: 20px;
 		font-family: var(--font-body);
 		font-size: 14px;
 		font-weight: 600;
@@ -503,13 +521,42 @@
 		color: var(--color-text);
 		cursor: pointer;
 		text-align: left;
-		transition: background-color var(--motion-base) var(--ease-out);
+		transition:
+			border-color var(--motion-base) var(--ease-out),
+			box-shadow var(--motion-base) var(--ease-out);
 	}
-	.qs-option:hover {
-		background-color: rgba(255, 255, 255, 0.06);
+	.qs-option:hover:not(.qs-option-selected) {
+		border-color: rgba(255, 255, 255, 0.08);
 	}
-	.qs-option[aria-selected='true'] {
-		background-color: rgba(255, 255, 255, 0.04);
+	.qs-option-selected {
+		background-color: var(--color-surface-inset);
+		border-color: var(--color-blue-500);
+		box-shadow: 0 0 8px rgba(110, 151, 255, 0.8);
+	}
+	.qs-option-logo {
+		display: inline-flex;
+		flex: none;
+		align-items: center;
+		justify-content: center;
+		width: 32px;
+		height: 32px;
+		border-radius: 12px;
+		font-family: var(--font-body);
+		font-weight: 700;
+		font-size: 14px;
+		color: #fff;
+		overflow: hidden;
+	}
+	.qs-option-logo img {
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+	}
+	.qs-option-symbol {
+		font-family: var(--font-body);
+		font-size: 14px;
+		font-weight: 600;
+		letter-spacing: -0.6px;
 	}
 
 	/* Flip button — nested rotated diamonds with arrow icon centred. */
