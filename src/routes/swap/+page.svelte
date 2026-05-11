@@ -604,7 +604,7 @@
 									{/if}
 								</button>
 								{#if fromBalanceDisplay}
-									<span class="row-balance">Balance: {fromBalanceDisplay} {fromSymbol}</span>
+									<span class="row-balance">{fromBalanceDisplay} {fromSymbol}</span>
 								{/if}
 							</div>
 							<input
@@ -687,7 +687,7 @@
 									{/if}
 								</button>
 								{#if toBalanceDisplay}
-									<span class="row-balance">Balance: {toBalanceDisplay} {toSymbol}</span>
+									<span class="row-balance">{toBalanceDisplay} {toSymbol}</span>
 								{/if}
 							</div>
 							<input
