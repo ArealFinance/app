@@ -515,13 +515,16 @@
 							</button>
 						</div>
 
-						<!-- 18px gap-row painted with outer-mat colour at a z-level
-						     above the crystal so the cut windows stay visible across
-						     the entire width (crystal silhouette would otherwise hide
-						     the right cut). A 74px pill connector bridges the
-						     sections vertically through the centre of the gap. -->
+						<!-- 18px gap-row: outer-mat bg above the crystal + a 74px pill
+						     connector in the centre. Two side anchors carry pseudo-pies
+						     that carve concave fillets into the section material at the
+						     four corners adjacent to the connector (so the section's
+						     bottom edge curves smoothly into the connector's pill
+						     ends rather than meeting them at a 90°). -->
 						<div class="claim-gap-row" aria-hidden="true">
+							<span class="claim-fillet claim-fillet-left"></span>
 							<span class="claim-connector"></span>
+							<span class="claim-fillet claim-fillet-right"></span>
 						</div>
 
 						<!-- BOTTOM section: total value, chart, legend, stats -->
@@ -1182,6 +1185,55 @@
 		height: 18px;
 		background-color: var(--color-surface);
 		border-radius: 9px;
+	}
+
+	/* Concave fillets at the four section corners adjacent to the connector.
+	 * Each pseudo paints a 9×9 quarter-pie of outer-mat colour with its tip at
+	 * the section's 90° corner and the curve bulging into the section material,
+	 * carving the corner into a smooth fillet curving around the connector. */
+	.claim-fillet {
+		position: absolute;
+		top: 0;
+		width: 0;
+		height: 18px;
+		pointer-events: none;
+	}
+	.claim-fillet-left {
+		left: calc(50% - 37px);
+	}
+	.claim-fillet-right {
+		right: calc(50% - 37px);
+	}
+	.claim-fillet::before,
+	.claim-fillet::after {
+		content: '';
+		position: absolute;
+		width: 9px;
+		height: 9px;
+		background-color: var(--color-surface-inset);
+		pointer-events: none;
+	}
+	/* Left side — pseudos anchor to the right edge (= connector's left edge). */
+	.claim-fillet-left::before {
+		top: -9px;
+		right: 0;
+		border-radius: 9px 0 0 0;
+	}
+	.claim-fillet-left::after {
+		top: 18px;
+		right: 0;
+		border-radius: 0 0 0 9px;
+	}
+	/* Right side — pseudos anchor to the left edge (= connector's right edge). */
+	.claim-fillet-right::before {
+		top: -9px;
+		left: 0;
+		border-radius: 0 9px 0 0;
+	}
+	.claim-fillet-right::after {
+		top: 18px;
+		left: 0;
+		border-radius: 0 0 9px 0;
 	}
 
 	/* Crystal — fills claim-shell full width with baked-in aurora glow.
