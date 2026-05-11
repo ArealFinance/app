@@ -57,6 +57,13 @@
 	const PILL_H = 88;
 	const PILL_TOP = 21;
 	const PILL_GAP = 4; // distance between the two pills (113 - (21+88))
+	// Vertical range the BANDS occupy. Figma spec: top edge 20.83,
+	// bottom edge ~200.83 — i.e. visually aligned with the pills on the
+	// left and the marker on the right (top 21, bottom 201). Bands MUST
+	// not extend past pills, otherwise the top/bottom of the chart
+	// reads as floating ribbons.
+	const BAND_TOP = 21;
+	const BAND_H = 180;
 
 	// Resolution of the waveform along the X axis. 60 samples keeps the
 	// monotonic-X curve smooth without exploding DOM size.
@@ -121,8 +128,8 @@
 			const bot = band.leftBot + (band.rightBot - band.leftBot) * e;
 			return {
 				x: LEFT_PAD + t * INNER_W,
-				y0: H * top,
-				y1: H * bot
+				y0: BAND_TOP + BAND_H * top,
+				y1: BAND_TOP + BAND_H * bot
 			};
 		});
 		return areaGen(pts) ?? '';
