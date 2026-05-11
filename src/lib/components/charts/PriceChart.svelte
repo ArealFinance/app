@@ -14,18 +14,34 @@
 		xLabels?: string[];
 		/**
 		 * Centered rolling-average window applied to `y` values before
-		 * rendering. Defaults to 9, which dissolves the plateau-edge
-		 * corners on sparse Testnet NAV data into gentle slopes without
-		 * flattening the underlying trend. Paired with the `curveBumpX`
-		 * stroke in the renderer, the combination produces the wavy aesthetic
-		 * shown in the Figma macet even on data with abrupt single-tick
-		 * jumps. Set to `1` to bypass smoothing entirely (mock data, dense
-		 * mainnet series).
+		 * rendering. Defaults to 9.
+		 *
+		 * Combined with `smoothingPasses` (also 2 by default), this is
+		 * mathematically a triangular kernel of effective width
+		 * `2 * window - 1` — wide enough to dissolve the plateau-edge
+		 * corners on sparse Testnet NAV data into gentle arcs without
+		 * flattening the underlying trend. Set `smoothingWindow={1}` or
+		 * `smoothingPasses={0}` to bypass entirely (dense mainnet series).
 		 */
 		smoothingWindow?: number;
+		/**
+		 * Number of box-car smoothing passes applied in sequence. Two
+		 * passes ≈ triangular kernel, three ≈ approximate Gaussian — each
+		 * extra pass rounds plateau-edge corners further at the cost of
+		 * pulling the line slightly toward the data midpoint near very
+		 * sharp transitions. 2 is the visual sweet-spot from comparison
+		 * against the Figma macet.
+		 */
+		smoothingPasses?: number;
 	};
 
-	let { data = generateMockData(), currentPrice, xLabels, smoothingWindow = 9 }: Props = $props();
+	let {
+		data = generateMockData(),
+		currentPrice,
+		xLabels,
+		smoothingWindow = 9,
+		smoothingPasses = 2
+	}: Props = $props();
 
 	function generateMockData(): PricePoint[] {
 		// Smooth-ish growth + dip + recovery. Range ~7-15.
@@ -70,7 +86,22 @@
 		});
 	}
 
-	const smoothedRaw = $derived(smoothSeries(data, smoothingWindow));
+	/**
+	 * Apply box-car smoothing `n` times. Each repeated pass convolves the
+	 * boxcar with itself, so two passes ≈ triangular kernel and three ≈
+	 * Gaussian. Cheap O(n × points × window) — for typical chart sizes
+	 * (~120 points, window 9, 2 passes) that's ~2k operations per frame
+	 * which is well below any noticeable cost.
+	 */
+	function smoothMulti(input: PricePoint[], window: number, passes: number): PricePoint[] {
+		let out = input;
+		for (let i = 0; i < Math.max(0, passes); i++) {
+			out = smoothSeries(out, window);
+		}
+		return out;
+	}
+
+	const smoothedRaw = $derived(smoothMulti(data, smoothingWindow, smoothingPasses));
 
 	/**
 	 * Repeat the first and last points twice so `curveBasis` (B-spline)
