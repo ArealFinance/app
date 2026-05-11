@@ -601,10 +601,16 @@
 									</span>
 								</div>
 
-								<!-- The chart curve is a presentational mock until the
-								     backend exposes a portfolio snapshot history series.
-								     The legend below is real-data driven. -->
-								<AssetsDistributionChart />
+								<!-- Stacked-band chart driven by real bucket pct. Bands
+								     are strictly non-overlapping; heights match the
+								     legend percentages below. -->
+								<AssetsDistributionChart
+									buckets={legendEntries.map((e) => ({
+										key: e.key,
+										pct: e.pct / 100,
+										color: e.color
+									}))}
+								/>
 
 								<div class="dist-legend">
 									{#each legendEntries as entry (entry.key)}
