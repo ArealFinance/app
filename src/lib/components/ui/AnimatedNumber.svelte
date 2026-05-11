@@ -42,11 +42,12 @@
 		easing = 'linear'
 	}: Props = $props();
 
-	// Start at 0 and let the first $effect run animate up to `value`. Reading
-	// `value` in the `$state` initializer would only capture the prop's
-	// initial value (Svelte's `state_referenced_locally` lint) — the prop
-	// itself stays reactive, and the $effect below picks up every change.
+	// Start at 0; the first $effect run snaps to whatever `value` is on
+	// initial render (see `firstRun` guard below) so the user doesn't
+	// stare at a slow 0→N count-up on page load. Subsequent updates tween
+	// normally for the live-ticking feel.
 	let displayed = $state(0);
+	let firstRun = true;
 	let raf: number | null = null;
 
 	const EASING_FNS: Record<Easing, (t: number) => number> = {
@@ -60,6 +61,19 @@
 		// wherever the previous render landed (mid-animation re-targets stay
 		// smooth instead of snapping).
 		const target = value;
+
+		// Initial mount: skip the tween and snap directly to the first
+		// rendered value. Without this, a portfolio with `unclaimedRwt =
+		// 60 RWT` linearly counts 0 → 60 over 1500 ms before the user can
+		// read it. Subsequent updates (poll deltas, WS-triggered refetches)
+		// still tween so the value reads as "live ticking" rather than
+		// "snapping between polls".
+		if (firstRun) {
+			firstRun = false;
+			displayed = target;
+			return;
+		}
+
 		const start = displayed;
 		if (target === start) return;
 
