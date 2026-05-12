@@ -14,7 +14,6 @@
 	import '$lib/runtime/browser-globals';
 	import { dev } from '$app/environment';
 	import { page } from '$app/state';
-	import favicon from '$lib/assets/favicon.svg';
 	import { Toaster } from '$lib/components/ui';
 
 	let { children } = $props();
@@ -57,7 +56,14 @@
 </script>
 
 <svelte:head>
-	<link rel="icon" href={favicon} />
+	<!-- Two favicons: the dark-themed one (light glyph on dark) shows in
+	     OS dark mode, the light-themed one (dark glyph on light) in
+	     light mode. Browsers pick the matching `media` query at runtime,
+	     so the in-tab icon stays readable on either theme. The legacy
+	     `src/lib/assets/favicon.svg` (Svelte logo) is gone — never the
+	     correct icon for this product. -->
+	<link rel="icon" type="image/svg+xml" href="/favicon-dark.svg" media="(prefers-color-scheme: dark)" />
+	<link rel="icon" type="image/svg+xml" href="/favicon-light.svg" media="(prefers-color-scheme: light)" />
 </svelte:head>
 
 <!-- Header aurora — always in the DOM (one element, lifetime ==
