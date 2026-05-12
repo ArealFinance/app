@@ -121,4 +121,24 @@
 	});
 </script>
 
-<span>{displayed.toFixed(decimals)}</span>
+<span class="num">{displayed.toFixed(decimals)}</span>
+
+<style>
+	/*
+	 * Tabular-nums fixes the layout jitter when the rendered value
+	 * animates: proportional fonts render `1` narrower than `8`, so a
+	 * count-up from `100.000000` to `103.193199` reflows the parent
+	 * every frame — neighbouring elements (e.g. the trailing "RWT"
+	 * pill on /portfolio) bounce horizontally. `tabular-nums` opts in
+	 * to the OpenType `tnum` feature which gives every digit the same
+	 * advance width. `font-feature-settings: "tnum"` is the same flag
+	 * via the longhand syntax — duplicated for older browsers that
+	 * implement one but not the other. `font-variant-numeric` also
+	 * covers Safari's older quirk where `tnum` alone didn't fix the
+	 * period glyph width.
+	 */
+	.num {
+		font-variant-numeric: tabular-nums;
+		font-feature-settings: 'tnum' 1;
+	}
+</style>
