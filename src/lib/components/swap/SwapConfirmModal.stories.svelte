@@ -34,7 +34,21 @@
 		expectedOut: 99_750_000n,
 		fees: { feeTotal: 250_000n, feeLp: 200_000n, feeProtocol: 50_000n, feeOtTreasury: 0n },
 		priceImpactBps: 25,
-		slippageBps: 50
+		slippageBps: 50,
+		// USDC → RWT (buy-RWT branch): fees come off output, debit == amountIn.
+		userTotalDebit: 100_000_000n
+	};
+
+	// Mirror fakeIntent but on the sell-RWT branch (RWT → USDC). The wallet
+	// is debited `amountIn + fees` here so the modal renders the "swap + fee"
+	// sub-line.
+	const fakeIntentSellRwt: SwapIntent = {
+		...fakeIntent,
+		fromMint: FAKE_RWT,
+		toMint: FAKE_USDC,
+		aToB: false,
+		// Sell-RWT debits amountIn + feeTotal + feeOtTreasury from the wallet.
+		userTotalDebit: 100_000_000n + 250_000n
 	};
 
 	const slippageExceededIntent: SwapIntent = {
@@ -77,6 +91,16 @@
 		onclose={noop}
 		onconfirm={noop}
 		intent={fakeIntent}
+		attempt={null}
+	/>
+</Story>
+
+<Story name="IdlePreConfirmSellRwt">
+	<SwapConfirmModal
+		open={true}
+		onclose={noop}
+		onconfirm={noop}
+		intent={fakeIntentSellRwt}
 		attempt={null}
 	/>
 </Story>

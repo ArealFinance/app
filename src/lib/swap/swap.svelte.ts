@@ -67,6 +67,7 @@ import { SvelteMap } from 'svelte/reactivity';
 import {
 	Connection,
 	PublicKey,
+	SolanaJSONRPCError,
 	type Transaction
 } from '@solana/web3.js';
 
@@ -85,6 +86,7 @@ import { network } from '$lib/network/network.svelte';
 import { portfolio } from '$lib/portfolio/store.svelte';
 import { showError } from '$lib/errors';
 import { toast } from '$lib/components/ui';
+import { formatTokenAmount } from '$lib/portfolio/format';
 import { userBalances } from './balances.svelte';
 import type { PoolEntry } from './pool-catalogue';
 
@@ -120,6 +122,8 @@ export interface SwapIntent {
 	priceImpactBps: number;
 	/** Slippage in bps the user picked. */
 	slippageBps: number;
+	/** Wallet debit total in `fromMint` lamports — equals amountIn + fees on the sell-RWT branch; equals amountIn on buy-RWT. */
+	userTotalDebit: bigint;
 }
 
 export interface SwapAttempt {
@@ -144,6 +148,75 @@ const attempts = new SvelteMap<string, SwapAttempt>();
 
 /** Per-attempt cleanup timers, keyed by poolBase58. */
 const cleanupTimers = new Map<string, ReturnType<typeof setTimeout>>();
+
+/**
+ * Distinguish "ATA does not exist" (a normal pre-condition for first-time
+ * holders) from real RPC failures (timeout, 500, network partition). The
+ * Solana JSON-RPC server returns `code: -32602` (Invalid params) with a
+ * message containing "could not find account" / "Invalid param" when the
+ * queried token account is missing. Match by both code and message text —
+ * the code by itself is overloaded (any malformed param trips -32602), and
+ * non-stock RPC providers occasionally surface the same condition with a
+ * slightly different wording. Belt-and-braces: also accept a plain `Error`
+ * whose message carries the substring, since some upstreams unwrap the
+ * SolanaJSONRPCError class boundary.
+ */
+function isAccountNotFoundError(err: unknown): boolean {
+	if (err instanceof SolanaJSONRPCError) {
+		// -32602 Invalid params is the canonical signal for missing account.
+		// Pair with a message check so we don't swallow unrelated param errors.
+		const msg = err.message.toLowerCase();
+		return (
+			err.code === -32602 &&
+			(msg.includes('could not find account') || msg.includes('invalid param'))
+		);
+	}
+	if (err instanceof Error) {
+		const msg = err.message.toLowerCase();
+		return (
+			msg.includes('could not find account') ||
+			msg.includes('account does not exist')
+		);
+	}
+	return false;
+}
+
+/**
+ * Read the holder's `fromMint` ATA balance for the preflight check.
+ *
+ *   - `0n` when the ATA hasn't been created yet (a missing ATA implies zero
+ *     balance — `buildSwapTx({ ensureAta: true })` will mint it for us).
+ *   - `null` on any other RPC failure (timeout, 5xx, network partition,
+ *     malformed response). The caller MUST treat this as "balance unknown"
+ *     and fail-open the preflight rather than false-positive an
+ *     "Insufficient balance" abort for a fully funded wallet during a
+ *     transient blip. The contract still enforces the balance check
+ *     server-side, so the worst case is a wasted wallet prompt — much
+ *     better UX than refusing to even ask for a signature.
+ *
+ * Mirrors the `userBalances.readBalance` helper but takes a Connection
+ * directly so we pin to the same instance the FSM used for the rest of the
+ * preparing phase.
+ */
+async function readUserBalance(
+	connection: Connection,
+	owner: PublicKey,
+	mint: PublicKey
+): Promise<bigint | null> {
+	const [ata] = findAssociatedTokenAddressPda(owner, mint);
+	try {
+		const res = await connection.getTokenAccountBalance(ata);
+		return BigInt(res.value.amount);
+	} catch (err) {
+		if (isAccountNotFoundError(err)) return 0n;
+		// Transient RPC failure — log for observability and let the caller
+		// decide. Returning `null` (vs re-throwing) keeps the preflight a
+		// soft gate: a stale-quote / mainnet-placeholder check still aborts,
+		// but a one-off `getTokenAccountBalance` flake doesn't.
+		console.warn('readUserBalance: RPC failure, skipping preflight', err);
+		return null;
+	}
+}
 
 function isUserRejection(err: unknown): boolean {
 	if (!(err instanceof Error)) {
@@ -360,6 +433,29 @@ async function runSwap(intent: SwapIntent): Promise<void> {
 			failSilent(
 				key,
 				'Price moved. Try increasing slippage tolerance or refresh the quote.',
+				programId
+			);
+			return;
+		}
+
+		// Balance preflight against the docs-compliant `userTotalDebit` —
+		// for sell-RWT swaps the wallet is debited `amountIn + fees` (fees
+		// on top), so checking `amountIn` alone would let a swap through
+		// that the SPL transfer would revert with "insufficient funds".
+		// Buy-RWT collapses to `amountIn` (fees come off the gross output).
+		//
+		// `readUserBalance` returns `null` on transient RPC failures (not
+		// account-not-found). When that happens we fail-open: skip the
+		// preflight and let the contract enforce the balance check. The
+		// alternative — false-positive "Insufficient balance" on an RPC
+		// blip with a fully funded wallet — is strictly worse UX (APP-H1).
+		const fromDecimals = intent.aToB ? intent.poolEntry.decimalsA : intent.poolEntry.decimalsB;
+		const userTotalDebit = freshQuote.quote.userTotalDebit;
+		const fromBalance = await readUserBalance(connection, holder, intent.fromMint);
+		if (fromBalance !== null && fromBalance < userTotalDebit) {
+			failSilent(
+				key,
+				`Insufficient balance: need ${formatTokenAmount(userTotalDebit, fromDecimals, fromDecimals)} including fees, have ${formatTokenAmount(fromBalance, fromDecimals, fromDecimals)}.`,
 				programId
 			);
 			return;

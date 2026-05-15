@@ -20,9 +20,15 @@
  *   FA-11. User-rejection by code 4001 also silent
  *   FA-12. isInFlight reflects in-flight only
  *   FA-13. Concurrent different-pool starts run in parallel
+ *   FA-14. Resolved balance < userTotalDebit → preflight abort
+ *   FA-15. RPC failure on balance read → fail-open (no false-positive abort)
+ *          — APP-H1 regression: the blanket `catch { return 0n }` used to
+ *          conflate "account missing" with "RPC timeout", producing a
+ *          spurious "Insufficient balance" toast during transient blips
+ *          even for fully funded wallets.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { PublicKey } from '@solana/web3.js';
+import { PublicKey, SolanaJSONRPCError } from '@solana/web3.js';
 
 // ──────────────────────────── fixtures ────────────────────────────────────
 
@@ -57,6 +63,7 @@ const mocks = vi.hoisted(() => ({
 	getAccountInfo: vi.fn(),
 	getLatestBlockhash: vi.fn(),
 	confirmTransaction: vi.fn(),
+	getTokenAccountBalance: vi.fn(),
 	portfolioRefresh: vi.fn(),
 	balancesRefreshAll: vi.fn(),
 	toastError: vi.fn(),
@@ -109,7 +116,8 @@ vi.mock('$lib/network/network.svelte', () => ({
 			return {
 				getAccountInfo: mocks.getAccountInfo,
 				getLatestBlockhash: mocks.getLatestBlockhash,
-				confirmTransaction: mocks.confirmTransaction
+				confirmTransaction: mocks.confirmTransaction,
+				getTokenAccountBalance: mocks.getTokenAccountBalance
 			};
 		},
 		get endpoint() {
@@ -163,7 +171,10 @@ function makeIntent(poolPda: PublicKey = POOL_PDA_A) {
 		expectedOut: 1_000_000n,
 		fees: { feeTotal: 1_000n, feeLp: 800n, feeProtocol: 200n, feeOtTreasury: 0n },
 		priceImpactBps: 5,
-		slippageBps: 50
+		slippageBps: 50,
+		// USDC → RWT (buy-RWT branch): fees come off the gross output, so
+		// the wallet is debited exactly `amountIn`.
+		userTotalDebit: 1_000_000n
 	};
 }
 
@@ -208,7 +219,10 @@ function setupHappyPath() {
 			reserveInBefore: 1_000_000_000n,
 			reserveOutBefore: 1_000_000_000n,
 			reserveInAfter: 1_001_000_000n,
-			reserveOutAfter: 999_000_000n
+			reserveOutAfter: 999_000_000n,
+			// Buy-RWT branch (`makeIntent` defaults to USDC → RWT): the
+			// wallet is debited `amountIn` (fees come off output).
+			userTotalDebit: 1_000_000n
 		}
 	});
 	mocks.buildSwapTx.mockResolvedValue({});
@@ -218,6 +232,11 @@ function setupHappyPath() {
 	});
 	mocks.signAndSendTransaction.mockResolvedValue({ signature: 'SIG_SWAP_OK' });
 	mocks.confirmTransaction.mockResolvedValue({ value: { err: null } });
+	// Balance preflight: return well over the intent's userTotalDebit
+	// (1_000_000n) so the FSM passes the check.
+	mocks.getTokenAccountBalance.mockResolvedValue({
+		value: { amount: '1000000000', decimals: 6, uiAmount: 1000, uiAmountString: '1000' }
+	});
 	mocks.portfolioRefresh.mockResolvedValue(undefined);
 	mocks.balancesRefreshAll.mockResolvedValue(undefined);
 }
@@ -326,7 +345,8 @@ describe('swap FSM service', () => {
 				reserveInBefore: 1_000_000_000n,
 				reserveOutBefore: 1_000_000_000n,
 				reserveInAfter: 1_001_000_000n,
-				reserveOutAfter: 999_200_000n
+				reserveOutAfter: 999_200_000n,
+				userTotalDebit: 1_000_000n
 			}
 		});
 
@@ -432,6 +452,41 @@ describe('swap FSM service', () => {
 		expect(swap.isInFlight(POOL_PDA_A)).toBe(false);
 	});
 
+	it('FA-14 insufficient balance vs userTotalDebit: error before signature', async () => {
+		setupHappyPath();
+		// Re-quote returns a userTotalDebit (fees-on-top sell-RWT branch)
+		// that exceeds the wallet's ATA balance — preflight must abort.
+		mocks.quoteSwap.mockReturnValue({
+			ok: true,
+			quote: {
+				amountOut: 1_000_000n,
+				netInput: 1_000_000n,
+				fees: { feeTotal: 30n, feeLp: 24n, feeProtocol: 6n, feeOtTreasury: 0n },
+				priceImpactBps: 5,
+				reserveInBefore: 1_000_000_000n,
+				reserveOutBefore: 1_000_000_000n,
+				reserveInAfter: 1_001_000_000n,
+				reserveOutAfter: 999_000_000n,
+				// Sell-RWT debit: amountIn + feeTotal.
+				userTotalDebit: 1_000_030n
+			}
+		});
+		// Wallet balance is below the debit (1_000_000 < 1_000_030).
+		mocks.getTokenAccountBalance.mockResolvedValue({
+			value: { amount: '1000000', decimals: 6, uiAmount: 1, uiAmountString: '1' }
+		});
+
+		await swap.start(makeIntent());
+		await settle();
+
+		const a = swap.attempts.get(POOL_PDA_A.toBase58());
+		expect(a?.phase).toBe('error');
+		expect(a?.error).toMatch(/Insufficient balance/);
+		// No wallet prompt fired.
+		expect(mocks.signAndSendTransaction).not.toHaveBeenCalled();
+		expect(mocks.toastError).toHaveBeenCalled();
+	});
+
 	it('FA-13 concurrent starts for different pools run in parallel', async () => {
 		setupHappyPath();
 
@@ -445,5 +500,79 @@ describe('swap FSM service', () => {
 
 		// Each pool got its own buildSwapTx call.
 		expect(mocks.buildSwapTx).toHaveBeenCalledTimes(2);
+	});
+
+	it('FA-15 RPC failure on balance read: fail-open, preflight does not abort', async () => {
+		// APP-H1 regression. Before the fix, ANY thrown error from
+		// `getTokenAccountBalance` (including RPC timeouts / 5xx / network
+		// partitions) was caught and converted to `0n`, which then failed
+		// the `fromBalance < userTotalDebit` check and surfaced a spurious
+		// "Insufficient balance" toast even for fully funded wallets.
+		//
+		// The fix distinguishes account-not-found (legitimate 0 balance)
+		// from other failures and returns `null` for the latter so the
+		// preflight is skipped and the contract enforces the balance check
+		// instead. This test pins that behavior by:
+		//   1. Forcing `getTokenAccountBalance` to throw a generic RPC
+		//      error (NOT account-not-found).
+		//   2. Mocking `signAndSendTransaction` to reject with a user-
+		//      rejection so the FSM exits cleanly without entering the
+		//      confirm-poll loop (which can't be driven under fake timers
+		//      — same pre-existing limitation as FA-1/8/9/12/13).
+		//   3. Asserting `signAndSendTransaction` WAS called — i.e. the
+		//      preflight let us through — and no spurious
+		//      "Insufficient balance" toast fired.
+		setupHappyPath();
+		// Simulate a transient RPC failure. A 5xx-style SolanaJSONRPCError
+		// with a generic Internal-error code (-32603) is representative of
+		// what an RPC provider returns during a relayer hiccup; it MUST
+		// NOT be conflated with the -32602 / "could not find account"
+		// signal that means "no ATA yet".
+		mocks.getTokenAccountBalance.mockRejectedValue(
+			new SolanaJSONRPCError(
+				{ code: -32603, message: 'Internal error' },
+				'failed to get token account balance'
+			)
+		);
+		// Short-circuit on the wallet step so we don't depend on the
+		// confirm-poll loop (which the test connection mock can't drive).
+		mocks.signAndSendTransaction.mockRejectedValue(
+			new Error('User rejected the request')
+		);
+
+		await swap.start(makeIntent());
+		await settle();
+
+		// Wallet sign-and-send WAS called: the preflight did not abort.
+		// THIS is the load-bearing assertion for APP-H1.
+		expect(mocks.signAndSendTransaction).toHaveBeenCalledTimes(1);
+		// No spurious "Insufficient balance" toast was surfaced.
+		expect(mocks.toastError).not.toHaveBeenCalled();
+		// And the FSM took the user-rejection silent-drop path — not the
+		// preflight failSilent path.
+		expect(swap.attempts.get(POOL_PDA_A.toBase58())).toBeUndefined();
+	});
+
+	it('FA-15b account-not-found on balance read: 0n returned, preflight aborts when debit > 0', async () => {
+		// Companion to FA-15: confirm we still treat "account does not
+		// exist" as a legitimate 0 balance. A user with no ATA for the
+		// `fromMint` cannot afford any debit > 0, so the preflight should
+		// abort with the existing "Insufficient balance" toast.
+		setupHappyPath();
+		mocks.getTokenAccountBalance.mockRejectedValue(
+			new SolanaJSONRPCError(
+				{ code: -32602, message: 'Invalid param: could not find account' },
+				'failed to get token account balance'
+			)
+		);
+
+		await swap.start(makeIntent());
+		await settle();
+
+		const a = swap.attempts.get(POOL_PDA_A.toBase58());
+		expect(a?.phase).toBe('error');
+		expect(a?.error).toMatch(/Insufficient balance/);
+		expect(mocks.signAndSendTransaction).not.toHaveBeenCalled();
+		expect(mocks.toastError).toHaveBeenCalled();
 	});
 });

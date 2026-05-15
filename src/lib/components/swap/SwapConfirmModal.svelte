@@ -113,6 +113,22 @@
 	const feeTotalDisplay = $derived(
 		intent ? formatTokenAmount(intent.fees.feeTotal, toDecimals, toDecimals) : '0'
 	);
+	// Docs-compliant "You pay" — wallet debit total (`amountIn + fees` on
+	// the sell-RWT branch, `amountIn` on buy-RWT). When the two differ we
+	// surface the swap-amount + fee-on-top breakdown as a sub-line so the
+	// holder isn't surprised by a 1.005× debit at signature time.
+	const userTotalDebitDisplay = $derived(
+		intent ? formatTokenAmount(intent.userTotalDebit, fromDecimals, fromDecimals) : '0'
+	);
+	const feeOnTopDisplay = $derived(
+		intent
+			? formatTokenAmount(
+				intent.userTotalDebit - intent.amountIn,
+				fromDecimals,
+				fromDecimals
+			)
+			: '0'
+	);
 </script>
 
 <Modal
@@ -142,7 +158,14 @@
 				<dl class="quote-grid">
 					<div class="quote-row">
 						<dt>You pay</dt>
-						<dd>{amountInDisplay} {fromSymbol}</dd>
+						<dd>
+							{userTotalDebitDisplay} {fromSymbol}
+							{#if intent.userTotalDebit !== intent.amountIn}
+								<span class="muted debit-breakdown">
+									({amountInDisplay} swapped + {feeOnTopDisplay} fee)
+								</span>
+							{/if}
+						</dd>
 					</div>
 					<div class="quote-row">
 						<dt>You receive (estimated)</dt>
@@ -299,6 +322,14 @@
 	.quote-row .muted {
 		color: var(--color-text-muted);
 		font-weight: var(--font-weight-medium);
+	}
+	/* The "You pay" sub-line that breaks down `userTotalDebit` into the
+	 * swap amount + fee-on-top renders as a block below the primary debit
+	 * total so it doesn't squash on narrow viewports. */
+	.debit-breakdown {
+		display: block;
+		font-size: var(--text-xs);
+		margin-top: 2px;
 	}
 	.price-impact-high {
 		color: var(--color-danger);

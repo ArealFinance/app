@@ -131,7 +131,11 @@ describe('quote store', () => {
 				reserveInBefore: 0n,
 				reserveOutBefore: 0n,
 				reserveInAfter: 0n,
-				reserveOutAfter: 0n
+				reserveOutAfter: 0n,
+				// Buy-RWT default for quote-store tests (USDC → RWT): debit
+				// equals amountIn. Tests don't exercise this field directly,
+				// but the SDK contract requires it on every QuoteResult.
+				userTotalDebit: 1_000n
 			}
 		});
 

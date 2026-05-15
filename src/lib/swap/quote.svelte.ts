@@ -11,6 +11,10 @@
  *          setInput(amount, fromMint, toMint), setSlippage(bps),
  *          activatePool(entry), deactivate()}
  *
+ * Re-exports `QuoteOutcome` transparently; `result.quote.userTotalDebit`
+ * carries the docs-compliant "wallet debit" for balance preflight (sell-RWT
+ * adds fees on top of `amountIn`; buy-RWT equals `amountIn`).
+ *
  * Critical correctness invariants (mirrors the portfolio store contract):
  *
  *   1. SAME CONNECTION INSTANCE for `onAccountChange` register and
