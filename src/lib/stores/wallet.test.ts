@@ -6,9 +6,20 @@
  *
  * The store under test is a runes-based singleton imported once. Each test
  * resets connection state by calling `wallet.disconnect()` in `beforeEach`.
+ *
+ * Implementation note: production `wallet.signAndSendTransaction` is a two-
+ * step flow — `provider.signTransaction(tx)` returns a signed Transaction,
+ * then `network.connection.sendRawTransaction(signed.serialize())` submits
+ * it. Tests below mock both surfaces and assert the dispatch on the right
+ * provider.signTransaction call.
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { Transaction } from '@solana/web3.js';
+
+// Used as the resolved return value for `provider.signTransaction`. Must
+// expose `serialize()` because `signAndSendTransaction` calls it before
+// handing the wire bytes to the Connection's sendRawTransaction.
+const fakeSignedTx = { serialize: () => new Uint8Array([1, 2, 3]) };
 
 const phantomProvider = {
 	publicKey: null as unknown,
@@ -16,7 +27,7 @@ const phantomProvider = {
 	isConnected: false,
 	connect: vi.fn(async () => ({ publicKey: { toBase58: () => 'PhantomKey' } })),
 	disconnect: vi.fn(async () => undefined),
-	signTransaction: vi.fn(),
+	signTransaction: vi.fn(async () => fakeSignedTx),
 	signAndSendTransaction: vi.fn(),
 	on: vi.fn(),
 	off: vi.fn()
@@ -28,11 +39,23 @@ const solflareProvider = {
 	isConnected: false,
 	connect: vi.fn(async () => undefined),
 	disconnect: vi.fn(async () => undefined),
-	signTransaction: vi.fn(),
+	signTransaction: vi.fn(async () => fakeSignedTx),
 	signAndSendTransaction: vi.fn(),
 	on: vi.fn(),
 	off: vi.fn()
 };
+
+// Network connection mock — `wallet.signAndSendTransaction` reads
+// `network.connection.sendRawTransaction` to submit the signed bytes.
+const sendRawTransaction = vi.fn(async () => 'mockSignature');
+
+vi.mock('$lib/network/network.svelte', () => ({
+	network: {
+		get connection() {
+			return { sendRawTransaction };
+		}
+	}
+}));
 
 // `connectPhantom` / `connectSolflare` are mocked to control the connect
 // flow without touching the (unrelated) deeplink/global detection logic.
@@ -69,8 +92,14 @@ import { wallet } from './wallet.svelte';
 describe('wallet.signAndSendTransaction', () => {
 	beforeEach(async () => {
 		await wallet.disconnect();
-		phantomProvider.signAndSendTransaction.mockReset();
-		solflareProvider.signAndSendTransaction.mockReset();
+		// Reset call history but keep the default `async () => fakeSignedTx`
+		// resolution shape — individual tests override on the per-case basis.
+		phantomProvider.signTransaction.mockReset();
+		phantomProvider.signTransaction.mockResolvedValue(fakeSignedTx);
+		solflareProvider.signTransaction.mockReset();
+		solflareProvider.signTransaction.mockResolvedValue(fakeSignedTx);
+		sendRawTransaction.mockReset();
+		sendRawTransaction.mockResolvedValue('mockSignature');
 	});
 
 	it('throws when wallet is not connected', async () => {
@@ -84,34 +113,36 @@ describe('wallet.signAndSendTransaction', () => {
 		await wallet.connect('phantom');
 		expect(wallet.isConnected).toBe(true);
 
-		phantomProvider.signAndSendTransaction.mockResolvedValue({ signature: 'sigP' });
+		sendRawTransaction.mockResolvedValueOnce('sigP');
 
 		const tx = new Transaction();
 		const res = await wallet.signAndSendTransaction(tx);
 
 		expect(res.signature).toBe('sigP');
-		expect(phantomProvider.signAndSendTransaction).toHaveBeenCalledWith(tx);
-		expect(solflareProvider.signAndSendTransaction).not.toHaveBeenCalled();
+		expect(phantomProvider.signTransaction).toHaveBeenCalledWith(tx);
+		expect(solflareProvider.signTransaction).not.toHaveBeenCalled();
+		expect(sendRawTransaction).toHaveBeenCalledTimes(1);
 	});
 
 	it('dispatches to Solflare provider when connected via Solflare', async () => {
 		await wallet.connect('solflare');
 		expect(wallet.isConnected).toBe(true);
 
-		solflareProvider.signAndSendTransaction.mockResolvedValue({ signature: 'sigS' });
+		sendRawTransaction.mockResolvedValueOnce('sigS');
 
 		const tx = new Transaction();
 		const res = await wallet.signAndSendTransaction(tx);
 
 		expect(res.signature).toBe('sigS');
-		expect(solflareProvider.signAndSendTransaction).toHaveBeenCalledWith(tx);
-		expect(phantomProvider.signAndSendTransaction).not.toHaveBeenCalled();
+		expect(solflareProvider.signTransaction).toHaveBeenCalledWith(tx);
+		expect(phantomProvider.signTransaction).not.toHaveBeenCalled();
+		expect(sendRawTransaction).toHaveBeenCalledTimes(1);
 	});
 
 	it('surfaces user-rejection errors with consistent message shape', async () => {
 		await wallet.connect('phantom');
 
-		phantomProvider.signAndSendTransaction.mockRejectedValue(
+		phantomProvider.signTransaction.mockRejectedValueOnce(
 			new Error('User rejected the request')
 		);
 
@@ -125,7 +156,7 @@ describe('wallet.signAndSendTransaction', () => {
 		await wallet.connect('phantom');
 
 		const err = new Error('blockhash not found');
-		phantomProvider.signAndSendTransaction.mockRejectedValue(err);
+		phantomProvider.signTransaction.mockRejectedValueOnce(err);
 
 		const tx = new Transaction();
 		await expect(wallet.signAndSendTransaction(tx)).rejects.toBe(err);

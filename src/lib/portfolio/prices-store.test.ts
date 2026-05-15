@@ -53,6 +53,14 @@ vi.mock('$lib/network/network.svelte', () => ({
 	network: {
 		get current() {
 			return mocks.currentNetwork;
+		},
+		get endpoint() {
+			// `prices-store.svelte.ts::doRefresh` reads
+			// `network.endpoint.backendApiUrl` to bypass the SDK's stale
+			// `BACKEND_API_BASE_URLS[cluster]` table. The actual value
+			// isn't asserted on — the SDK call is mocked — but it must
+			// be defined so the property access doesn't throw.
+			return { backendApiUrl: 'http://test-backend.example' };
 		}
 	}
 }));
@@ -129,7 +137,7 @@ describe('priceFeed store', () => {
 		expect(priceFeed.status).toBe('idle');
 	});
 
-	it('refresh fetches one row per pool with cluster + days=2', async () => {
+	it('refresh fetches one row per pool with baseUrl + days=2', async () => {
 		mocks.marketsSnapshot = {
 			pools: [
 				makePool(POOL_X, MINT_A, MINT_USDC, 1000),
@@ -152,7 +160,10 @@ describe('priceFeed store', () => {
 		const callArgs = mocks.getPoolAggregate.mock.calls.map((c) => c[0]);
 		for (const args of callArgs) {
 			expect(args.days).toBe(2);
-			expect(args.cluster).toBe('devnet');
+			// Production passes `baseUrl` (from `network.endpoint.backendApiUrl`)
+			// rather than `cluster` to bypass the SDK's stale
+			// `BACKEND_API_BASE_URLS[cluster]` table — see prices-store.svelte.ts.
+			expect(args.baseUrl).toBe('http://test-backend.example');
 		}
 		expect(priceFeed.status).toBe('ready');
 		expect(priceFeed.rows.size).toBe(2);

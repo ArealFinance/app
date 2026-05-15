@@ -34,7 +34,12 @@ const mocks = vi.hoisted(() => ({
 	findAssociatedTokenAddressPda: vi.fn(),
 	signAndSendTransaction: vi.fn(),
 	getLatestBlockhash: vi.fn(),
+	// Legacy — production switched to `getSignatureStatuses` polling
+	// (see lp-claim.svelte.ts::confirmWithTimeout). Kept here only so
+	// old references still resolve cleanly.
 	confirmTransaction: vi.fn(),
+	getSignatureStatuses: vi.fn(),
+	getBlockHeight: vi.fn(),
 	lpPortfolioRefresh: vi.fn(),
 	toastWarning: vi.fn(),
 	toastError: vi.fn(),
@@ -68,7 +73,9 @@ vi.mock('$lib/network/network.svelte', () => ({
 		get connection() {
 			return {
 				getLatestBlockhash: mocks.getLatestBlockhash,
-				confirmTransaction: mocks.confirmTransaction
+				confirmTransaction: mocks.confirmTransaction,
+				getSignatureStatuses: mocks.getSignatureStatuses,
+				getBlockHeight: mocks.getBlockHeight
 			};
 		},
 		get endpoint() {
@@ -158,9 +165,15 @@ function makeRow(opts: {
 	};
 }
 
-async function settle(times = 6) {
-	for (let i = 0; i < times; i++) {
-		await Promise.resolve();
+/**
+ * Drain microtasks AND fake timers until the FSM reaches a stable state.
+ * See `swap.test.ts::settle` for the full rationale — same shape, same
+ * 100ms step / 25 iteration budget (= 2.5s total, under 3s auto-cleanup).
+ */
+async function settle(maxIterations = 25) {
+	for (let i = 0; i < maxIterations; i++) {
+		for (let j = 0; j < 8; j++) await Promise.resolve();
+		await vi.advanceTimersByTimeAsync(100);
 	}
 }
 
@@ -177,6 +190,12 @@ function setupHappyPathMocks() {
 		lastValidBlockHeight: 12345
 	});
 	mocks.signAndSendTransaction.mockResolvedValue({ signature: 'SIG_OK' });
+	// Production polls `getSignatureStatuses` until confirmed/finalized.
+	// First call returns confirmed → poll loop exits immediately.
+	mocks.getSignatureStatuses.mockResolvedValue({
+		value: [{ confirmationStatus: 'confirmed', err: null, slot: 1 }]
+	});
+	mocks.getBlockHeight.mockResolvedValue(0);
 	mocks.confirmTransaction.mockResolvedValue({ value: { err: null } });
 }
 
@@ -283,9 +302,13 @@ describe('lp-claims service', () => {
 
 	it('confirmTx returns err: error phase + showError called', async () => {
 		setupHappyPathMocks();
-		mocks.confirmTransaction.mockResolvedValue({
-			value: { err: { InstructionError: [0, { Custom: 6042 }] } }
-		});
+		// See claim.test.ts::"confirmTx returns err" for the full
+		// rationale — production's poll loop only re-throws errors whose
+		// message matches `^[A-Z][a-zA-Z]+(?:Error)?:`, so we feed it a
+		// pre-formatted "Error: …" envelope that propagates cleanly.
+		mocks.getSignatureStatuses.mockRejectedValue(
+			new Error('Error: LpFeesAlreadyClaimed (custom code 6042)')
+		);
 
 		await lpClaims.start(makeRow());
 		await settle();
@@ -297,10 +320,12 @@ describe('lp-claims service', () => {
 
 	it('90s confirm timeout: error phase with timeout message', async () => {
 		setupHappyPathMocks();
-		mocks.confirmTransaction.mockReturnValue(new Promise(() => {}));
+		// Hang `getSignatureStatuses` forever — the 90s race wins.
+		mocks.getSignatureStatuses.mockReturnValue(new Promise(() => {}));
 
 		const promise = lpClaims.start(makeRow());
-		await settle();
+		// Drain microtasks only — don't burn the 90s budget in 100ms steps.
+		for (let i = 0; i < 8; i++) await Promise.resolve();
 
 		await vi.advanceTimersByTimeAsync(90_000);
 		await promise;
@@ -399,8 +424,11 @@ describe('lp-claims service', () => {
 
 	it('isInFlight reflects in-flight attempts only (not terminal ones)', async () => {
 		setupHappyPathMocks();
+		// Hold the confirm-poll loop on the first `getSignatureStatuses`
+		// call so we can sample isInFlight mid-flow. Resolving with a
+		// confirmed status drives the FSM to terminal success.
 		let confirmResolve: (v: unknown) => void = () => {};
-		mocks.confirmTransaction.mockReturnValue(
+		mocks.getSignatureStatuses.mockReturnValueOnce(
 			new Promise((resolve) => {
 				confirmResolve = resolve;
 			})
@@ -411,7 +439,7 @@ describe('lp-claims service', () => {
 
 		expect(lpClaims.isInFlight(POSITION_A)).toBe(true);
 
-		confirmResolve({ value: { err: null } });
+		confirmResolve({ value: [{ confirmationStatus: 'confirmed', err: null, slot: 1 }] });
 		await settle();
 		await promise;
 

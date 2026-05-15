@@ -54,7 +54,12 @@ const mocks = vi.hoisted(() => ({
 	signAndSendTransaction: vi.fn(),
 	getAccountInfo: vi.fn(),
 	getLatestBlockhash: vi.fn(),
+	// Legacy — production switched to `getSignatureStatuses` polling
+	// (see claim.svelte.ts::confirmWithTimeout). Kept here only so old
+	// references still resolve cleanly.
 	confirmTransaction: vi.fn(),
+	getSignatureStatuses: vi.fn(),
+	getBlockHeight: vi.fn(),
 	portfolioRefresh: vi.fn(),
 	toastWarning: vi.fn(),
 	toastError: vi.fn(),
@@ -105,11 +110,16 @@ vi.mock('$lib/network/network.svelte', () => ({
 			return {
 				getAccountInfo: mocks.getAccountInfo,
 				getLatestBlockhash: mocks.getLatestBlockhash,
-				confirmTransaction: mocks.confirmTransaction
+				confirmTransaction: mocks.confirmTransaction,
+				getSignatureStatuses: mocks.getSignatureStatuses,
+				getBlockHeight: mocks.getBlockHeight
 			};
 		},
 		get endpoint() {
 			return { programIds: PROGRAM_IDS };
+		},
+		get rwtMint() {
+			return RWT_MINT_DEVNET;
 		}
 	}
 }));
@@ -175,9 +185,15 @@ const fakeMerkleDistributor = {
 	rewardVault: REWARD_VAULT
 };
 
-async function settle(times = 6) {
-	for (let i = 0; i < times; i++) {
-		await Promise.resolve();
+/**
+ * Drain microtasks AND fake timers until the FSM reaches a stable state.
+ * See `swap.test.ts::settle` for the full rationale — same shape, same
+ * 100ms step / 25 iteration budget (= 2.5s total, under 3s auto-cleanup).
+ */
+async function settle(maxIterations = 25) {
+	for (let i = 0; i < maxIterations; i++) {
+		for (let j = 0; j < 8; j++) await Promise.resolve();
+		await vi.advanceTimersByTimeAsync(100);
 	}
 }
 
@@ -191,6 +207,12 @@ function setupHappyPathMocks() {
 		lastValidBlockHeight: 12345
 	});
 	mocks.signAndSendTransaction.mockResolvedValue({ signature: 'SIG_OK' });
+	// Production polls `getSignatureStatuses` until confirmed/finalized.
+	// First call returns confirmed → poll loop exits immediately.
+	mocks.getSignatureStatuses.mockResolvedValue({
+		value: [{ confirmationStatus: 'confirmed', err: null, slot: 1 }]
+	});
+	mocks.getBlockHeight.mockResolvedValue(0);
 	mocks.confirmTransaction.mockResolvedValue({ value: { err: null } });
 }
 
@@ -292,10 +314,19 @@ describe('claims service', () => {
 
 	it('confirmTx returns err: error phase + showError called', async () => {
 		setupHappyPathMocks();
-		// InvalidProof = 6006 in YD program — surface via Anchor decode.
-		mocks.confirmTransaction.mockResolvedValue({
-			value: { err: { InstructionError: [0, { Custom: 6006 }] } }
-		});
+		// Production's `confirmWithTimeout` polls `getSignatureStatuses`
+		// and only re-throws errors whose message matches
+		// `^[A-Z][a-zA-Z]+(?:Error)?:` (covers JS-class style errors and
+		// "Error: …" payloads). Stringified Anchor errors like
+		// `{"InstructionError":[0,{"Custom":6006}]}` don't match, so we
+		// reject the RPC call with a pre-formatted "Error: …" envelope —
+		// this is the closest shape to a real on-chain Anchor failure
+		// that the poll loop will propagate cleanly. The FSM then routes
+		// to `fail(err, programId)` → `showError`, which is the load-
+		// bearing assertion.
+		mocks.getSignatureStatuses.mockRejectedValue(
+			new Error('Error: InvalidProof (custom code 6006)')
+		);
 
 		await claims.start(makeRow());
 		await settle();
@@ -312,9 +343,9 @@ describe('claims service', () => {
 
 	it('confirmTx with SystemPaused (6002) flows through error path', async () => {
 		setupHappyPathMocks();
-		mocks.confirmTransaction.mockResolvedValue({
-			value: { err: { InstructionError: [0, { Custom: 6002 }] } }
-		});
+		mocks.getSignatureStatuses.mockRejectedValue(
+			new Error('Error: SystemPaused (custom code 6002)')
+		);
 
 		await claims.start(makeRow());
 		await settle();
@@ -325,9 +356,9 @@ describe('claims service', () => {
 
 	it('confirmTx with ExceedsMaxClaim (6010) flows through error path', async () => {
 		setupHappyPathMocks();
-		mocks.confirmTransaction.mockResolvedValue({
-			value: { err: { InstructionError: [0, { Custom: 6010 }] } }
-		});
+		mocks.getSignatureStatuses.mockRejectedValue(
+			new Error('Error: ExceedsMaxClaim (custom code 6010)')
+		);
 
 		await claims.start(makeRow());
 		await settle();
@@ -337,11 +368,12 @@ describe('claims service', () => {
 
 	it('90s confirm timeout: error phase with timeout message', async () => {
 		setupHappyPathMocks();
-		// confirmTransaction never resolves — the 90s race wins.
-		mocks.confirmTransaction.mockReturnValue(new Promise(() => {}));
+		// Hang `getSignatureStatuses` forever — the 90s race wins.
+		mocks.getSignatureStatuses.mockReturnValue(new Promise(() => {}));
 
 		const promise = claims.start(makeRow());
-		await settle();
+		// Drain microtasks only — don't burn the 90s budget in 100ms steps.
+		for (let i = 0; i < 8; i++) await Promise.resolve();
 
 		// Advance past the 90s timeout window.
 		await vi.advanceTimersByTimeAsync(90_000);
@@ -500,9 +532,11 @@ describe('claims service', () => {
 
 	it('isInFlight reflects in-flight attempts only (not terminal ones)', async () => {
 		setupHappyPathMocks();
-		// Hold confirmTransaction so we can sample isInFlight mid-flow.
+		// Hold the confirm-poll loop on the first `getSignatureStatuses`
+		// call so we can sample isInFlight mid-flow. Resolving with a
+		// confirmed status drives the FSM to terminal success.
 		let confirmResolve: (v: unknown) => void = () => {};
-		mocks.confirmTransaction.mockReturnValue(
+		mocks.getSignatureStatuses.mockReturnValueOnce(
 			new Promise((resolve) => {
 				confirmResolve = resolve;
 			})
@@ -513,7 +547,7 @@ describe('claims service', () => {
 
 		expect(claims.isInFlight(OT_MINT_A)).toBe(true);
 
-		confirmResolve({ value: { err: null } });
+		confirmResolve({ value: [{ confirmationStatus: 'confirmed', err: null, slot: 1 }] });
 		await settle();
 		await promise;
 

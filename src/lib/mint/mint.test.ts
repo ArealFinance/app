@@ -50,7 +50,12 @@ const mocks = vi.hoisted(() => ({
 	signAndSendTransaction: vi.fn(),
 	getAccountInfo: vi.fn(),
 	getLatestBlockhash: vi.fn(),
+	// Legacy — production switched to `getSignatureStatuses` polling
+	// (see mint.svelte.ts::confirmWithTimeout). Kept here only so old
+	// references still resolve cleanly.
 	confirmTransaction: vi.fn(),
+	getSignatureStatuses: vi.fn(),
+	getBlockHeight: vi.fn(),
 	portfolioRefresh: vi.fn(),
 	balancesRefreshAll: vi.fn(),
 	toastError: vi.fn(),
@@ -111,11 +116,19 @@ vi.mock('$lib/network/network.svelte', () => ({
 			return {
 				getAccountInfo: mocks.getAccountInfo,
 				getLatestBlockhash: mocks.getLatestBlockhash,
-				confirmTransaction: mocks.confirmTransaction
+				confirmTransaction: mocks.confirmTransaction,
+				getSignatureStatuses: mocks.getSignatureStatuses,
+				getBlockHeight: mocks.getBlockHeight
 			};
 		},
 		get endpoint() {
 			return { programIds: PROGRAM_IDS };
+		},
+		get rwtMint() {
+			return RWT_MINT;
+		},
+		get usdcMint() {
+			return USDC_MINT;
 		}
 	}
 }));
@@ -179,9 +192,15 @@ const fakeVaultInfo = {
 	owner: PROGRAM_IDS.rwtEngine
 };
 
-async function settle(times = 6) {
-	for (let i = 0; i < times; i++) {
-		await Promise.resolve();
+/**
+ * Drain microtasks AND fake timers until the FSM reaches a stable state.
+ * See `swap.test.ts::settle` for the full rationale — same shape, same
+ * 100ms step / 25 iteration budget (= 2.5s total, under 3s auto-cleanup).
+ */
+async function settle(maxIterations = 25) {
+	for (let i = 0; i < maxIterations; i++) {
+		for (let j = 0; j < 8; j++) await Promise.resolve();
+		await vi.advanceTimersByTimeAsync(100);
 	}
 }
 
@@ -207,6 +226,12 @@ function setupHappyPath() {
 		lastValidBlockHeight: 12345
 	});
 	mocks.signAndSendTransaction.mockResolvedValue({ signature: 'SIG_MINT_OK' });
+	// Production polls `getSignatureStatuses` until confirmed/finalized.
+	// First call returns confirmed → poll loop exits immediately.
+	mocks.getSignatureStatuses.mockResolvedValue({
+		value: [{ confirmationStatus: 'confirmed', err: null, slot: 1 }]
+	});
+	mocks.getBlockHeight.mockResolvedValue(0);
 	mocks.confirmTransaction.mockResolvedValue({ value: { err: null } });
 	mocks.portfolioRefresh.mockResolvedValue(undefined);
 	mocks.balancesRefreshAll.mockResolvedValue(undefined);
@@ -345,10 +370,13 @@ describe('mint FSM service', () => {
 
 	it('FM-8 90s confirm timeout: error phase with timeout message', async () => {
 		setupHappyPath();
-		mocks.confirmTransaction.mockReturnValue(new Promise(() => {}));
+		// Hang `getSignatureStatuses` so the FSM sits in the confirm-poll
+		// loop until the 90s timeout fires.
+		mocks.getSignatureStatuses.mockReturnValue(new Promise(() => {}));
 
 		const promise = mint.start(makeIntent());
-		await settle();
+		// Drain microtasks only — don't burn the 90s budget in 100ms steps.
+		for (let i = 0; i < 8; i++) await Promise.resolve();
 
 		await vi.advanceTimersByTimeAsync(90_000);
 		await promise;
@@ -396,8 +424,12 @@ describe('mint FSM service', () => {
 
 	it('FM-12 isInFlight reflects in-flight only (not terminal)', async () => {
 		setupHappyPath();
+		// Hold the confirm-poll loop on the first `getSignatureStatuses`
+		// call so we can observe the in-flight state. Resolving the
+		// deferred promise with a `confirmed` status drives the FSM to
+		// terminal success.
 		let confirmResolve: (v: unknown) => void = () => {};
-		mocks.confirmTransaction.mockReturnValue(
+		mocks.getSignatureStatuses.mockReturnValueOnce(
 			new Promise((resolve) => {
 				confirmResolve = resolve;
 			})
@@ -408,7 +440,7 @@ describe('mint FSM service', () => {
 
 		expect(mint.isInFlight()).toBe(true);
 
-		confirmResolve({ value: { err: null } });
+		confirmResolve({ value: [{ confirmationStatus: 'confirmed', err: null, slot: 1 }] });
 		await settle();
 		await promise;
 

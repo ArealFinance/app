@@ -62,7 +62,13 @@ const mocks = vi.hoisted(() => ({
 	signAndSendTransaction: vi.fn(),
 	getAccountInfo: vi.fn(),
 	getLatestBlockhash: vi.fn(),
+	// `confirmTransaction` is legacy — production switched to a
+	// `getSignatureStatuses` polling loop (see swap.svelte.ts::confirmWithTimeout).
+	// Kept here only so old tests can reference it; new tests must mock
+	// `getSignatureStatuses` instead.
 	confirmTransaction: vi.fn(),
+	getSignatureStatuses: vi.fn(),
+	getBlockHeight: vi.fn(),
 	getTokenAccountBalance: vi.fn(),
 	portfolioRefresh: vi.fn(),
 	balancesRefreshAll: vi.fn(),
@@ -117,11 +123,16 @@ vi.mock('$lib/network/network.svelte', () => ({
 				getAccountInfo: mocks.getAccountInfo,
 				getLatestBlockhash: mocks.getLatestBlockhash,
 				confirmTransaction: mocks.confirmTransaction,
+				getSignatureStatuses: mocks.getSignatureStatuses,
+				getBlockHeight: mocks.getBlockHeight,
 				getTokenAccountBalance: mocks.getTokenAccountBalance
 			};
 		},
 		get endpoint() {
 			return { programIds: PROGRAM_IDS };
+		},
+		get rwtMint() {
+			return RWT_MINT;
 		}
 	}
 }));
@@ -194,9 +205,38 @@ const FAKE_CONFIG = {
 const fakePoolInfo = { data: new Uint8Array([1, 2, 3]), executable: false, lamports: 0, owner: PROGRAM_IDS.nativeDex };
 const fakeConfigInfo = { data: new Uint8Array([4, 5, 6]), executable: false, lamports: 0, owner: PROGRAM_IDS.nativeDex };
 
-async function settle(times = 6) {
-	for (let i = 0; i < times; i++) {
-		await Promise.resolve();
+/**
+ * Drain microtasks AND fake timers until the FSM reaches a stable state.
+ *
+ * Production's `confirmWithTimeout` poll loop uses
+ * `await new Promise((r) => setTimeout(r, 1500))` between RPC polls — under
+ * `vi.useFakeTimers()` that setTimeout never fires unless tests advance the
+ * clock. The plain "drain microtasks N times" helper used previously only
+ * worked when the FSM didn't enter the confirm loop. By interleaving
+ * microtask drains with `advanceTimersByTimeAsync(STEP_MS)` we keep single-
+ * pass test code valid for both pre- and post-confirm paths.
+ *
+ * Each iteration advances 100ms of fake time — small enough to stay well
+ * below the FSM's 3s auto-cleanup window (so terminal attempts aren't
+ * silently dropped before the test asserts on `phase`), and we cap the
+ * total advance at 2500ms which is also under the 3s cleanup. Tests that
+ * need to drive past the cleanup window (e.g. FA-9) advance the clock
+ * explicitly.
+ */
+async function settle(maxIterations = 25) {
+	for (let i = 0; i < maxIterations; i++) {
+		// Drain microtask queue: lets any chained `.then()` continuations
+		// run before we advance fake time. Using 8 ticks here (was 6 in the
+		// old helper) gives enough headroom for the `await tick()` + setPhase
+		// chain in the FSM's broadcasting→confirming hand-off.
+		for (let j = 0; j < 8; j++) await Promise.resolve();
+		// Step forward 100ms. `getSignatureStatuses` mock returns
+		// `confirmed` immediately, so the poll loop exits via the early-
+		// return before this timer is needed — but tests that delay the
+		// confirmation (e.g. FA-12) depend on this to flush the post-
+		// confirm continuations. Total budget: 100ms * 25 = 2500ms,
+		// strictly under the 3s auto-cleanup ceiling.
+		await vi.advanceTimersByTimeAsync(100);
 	}
 }
 
@@ -231,6 +271,15 @@ function setupHappyPath() {
 		lastValidBlockHeight: 12345
 	});
 	mocks.signAndSendTransaction.mockResolvedValue({ signature: 'SIG_SWAP_OK' });
+	// Production polls `getSignatureStatuses` until it returns a confirmed
+	// or finalized status. The first call resolves the poll loop, so the
+	// `await setTimeout(POLL_INTERVAL_MS)` between iterations never runs.
+	mocks.getSignatureStatuses.mockResolvedValue({
+		value: [{ confirmationStatus: 'confirmed', err: null, slot: 1 }]
+	});
+	mocks.getBlockHeight.mockResolvedValue(0);
+	// Legacy — production no longer calls confirmTransaction directly, but
+	// keep the mock wired so any stale references resolve cleanly.
 	mocks.confirmTransaction.mockResolvedValue({ value: { err: null } });
 	// Balance preflight: return well over the intent's userTotalDebit
 	// (1_000_000n) so the FSM passes the check.
@@ -363,10 +412,17 @@ describe('swap FSM service', () => {
 
 	it('FA-6 90s confirm timeout: error phase with timeout message', async () => {
 		setupHappyPath();
-		mocks.confirmTransaction.mockReturnValue(new Promise(() => {}));
+		// Make `getSignatureStatuses` hang forever so the FSM stays in the
+		// confirm-poll loop until the 90s timeout fires. `getBlockHeight`
+		// must also stay quiet (no expiry-detection short-circuit).
+		mocks.getSignatureStatuses.mockReturnValue(new Promise(() => {}));
+		mocks.getBlockHeight.mockResolvedValue(0);
 
 		const promise = swap.start(makeIntent());
-		await settle();
+		// Don't use `settle()` here — it would consume the 90s budget by
+		// advancing the clock in 1.5s steps. Drain only microtasks so the
+		// FSM enters the confirm-poll loop, then jump the full 90s.
+		for (let i = 0; i < 8; i++) await Promise.resolve();
 
 		await vi.advanceTimersByTimeAsync(90_000);
 		await promise;
@@ -433,8 +489,13 @@ describe('swap FSM service', () => {
 
 	it('FA-12 isInFlight reflects in-flight only (not terminal)', async () => {
 		setupHappyPath();
+		// Hold the confirm-poll loop on the first `getSignatureStatuses`
+		// call so we can observe the in-flight state. Resolving the
+		// deferred promise with a `confirmed` status drives the FSM to
+		// terminal success — same shape as the old `confirmTransaction`
+		// pattern but on the production code path.
 		let confirmResolve: (v: unknown) => void = () => {};
-		mocks.confirmTransaction.mockReturnValue(
+		mocks.getSignatureStatuses.mockReturnValueOnce(
 			new Promise((resolve) => {
 				confirmResolve = resolve;
 			})
@@ -445,7 +506,7 @@ describe('swap FSM service', () => {
 
 		expect(swap.isInFlight(POOL_PDA_A)).toBe(true);
 
-		confirmResolve({ value: { err: null } });
+		confirmResolve({ value: [{ confirmationStatus: 'confirmed', err: null, slot: 1 }] });
 		await settle();
 		await promise;
 
