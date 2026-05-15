@@ -431,7 +431,8 @@
 			expectedOut,
 			fees: quoteResult.quote.fees,
 			priceImpactBps: quoteResult.quote.priceImpactBps,
-			slippageBps
+			slippageBps,
+			userTotalDebit: quoteResult.quote.userTotalDebit
 		};
 		modalOpen = true;
 	}
