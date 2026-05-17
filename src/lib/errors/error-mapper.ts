@@ -72,12 +72,52 @@ const FRIENDLY_BY_NAME: Record<string, { title: string; body: string }> = {
 		title: 'Missing fee account',
 		body: 'OT treasury fee account is missing for this pool.'
 	},
-	// Defensive: the contract may add an explicit master-pool block in a
-	// future revision. Keep a friendly translation ready so we don't fall
-	// through to the raw IDL `msg`.
+	// CP-11 — Monotonic Ladder error surface. The contract explicitly
+	// rejects user-side LP on master pools and gates `create_master_pool`
+	// on a small set of well-formed configurations. The strings below
+	// translate the IDL error names into actionable copy users can act on.
 	MasterPoolUserLpDisabled: {
 		title: 'Liquidity managed by Areal Nexus',
-		body: 'User liquidity is managed by Areal Nexus on this pool.'
+		body: 'User LP is disabled on master pools. Use a StandardCurve pool to provide liquidity.'
+	},
+	InvalidMintPair: {
+		title: 'Invalid master pool mints',
+		body: 'Master pools must pair RWT with USDC or USDY.'
+	},
+	InvalidPermanentTailOffset: {
+		title: 'Tail offset too low',
+		body: 'Permanent tail offset must be at least 0.3 %.'
+	},
+	OtTreasuryNotAllowedOnMasterPool: {
+		title: 'OT treasury not allowed',
+		body: 'Master pools cannot carry OT treasury accounts.'
+	},
+	InvalidRebalancer: {
+		title: 'Rebalancer required',
+		body: 'Only the Pool Rebalancer can submit this instruction.'
+	},
+	NexusAccumulatorEmpty: {
+		title: 'Growth deferred',
+		body: 'Liquidity Nexus accumulator is empty; growth deferred.'
+	},
+	// Less likely to surface to a user (these come from Rebalancer-only
+	// instructions), but a friendly translation costs nothing and avoids
+	// a raw IDL message bleeding into a toast if an admin pathway lands.
+	NotGrowthDirection: {
+		title: 'Wrong direction',
+		body: 'grow_liquidity requires a NAV bin above the last rebalance.'
+	},
+	NotCompressionDirection: {
+		title: 'Wrong direction',
+		body: 'compress_liquidity requires a NAV bin below the last rebalance.'
+	},
+	ActiveZoneOverlapsTail: {
+		title: 'Active zone overlap',
+		body: 'Active zone would overlap the permanent tail — pick a higher NAV bin.'
+	},
+	ExceedsRightEdgeBuffer: {
+		title: 'Outside bin range',
+		body: 'NAV bin is too close to the bin-array upper edge.'
 	},
 
 	// rwt-engine errors that surface to a user during mint_rwt.

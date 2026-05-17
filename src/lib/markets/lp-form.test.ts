@@ -377,7 +377,9 @@ describe('lp-form FSM service', () => {
 
 		const a = lpForm.attempts.get(POOL_PDA_A.toBase58());
 		expect(a?.phase).toBe('error');
-		expect(a?.error).toMatch(/Areal Nexus/);
+		// CP-11 — wording aligned with contract error
+		// (`MasterPoolUserLpDisabled`): "User LP is disabled on this pool."
+		expect(a?.error).toMatch(/User LP is disabled/);
 		// No RPC roundtrip ever fired.
 		expect(mocks.getAccountInfo).not.toHaveBeenCalled();
 		expect(mocks.signAndSendTransaction).not.toHaveBeenCalled();

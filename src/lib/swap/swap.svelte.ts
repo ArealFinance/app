@@ -72,13 +72,21 @@ import {
 } from '@solana/web3.js';
 
 import {
+	parseBinArray,
 	parseDexConfig,
 	parsePoolState,
 	quoteSwap,
-	type QuoteFees
+	type MasterPoolQuoteContext,
+	type QuoteFees,
+	type QuoteRoute
 } from '@areal/sdk/native-dex';
+import { parseRwtVault } from '@areal/sdk/rwt-engine';
 import { buildSwapTx, type SwapAccountContext } from '@areal/sdk/tx';
-import { findAssociatedTokenAddressPda, findBinArrayPda } from '@areal/sdk/pda';
+import {
+	findAssociatedTokenAddressPda,
+	findBinArrayPda,
+	findRwtVaultPda
+} from '@areal/sdk/pda';
 import { isPlaceholderRwtMint, RWT_MINTS } from '@areal/sdk/network';
 
 import { wallet } from '$lib/stores/wallet.svelte';
@@ -122,8 +130,23 @@ export interface SwapIntent {
 	priceImpactBps: number;
 	/** Slippage in bps the user picked. */
 	slippageBps: number;
-	/** Wallet debit total in `fromMint` lamports — equals amountIn + fees on the sell-RWT branch; equals amountIn on buy-RWT. */
+	/** Wallet debit total in `fromMint` lamports — equals amountIn + fees on the sell-RWT branch; equals amountIn on buy-RWT. On mint-route swaps this equals `amountIn` exactly (1% mint fee is built into the NAV × 1.01 price ratio). */
 	userTotalDebit: bigint;
+	/**
+	 * CP-11 — which on-chain branch the SDK predicted at intent-freeze
+	 * time. `'binWalk'` for every swap that consumes organic ask (or a
+	 * StandardCurve pool); `'mintRoute'` only for master-pool USDC → RWT
+	 * when the mint-route gate fires (no organic ask above NAV × 1.005).
+	 *
+	 * UI uses this to:
+	 *   - render a "Routed via mint" badge in the confirm modal,
+	 *   - swap the fee breakdown (1% mint fee replaces the DEX fee lines).
+	 *
+	 * The FSM re-quotes against fresh reserves in `preparing` — if the
+	 * fresh route differs from the intent's snapshot, the fresh route wins
+	 * (the on-chain gate is the authoritative decision).
+	 */
+	route: QuoteRoute;
 }
 
 export interface SwapAttempt {
@@ -214,6 +237,63 @@ async function readUserBalance(
 		// soft gate: a stale-quote / mainnet-placeholder check still aborts,
 		// but a one-off `getTokenAccountBalance` flake doesn't.
 		console.warn('readUserBalance: RPC failure, skipping preflight', err);
+		return null;
+	}
+}
+
+/**
+ * CP-11 — scan a parsed BinArray for any non-zero `liquidity_a` strictly
+ * above `activeBinId`. Mirrors `is_organic_ask_present` in the contract.
+ * Hoisted into the FSM (rather than imported from quote.svelte.ts) so the
+ * `preparing` phase doesn't depend on the quote store's reactivity layer.
+ */
+function hasOrganicAskAbove(
+	bins: readonly { liquidityA: bigint }[],
+	lowerBinId: number,
+	activeBinId: number
+): boolean {
+	for (let i = 0; i < bins.length; i++) {
+		const binId = lowerBinId + i;
+		if (binId <= activeBinId) continue;
+		if (bins[i]!.liquidityA > 0n) return true;
+	}
+	return false;
+}
+
+/**
+ * CP-11 — fetch a fresh `MasterPoolQuoteContext` for the FSM's stale-quote
+ * re-check. Used only for master pools (the caller gates on
+ * `intent.poolEntry.isMasterPool`). Returns `null` on any RPC or parse
+ * failure — the caller passes the result through to `quoteSwap`, which
+ * collapses to the legacy "EmptyReserves" refuse when context is missing.
+ *
+ * `rwtEngineProgramId` is captured from the network store at call time;
+ * we don't import it as a constant because Testnet currently overrides
+ * none of these IDs, but the override hook stays available for future
+ * cluster deployments.
+ */
+async function readMasterPoolContext(
+	connection: Connection,
+	poolPda: PublicKey,
+	rwtEngineProgramId: PublicKey,
+	nativeDexProgramId: PublicKey
+): Promise<MasterPoolQuoteContext | null> {
+	try {
+		const [rwtVaultPda] = findRwtVaultPda(rwtEngineProgramId);
+		const [binArrayPda] = findBinArrayPda(poolPda, nativeDexProgramId);
+		const [vaultInfo, binInfo] = await Promise.all([
+			connection.getAccountInfo(rwtVaultPda),
+			connection.getAccountInfo(binArrayPda)
+		]);
+		if (!vaultInfo || !binInfo) return null;
+		const vault = parseRwtVault(vaultInfo.data);
+		const bins = parseBinArray(binInfo.data);
+		return {
+			nav: vault.navBookValue,
+			hasOrganicAsk: hasOrganicAskAbove(bins.bins, bins.lowerBinId, bins.activeBinId)
+		};
+	} catch (err) {
+		console.warn('[swap FSM] master-pool context fetch failed:', err);
 		return null;
 	}
 }
@@ -410,12 +490,30 @@ async function runSwap(intent: SwapIntent): Promise<void> {
 		const freshPool = parsePoolState(poolInfo.data);
 		const freshConfig = parseDexConfig(configInfo.data);
 
+		// CP-11 — re-fetch the master-pool context (NAV + organic-ask flag)
+		// before re-quoting on a master pool. The cached `quote.svelte.ts`
+		// context is debounced through WS and may be ~200 ms stale; for the
+		// stale-quote race guard we want to compare against on-chain truth.
+		// Fail-open: a missing/parse-error context falls through to a
+		// no-context quote which the SDK refuses with EmptyReserves on
+		// concentrated pools (same outcome as before CP-11).
+		let freshMasterContext: MasterPoolQuoteContext | null = null;
+		if (intent.poolEntry.isMasterPool) {
+			freshMasterContext = await readMasterPoolContext(
+				connection,
+				intent.poolEntry.poolPda,
+				network.endpoint.programIds.rwtEngine,
+				programId
+			);
+		}
+
 		const freshQuote = quoteSwap({
 			pool: freshPool,
 			config: freshConfig,
 			amountIn: intent.amountIn,
 			aToB: intent.aToB,
-			rwtMint
+			rwtMint,
+			...(freshMasterContext ? { masterPoolContext: freshMasterContext } : {})
 		});
 
 		if (!freshQuote.ok) {
@@ -470,6 +568,37 @@ async function runSwap(intent: SwapIntent): Promise<void> {
 			? findBinArrayPda(intent.poolEntry.poolPda, programId)[0]
 			: undefined;
 
+		// CP-11 — master-pool USDC → RWT mint-route accounts. The on-chain
+		// gate inside `swap_internal` reads these only when the mint-route
+		// branch fires; supplying them unconditionally on master pools is
+		// the SDK convention (the contract simply ignores them on bin-walk
+		// paths). Skip for non-master pools to keep the tx small.
+		let masterPoolMintRouteAccounts: SwapAccountContext['masterPoolMintRouteAccounts'];
+		if (intent.poolEntry.isMasterPool && binArray) {
+			try {
+				const rwtEngineProgramId = network.endpoint.programIds.rwtEngine;
+				const [rwtVaultPda] = findRwtVaultPda(rwtEngineProgramId);
+				const vaultInfo = await connection.getAccountInfo(rwtVaultPda);
+				if (vaultInfo) {
+					const vault = parseRwtVault(vaultInfo.data);
+					masterPoolMintRouteAccounts = {
+						rwtVault: rwtVaultPda,
+						rwtMint,
+						capitalAcc: vault.capitalAccumulatorAta,
+						daoFeeAccount: vault.arealFeeDestination,
+						rwtEngineProgram: rwtEngineProgramId
+					};
+				}
+			} catch (err) {
+				// Fail-open: missing mint-route accounts collapse the on-chain
+				// gate to "bin-walk only". A user who hit the mint-route
+				// branch will get the on-chain MissingMintRouteAccounts
+				// error instead, but RPC blips during preparing are still
+				// better than refusing the tx outright.
+				console.warn('[swap FSM] mint-route account derivation failed:', err);
+			}
+		}
+
 		// Resolve pool-side context. `vaultA` / `vaultB` come from
 		// PoolState; `arealFeeAccount` comes from DexConfig.
 		const ctx: SwapAccountContext = {
@@ -483,7 +612,8 @@ async function runSwap(intent: SwapIntent): Promise<void> {
 			otTreasuryFeeDestination: freshPool.hasOtTreasury
 				? freshPool.otTreasuryFeeDestination
 				: undefined,
-			binArray
+			binArray,
+			masterPoolMintRouteAccounts
 		};
 
 		// User's input/output ATAs — derived deterministically (no RPC).

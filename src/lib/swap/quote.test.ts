@@ -38,7 +38,24 @@ const mocks = vi.hoisted(() => ({
 vi.mock('@areal/sdk/native-dex', () => ({
 	parsePoolState: mocks.parsePoolState,
 	parseDexConfig: mocks.parseDexConfig,
-	quoteSwap: mocks.quoteSwap
+	quoteSwap: mocks.quoteSwap,
+	// CP-11 — `parseBinArray` is imported by the quote store for the
+	// master-pool branch. Non-master tests never feed master pool entries,
+	// so the mock is a deterministic no-op.
+	parseBinArray: vi.fn(() => ({ bins: [], lowerBinId: 0, activeBinId: 0 }))
+}));
+
+vi.mock('@areal/sdk/rwt-engine', () => ({
+	parseRwtVault: vi.fn(() => ({
+		navBookValue: 1_000_000n,
+		capitalAccumulatorAta: USDC_MINT,
+		arealFeeDestination: USDC_MINT
+	}))
+}));
+
+vi.mock('@areal/sdk/pda', () => ({
+	findRwtVaultPda: (_programId: PublicKey): [PublicKey, number] => [USDC_MINT, 0],
+	findBinArrayPda: (pool: PublicKey, _programId: PublicKey): [PublicKey, number] => [pool, 0]
 }));
 
 vi.mock('@areal/sdk/network', () => ({
@@ -54,6 +71,14 @@ vi.mock('$lib/network/network.svelte', () => ({
 		get current() {
 			return mocks.currentNetwork;
 		},
+		get endpoint() {
+			return {
+				programIds: {
+					nativeDex: USDC_MINT,
+					rwtEngine: RWT_MINT
+				}
+			};
+		},
 		get connection() {
 			return {
 				getAccountInfo: mocks.getAccountInfo
@@ -65,6 +90,9 @@ vi.mock('$lib/network/network.svelte', () => ({
 			// verify the SAME Connection instance handles unsubscribe.
 			mocks.wsConnSeq++;
 			return mocks.wsConnSeq <= 1 ? mocks.connectionA : mocks.connectionB;
+		},
+		get rwtMint() {
+			return RWT_MINT;
 		}
 	}
 }));
@@ -79,7 +107,11 @@ function makeEntry(poolPda: PublicKey) {
 		decimalsA: 6,
 		decimalsB: 6,
 		poolPda,
-		dexConfigPda: DEX_CONFIG_PDA
+		dexConfigPda: DEX_CONFIG_PDA,
+		// CP-11 — non-master fixture. Master-pool branches (NAV/BinArray
+		// fetches) are exercised separately and would require additional
+		// `getAccountInfo` mocks to feed.
+		isMasterPool: false
 	};
 }
 

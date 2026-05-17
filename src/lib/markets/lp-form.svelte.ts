@@ -425,7 +425,11 @@ async function runAdd(intent: AddLiquidityIntent): Promise<void> {
 
 	// Pre-flight 1: master-pool guard.
 	if (isPoolRowMaster(intent.pool, cluster)) {
-		failSilent(key, 'User liquidity is managed by Areal Nexus on this pool.', 'add');
+		failSilent(
+			key,
+			'User LP is disabled on this pool. Please use a StandardCurve pool.',
+			'add'
+		);
 		return;
 	}
 
@@ -570,7 +574,11 @@ async function runZap(intent: ZapLiquidityIntent): Promise<void> {
 	const cluster = network.current;
 
 	if (isPoolRowMaster(intent.pool, cluster)) {
-		failSilent(key, 'User liquidity is managed by Areal Nexus on this pool.', 'zap');
+		failSilent(
+			key,
+			'User LP is disabled on this pool. Please use a StandardCurve pool.',
+			'zap'
+		);
 		return;
 	}
 

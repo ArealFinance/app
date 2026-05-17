@@ -24,7 +24,10 @@
 			decimalsA: 6,
 			decimalsB: 6,
 			poolPda: FAKE_POOL,
-			dexConfigPda: FAKE_DEX_CONFIG
+			dexConfigPda: FAKE_DEX_CONFIG,
+			// CP-11 — non-master fixture (StandardCurve). Master-pool stories
+			// override this below to drive the "Routed via mint" badge.
+			isMasterPool: false
 		},
 		fromMint: FAKE_USDC,
 		toMint: FAKE_RWT,
@@ -36,6 +39,22 @@
 		priceImpactBps: 25,
 		slippageBps: 50,
 		// USDC → RWT (buy-RWT branch): fees come off output, debit == amountIn.
+		userTotalDebit: 100_000_000n,
+		route: 'binWalk'
+	};
+
+	// CP-11 — master-pool mint-route fixture. Drives the "Routed via mint"
+	// badge + the 1 % mint fee receipt (no DEX fee line).
+	const fakeIntentMintRoute: SwapIntent = {
+		...fakeIntent,
+		poolEntry: {
+			...fakeIntent.poolEntry,
+			isMasterPool: true
+		},
+		// Mint-route quote has zero DEX fee and a 1% premium baked in.
+		fees: { feeTotal: 0n, feeLp: 0n, feeProtocol: 0n, feeOtTreasury: 0n },
+		priceImpactBps: 100,
+		route: 'mintRoute',
 		userTotalDebit: 100_000_000n
 	};
 
@@ -111,6 +130,17 @@
 		onclose={noop}
 		onconfirm={noop}
 		intent={slippageExceededIntent}
+		attempt={null}
+	/>
+</Story>
+
+<!-- CP-11 — mint-route receipt: badge + 1% mint fee replacing DEX fee. -->
+<Story name="IdleMintRoute">
+	<SwapConfirmModal
+		open={true}
+		onclose={noop}
+		onconfirm={noop}
+		intent={fakeIntentMintRoute}
 		attempt={null}
 	/>
 </Story>

@@ -80,7 +80,21 @@ const mocks = vi.hoisted(() => ({
 vi.mock('@areal/sdk/native-dex', () => ({
 	parsePoolState: mocks.parsePoolState,
 	parseDexConfig: mocks.parseDexConfig,
-	quoteSwap: mocks.quoteSwap
+	quoteSwap: mocks.quoteSwap,
+	// CP-11 — `parseBinArray` is imported by the FSM only for the master-
+	// pool re-quote branch. Non-master tests never hit this mock; we wire
+	// a no-op default so any incidental call returns a parseable shape.
+	parseBinArray: vi.fn(() => ({ bins: [], lowerBinId: 0, activeBinId: 0 }))
+}));
+
+// CP-11 — RWT engine. `parseRwtVault` is exercised only on master-pool
+// FSM cycles; non-master tests pass through without invoking it.
+vi.mock('@areal/sdk/rwt-engine', () => ({
+	parseRwtVault: vi.fn(() => ({
+		navBookValue: 1_000_000n,
+		capitalAccumulatorAta: new PublicKey('1111111111111111111111111111111H'),
+		arealFeeDestination: new PublicKey('1111111111111111111111111111111J')
+	}))
 }));
 
 vi.mock('@areal/sdk/tx', () => ({
@@ -90,6 +104,15 @@ vi.mock('@areal/sdk/tx', () => ({
 vi.mock('@areal/sdk/pda', () => ({
 	findAssociatedTokenAddressPda: (owner: PublicKey, mint: PublicKey): [PublicKey, number] => [
 		new PublicKey(owner),
+		0
+	],
+	// CP-11 — `findBinArrayPda` was already imported for concentrated pools
+	// in the pre-CP-11 FSM; CP-11 adds `findRwtVaultPda` for the master-pool
+	// mint-route account derivation. Both return deterministic stand-ins;
+	// the tests don't assert on their values.
+	findBinArrayPda: (pool: PublicKey, _programId: PublicKey): [PublicKey, number] => [pool, 0],
+	findRwtVaultPda: (_programId: PublicKey): [PublicKey, number] => [
+		new PublicKey('1111111111111111111111111111111K'),
 		0
 	]
 }));
@@ -172,7 +195,10 @@ function makeIntent(poolPda: PublicKey = POOL_PDA_A) {
 			decimalsA: 6,
 			decimalsB: 6,
 			poolPda,
-			dexConfigPda: DEX_CONFIG_PDA
+			dexConfigPda: DEX_CONFIG_PDA,
+			// CP-11 — non-master fixture (StandardCurve pool). Master-pool
+			// behaviour is exercised by the dedicated mint-route tests.
+			isMasterPool: false
 		},
 		fromMint: USDC_MINT,
 		toMint: RWT_MINT,
@@ -185,7 +211,10 @@ function makeIntent(poolPda: PublicKey = POOL_PDA_A) {
 		slippageBps: 50,
 		// USDC → RWT (buy-RWT branch): fees come off the gross output, so
 		// the wallet is debited exactly `amountIn`.
-		userTotalDebit: 1_000_000n
+		userTotalDebit: 1_000_000n,
+		// CP-11 — default to the bin-walk branch (no mint-route). The route
+		// is informational for UI rendering; the FSM does not key off it.
+		route: 'binWalk' as const
 	};
 }
 

@@ -26,8 +26,9 @@
 	<div class="master-body">
 		<p class="master-title">Protocol master pool</p>
 		<p class="master-text">
-			{symbolA}/{symbolB} liquidity is managed by Areal Nexus to keep the AMM
-			anchored to NAV. Direct deposits are disabled on this pair — withdrawals remain open.
+			LP deposits are disabled on master pools. Liquidity for {symbolA}/{symbolB} is
+			supplied by the Areal Liquidity Nexus to keep the AMM anchored to NAV.
+			Withdrawals remain open.
 		</p>
 	</div>
 </aside>

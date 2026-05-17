@@ -129,6 +129,28 @@
 			)
 			: '0'
 	);
+
+	// CP-11 — mint-route detection drives a different fee receipt + a
+	// "Routed via mint" badge near the title. The route lives on the
+	// SwapIntent (frozen at click time); the FSM re-quotes against fresh
+	// reserves but does not currently flip the route on intent — the
+	// on-chain gate is authoritative either way.
+	const isMintRoute = $derived(intent?.route === 'mintRoute');
+	// Show a small explanatory tooltip on click — kept inline (no
+	// separate Tooltip primitive) to stay self-contained.
+	let routeBadgeOpen = $state(false);
+	function toggleRouteBadge(e: MouseEvent) {
+		e.stopPropagation();
+		routeBadgeOpen = !routeBadgeOpen;
+	}
+	$effect(() => {
+		if (!routeBadgeOpen) return;
+		const close = () => {
+			routeBadgeOpen = false;
+		};
+		document.addEventListener('click', close);
+		return () => document.removeEventListener('click', close);
+	});
 </script>
 
 <Modal
@@ -141,7 +163,34 @@
 		{#if attempt === null}
 			<!-- ───────── State 1: idle pre-confirm ───────── -->
 			<header class="modal-head">
-				<h2 id="swap-modal-title" class="modal-title">Confirm swap</h2>
+				<div class="modal-title-row">
+					<h2 id="swap-modal-title" class="modal-title">Confirm swap</h2>
+					{#if isMintRoute}
+						<!-- CP-11 — mint-route badge. Click to expand the
+						     "why this isn't a normal swap" explanation. -->
+						<div class="route-badge-anchor">
+							<button
+								type="button"
+								class="route-badge"
+								aria-expanded={routeBadgeOpen}
+								aria-label="Routed via mint — show details"
+								onclick={toggleRouteBadge}
+							>
+								Routed via mint
+							</button>
+							{#if routeBadgeOpen}
+								<!-- Plain tooltip — no `role="dialog"` because the
+								     content is purely informational and the parent
+								     button keeps focus. Click-outside listener on the
+								     <script> side closes it. -->
+								<div class="route-badge-popover" role="tooltip">
+									Best on-book ask is above NAV × 1.005, so this swap mints
+									fresh RWT at the deterministic NAV price.
+								</div>
+							{/if}
+						</div>
+					{/if}
+				</div>
 				{#if intent}
 					<p class="modal-sub">
 						You are swapping <strong class="modal-amount"
@@ -179,10 +228,29 @@
 						<dt>Price impact</dt>
 						<dd class:price-impact-high={priceImpactHigh}>{priceImpactPct}%</dd>
 					</div>
-					<div class="quote-row">
-						<dt>Fee</dt>
-						<dd class="muted">{feeTotalDisplay} {toSymbol}</dd>
-					</div>
+					{#if isMintRoute}
+						<!-- CP-11 — mint-route fee receipt. The 1% mint fee is
+						     built into the NAV × 1.01 price ratio (not added on
+						     top of `amountIn`), and the DEX LP/protocol/OT-
+						     treasury fee lines do NOT apply on this branch. -->
+						<div class="quote-row">
+							<dt>Mint fee</dt>
+							<dd class="muted">1.00%</dd>
+						</div>
+						<div class="quote-row quote-row-sub">
+							<dt>↳ NAV accrual</dt>
+							<dd class="muted">0.50%</dd>
+						</div>
+						<div class="quote-row quote-row-sub">
+							<dt>↳ Areal DAO</dt>
+							<dd class="muted">0.50%</dd>
+						</div>
+					{:else}
+						<div class="quote-row">
+							<dt>Fee</dt>
+							<dd class="muted">{feeTotalDisplay} {toSymbol}</dd>
+						</div>
+					{/if}
 				</dl>
 			{/if}
 
@@ -271,6 +339,12 @@
 		flex-direction: column;
 		gap: var(--space-2);
 	}
+	.modal-title-row {
+		display: flex;
+		align-items: center;
+		gap: var(--space-3);
+		flex-wrap: wrap;
+	}
 	.modal-title {
 		margin: 0;
 		font-family: var(--font-sans);
@@ -279,6 +353,52 @@
 		text-transform: uppercase;
 		letter-spacing: var(--tracking-tight);
 		color: var(--color-text);
+	}
+	/* CP-11 — mint-route badge. Sits next to the modal title and opens an
+	 * explanatory tooltip on click. Color: brand-accent surface so it
+	 * reads as informational, not warning. */
+	.route-badge-anchor {
+		position: relative;
+	}
+	.route-badge {
+		display: inline-flex;
+		align-items: center;
+		gap: 4px;
+		padding: 2px 10px;
+		background-color: var(--color-surface-inset);
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-md);
+		font-family: var(--font-body);
+		font-size: var(--text-xs);
+		font-weight: var(--font-weight-semibold);
+		letter-spacing: var(--tracking-tight);
+		text-transform: uppercase;
+		color: var(--color-text-muted);
+		cursor: pointer;
+		transition: color var(--motion-base) var(--ease-out);
+	}
+	.route-badge:hover {
+		color: var(--color-text);
+	}
+	.route-badge-popover {
+		position: absolute;
+		top: calc(100% + var(--space-2));
+		right: 0;
+		z-index: 5;
+		max-width: 260px;
+		padding: var(--space-3);
+		background-color: var(--color-surface);
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-md);
+		box-shadow: var(--shadow-overlay);
+		font-family: var(--font-body);
+		font-size: var(--text-xs);
+		line-height: 1.4;
+		color: var(--color-text-muted);
+	}
+	/* Sub-line under the parent fee row (used for NAV / DAO 0.5%/0.5% split). */
+	.quote-row-sub dt {
+		padding-left: var(--space-3);
 	}
 	.modal-sub {
 		margin: 0;

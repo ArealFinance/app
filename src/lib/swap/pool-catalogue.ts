@@ -15,6 +15,7 @@
  */
 import { PublicKey } from '@solana/web3.js';
 import { findDexConfigPda, findPoolStatePda } from '@areal/sdk/pda';
+import { isMasterPool } from '@areal/sdk/markets';
 import { PROGRAM_IDS, RWT_MINTS, USDC_MINTS } from '@areal/sdk/network';
 
 import { ENDPOINTS, type NetworkId } from '$lib/network/endpoints';
@@ -38,6 +39,19 @@ export interface PoolEntry {
 	poolPda: PublicKey;
 	/** DexConfig singleton PDA — `["dex_config"]`. */
 	dexConfigPda: PublicKey;
+	/**
+	 * CP-11 — true when `(mintA, mintB)` matches a protocol master pool
+	 * (Monotonic Ladder: RWT/USDC, RWT/USDY). UI gates a few branches off
+	 * this flag:
+	 *   - the LP add/zap form is hidden / disabled on master pools (the
+	 *     contract rejects user LP with `MasterPoolUserLpDisabled`),
+	 *   - the swap quote may route through `rwt_engine::mint_rwt` when the
+	 *     master-pool gate fires (no organic ask above NAV × 1.005).
+	 *
+	 * Derived once from `isMasterPool(mintA, mintB, cluster)` so the SDK
+	 * helper stays the single source of truth.
+	 */
+	isMasterPool: boolean;
 }
 
 /**
@@ -98,7 +112,12 @@ function buildOtRwtEntry(opts: {
 		decimalsA: otIsA ? opts.otDecimals : RWT_DECIMALS,
 		decimalsB: otIsA ? RWT_DECIMALS : opts.otDecimals,
 		poolPda,
-		dexConfigPda
+		dexConfigPda,
+		// OT/RWT pairs are never master pools — Monotonic Ladder is only
+		// RWT/USDC and RWT/USDY. `isMasterPool` still routes through the
+		// SDK helper so a future shift in the master-pool set is picked up
+		// automatically.
+		isMasterPool: isMasterPool(mintA, mintB, opts.cluster)
 	};
 }
 
@@ -134,7 +153,11 @@ function buildUsdcRwtEntry(cluster: NetworkId): PoolEntry {
 		decimalsA: usdcIsA ? USDC_DECIMALS : RWT_DECIMALS,
 		decimalsB: usdcIsA ? RWT_DECIMALS : USDC_DECIMALS,
 		poolPda,
-		dexConfigPda
+		dexConfigPda,
+		// RWT/USDC is one of the two protocol master pools (the other is
+		// RWT/USDY). Defer to the SDK helper so the mapping stays consistent
+		// with the contract-side `is_master_pool` check.
+		isMasterPool: isMasterPool(mintA, mintB, cluster)
 	};
 }
 

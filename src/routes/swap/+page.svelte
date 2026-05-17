@@ -432,7 +432,11 @@
 			fees: quoteResult.quote.fees,
 			priceImpactBps: quoteResult.quote.priceImpactBps,
 			slippageBps,
-			userTotalDebit: quoteResult.quote.userTotalDebit
+			userTotalDebit: quoteResult.quote.userTotalDebit,
+			// CP-11 — surface the route the SDK predicted. The modal renders
+			// a "Routed via mint" badge + adjusted fee receipt when this is
+			// `'mintRoute'`.
+			route: quoteResult.quote.route
 		};
 		modalOpen = true;
 	}
