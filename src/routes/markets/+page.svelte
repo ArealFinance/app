@@ -114,10 +114,16 @@
 		name="description"
 		content="Build your wealth engine via ownership tokens backed by real-world assets."
 	/>
-	<!-- Hero crystal LCP preload. AVIF only — browsers without AVIF support
-	     will fall back to WebP/PNG via the <picture> tag below. Modern
-	     browsers fetch ~158 KB on the cold path instead of waiting for the
-	     image discovery pass after CSSOM. -->
+	<!-- Hero crystal LCP preload. Two formats with `type=` — each browser
+	     fetches only the one it can decode. WebM (VP9 + ALPHA_MODE=1) for
+	     Chromium/Firefox; HEVC-with-alpha (hvc1) for Safari, which ignores
+	     the alpha block in WebM and renders a solid background otherwise. -->
+	<link
+		rel="preload"
+		as="video"
+		href="/images/hero/crystal.hevc.mov"
+		type="video/mp4; codecs=hvc1"
+	/>
 	<link
 		rel="preload"
 		as="video"
@@ -192,10 +198,13 @@
 					fetchpriority="high"
 				/>
 			</picture>
-			<!-- Animated crystal hero. Per Figma `Crystal - Purple 2`. -->
+			<!-- Animated crystal hero. Per Figma `Crystal - Purple 2`.
+			     Source order matters: Safari ignores the alpha plane in
+			     VP9 WebM (`ALPHA_MODE=1` side-block), so HEVC-with-alpha
+			     `hvc1` MP4 must come first; Chromium/Firefox don't decode
+			     hvc1 and fall through to the WebM. -->
 			<video
 				class="hero-crystal hero-crystal-sharp"
-				src="/images/hero/crystal.webm"
 				poster="/images/hero/crystal-composite.avif"
 				width={1440}
 				height={1440}
@@ -204,7 +213,10 @@
 				muted
 				playsinline
 				preload="auto"
-			></video>
+			>
+				<source src="/images/hero/crystal.hevc.mov" type="video/mp4; codecs=hvc1" />
+				<source src="/images/hero/crystal.webm" type="video/webm" />
+			</video>
 		</div>
 	</section>
 
