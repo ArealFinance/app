@@ -12,7 +12,7 @@
  * across the codebase; the user-facing label is "Testnet".
  */
 import { PublicKey } from '@solana/web3.js';
-import { PROGRAM_IDS, USDC_MINTS } from '@areal/sdk/network';
+import { PROGRAM_IDS, RWT_MINTS, USDC_MINTS } from '@areal/sdk/network';
 
 /** Public RPC URL for the Areal-hosted test-validator. */
 const TESTNET_RPC_URL = 'https://rpc.areal.finance';
@@ -120,30 +120,21 @@ export const ENDPOINTS: Record<NetworkId, NetworkEndpoint> = {
 		backendApiUrl: AREAL_BACKEND_URL,
 		realtimeWsUrl: AREAL_REALTIME_WS_URL,
 		programIds: PROGRAM_IDS,
-		// Bootstrap-init.ts on the Areal-hosted Testnet validator created
-		// fresh test mints under the deployer's keypair. After Path B
-		// (R20-redeploy of contracts pinned to these mints, see
-		// `scripts/migrate-mints.sh` run on 2026-05-10), the on-chain
-		// programs accept these as the canonical RWT/USDC pair. The SDK's
-		// default `RWT_MINTS.localnet` / `USDC_MINTS.localnet` point at
-		// the original R20 placeholders, so the markets-snapshot reads
-		// would land on empty accounts and every price / TVL / market
-		// cap would surface as `—`. We set:
-		//   - `usdcMint` to the existing test USDC (replaces the
-		//     `USDC_MINTS.localnet` lookup wherever the markets layer
-		//     consumes `network.endpoint.usdcMint`).
-		//   - `rwtMint` as the optional override threaded through to
-		//     the SDK snapshot opts (no equivalent default field on
-		//     `NetworkEndpoint`).
-		// Drop both when the validator is rebuilt with the SDK's
-		// canonical R20 pins.
-		usdcMint: new PublicKey('F9NVj8dFsqxbCfytfmrEWDjdDhmpV1YrjRuxiusGr9Ys'),
-		rwtMint: new PublicKey('3pBtHBiBwh4agqghTYuDQnZV1po5YahbaBGywtiZooRr'),
-		// Testnet indexer hasn't shipped the holders projection yet — skip
-		// the call entirely so the browser doesn't log a 404 to the network
-		// panel. Drop this flag (or flip to true) once the backend deploys
-		// `/markets/tokens/<mint>/holders` against the Testnet validator.
-		holdersBackendAvailable: false
+		// Pull canonical Testnet mint pubkeys from SDK 0.12.4+:
+		//   - `USDC_MINTS.localnet`  — test USDC mint on the Areal VPS validator
+		//   - `RWT_MINTS.localnet`   — RWT mint pinned via R20 migrate-mints
+		// Both are re-synced via `scripts/sync-sdk-localnet-mints.sh` whenever
+		// the VPS validator state resets, so we keep ONE source of truth (SDK)
+		// instead of duplicating literals here. Earlier hardcoded values
+		// (`F9NVj…` / `3pBtH…`) pointed at stale mints and shadowed the SDK
+		// lookup — markets-snapshot landed on empty accounts and every
+		// supply / holders / price surfaced as `—`.
+		usdcMint: USDC_MINTS.localnet,
+		rwtMint: RWT_MINTS.localnet,
+		// Backend `/markets/tokens/<mint>/holders` projection is live on
+		// the Testnet validator (verified 2026-05-18 — returns count=5
+		// against the current RWT mint). Enable so holdersStore polls.
+		holdersBackendAvailable: true
 	},
 	devnet: {
 		id: 'devnet',
