@@ -62,3 +62,19 @@
 		<QuickSwap pinnedToken={rwt} initialOther={usdt} />
 	</div>
 </Story>
+
+<Story
+	name="NoPairs"
+	parameters={{
+		docs: {
+			description: {
+				story:
+					'Fail-soft state when the parent page has no counter-tokens to offer (e.g. fresh validator with not-yet-indexed pools, or a single-pool market). The CTA is replaced with a disabled "No pairs available" affordance and the panel logo falls back to a neutral surface — no runtime crash.'
+			}
+		}
+	}}
+>
+	<div style="width: 324px;">
+		<QuickSwap pinnedToken={rwt} tokens={[]} />
+	</div>
+</Story>

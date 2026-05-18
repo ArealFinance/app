@@ -53,11 +53,21 @@
 		[pinnedAmount, otherAmount] = [otherAmount, pinnedAmount];
 	}
 
-	const otherCandidates = $derived(tokens.filter((t) => t.id !== pinnedToken.id));
-	let other = $state<SwapToken>(untrack(() => initialOther ?? otherCandidates[0]));
+	const otherCandidates = $derived(
+		pinnedToken ? tokens.filter((t) => t.id !== pinnedToken.id) : tokens
+	);
+	// `other` is intentionally typed as possibly-undefined: when the parent page
+	// passes an empty (or singleton-pinned) `tokens` list — e.g. a freshly
+	// bootstrapped chain where the pools indexer hasn't caught up yet — there
+	// is simply no counter-token to swap into. The template gates on `other`
+	// and falls back to a graceful empty state instead of crashing.
+	let other = $state<SwapToken | undefined>(
+		untrack(() => initialOther ?? otherCandidates[0])
+	);
 	$effect(() => {
-		if (!pinnedToken || !other) return;
-		if (other.id === pinnedToken.id) {
+		if (!pinnedToken) return;
+		// If counterparts arrive (or change) after mount, fill / refresh `other`.
+		if (!other || other.id === pinnedToken.id) {
 			const next = otherCandidates[0];
 			if (next) other = next;
 		}
@@ -106,6 +116,9 @@
 			walletDialog.open('connect');
 			return;
 		}
+		// Defensive: should be unreachable because the CTA is disabled when
+		// `other` is missing, but typescript-narrow on the union.
+		if (!fromToken || !toToken) return;
 		const params = new URLSearchParams();
 		params.set('from', fromToken.symbol);
 		params.set('to', toToken.symbol);
@@ -181,11 +194,11 @@
 		{@const token = side === 'pinned' ? pinnedToken : other}
 		{@const amount = side === 'pinned' ? pinnedAmount : otherAmount}
 		<div class="qs-panel">
-			<span class="qs-token-logo" style:background={token.bg}>
-				{#if token.iconSrc}
+			<span class="qs-token-logo" style:background={token?.bg ?? 'var(--color-surface)'}>
+				{#if token?.iconSrc}
 					<img src={token.iconSrc} alt="" aria-hidden="true" />
-				{:else}
-					<span class="qs-token-letter">{token.iconLetter ?? token.symbol[0]}</span>
+				{:else if token}
+					<span class="qs-token-letter">{token.iconLetter ?? token.symbol[0] ?? '?'}</span>
 				{/if}
 			</span>
 
@@ -193,7 +206,7 @@
 				<div class="qs-label-row">
 					<span class="qs-label">{label}</span>
 					{#if side === 'pinned'}
-						<span class="qs-symbol qs-symbol-locked">{token.symbol}</span>
+						<span class="qs-symbol qs-symbol-locked">{token?.symbol ?? '—'}</span>
 					{:else}
 						<button
 							type="button"
@@ -202,8 +215,9 @@
 							onclick={toggleOtherDropdown}
 							aria-haspopup="listbox"
 							aria-expanded={isOtherOpen}
+							disabled={!token}
 						>
-							{token.symbol}
+							{token?.symbol ?? '—'}
 							{#if isOtherOpen}
 								<AngleUpSmall size={16} />
 							{:else}
@@ -236,9 +250,9 @@
 					<button
 						type="button"
 						class="qs-option"
-						class:qs-option-selected={t.id === other.id}
+						class:qs-option-selected={t.id === other?.id}
 						role="option"
-						aria-selected={t.id === other.id}
+						aria-selected={t.id === other?.id}
 						onclick={() => pickOther(t)}
 					>
 						<span class="qs-option-logo" style:background={t.bg}>
@@ -276,6 +290,11 @@
 			<!-- Trigger is the To-side: dropdown anchors under To-card,
 			     hiding only the CTA. -->
 			{@render dropdown()}
+		{:else if !other}
+			<!-- Fail-soft: no counterparts means there's nothing to swap into.
+			     Happens when the page-level catalogue returns zero pairs
+			     (fresh validator, single-pool market, indexer lag). -->
+			<button type="button" class="qs-cta" disabled>No pairs available</button>
 		{:else}
 			<button
 				type="button"
@@ -670,5 +689,12 @@
 	}
 	.qs-cta:hover {
 		opacity: 0.9;
+	}
+	.qs-cta:disabled {
+		opacity: 0.5;
+		cursor: not-allowed;
+	}
+	.qs-cta:disabled:hover {
+		opacity: 0.5;
 	}
 </style>
