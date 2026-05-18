@@ -34,7 +34,7 @@
 				{ label: 'Architecture', href: '/docs/architecture' },
 				{ label: 'Ownership Tokens', href: '/docs/ownership-tokens' },
 				{ label: 'RWT Token', href: '/docs/rwt' },
-				{ label: 'ARL Token', href: '/docs/arl' }
+				{ label: 'SPRK Token', href: '/docs/sprk' }
 			]
 		},
 		{
