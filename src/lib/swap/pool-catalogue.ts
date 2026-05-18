@@ -122,7 +122,7 @@ function buildOtRwtEntry(opts: {
 }
 
 /** SPRK mint (Sparkles OT) created by `scripts/lib/create-sparkles-ot.ts`. */
-const SPRK_MINT = new PublicKey('3xWNZFsPKNmmeQHTo1HDxQK6EGutZHadnGQZBrmd8RYQ');
+const SPRK_MINT = new PublicKey('ApLvdzo2SrsXrC3C6z88uQxxhtvQtME8DpGdp5Xu9Q3J');
 const SPRK_DECIMALS = 6;
 
 /** Build a USDC↔RWT pool entry for a given cluster.
