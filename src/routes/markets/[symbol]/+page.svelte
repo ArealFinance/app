@@ -135,15 +135,22 @@
 		if (!isVaultToken) return null;
 		const vault = markets.rwtVault;
 		if (!vault || vault.totalRwtSupply === 0n) return null;
-		// navBookValue and totalRwtSupply both have 6 decimals → cancel out.
-		return Number(vault.navBookValue) / Number(vault.totalRwtSupply);
+		// `nav_book_value` on-chain is per-token NAV scaled by NAV_SCALE = 1e6
+		// (see contracts/rwt-engine/src/nav.rs::calculate_nav). Divide by the
+		// scale to get USDC-per-RWT in whole units. NOT a ratio of two
+		// 6-decimal raw values — the previous formula collapsed to capital /
+		// supply with the NAV_SCALE factor missing, showing $0.0001 instead
+		// of $1.0 at protocol launch.
+		return Number(vault.navBookValue) / 1_000_000;
 	});
 
 	const navBookValueUsdc = $derived.by((): number | null => {
 		if (!isVaultToken) return null;
 		const vault = markets.rwtVault;
 		if (!vault) return null;
-		return Number(vault.navBookValue) / 1_000_000;
+		// Book NAV in traditional finance = total assets backing the fund.
+		// On-chain: total_invested_capital (raw u128 with 6 decimals).
+		return Number(vault.totalInvestedCapital) / 1_000_000;
 	});
 
 	/** SwapToken adapter for QuickSwap pinned side. */
