@@ -85,9 +85,9 @@ export function canonicalMintOrder(
 }
 
 /**
- * Generic OT↔RWT pool builder. Both `create-sparkles-ot.ts` and the
- * Testnet bootstrap pair every OT against RWT (the native DEX requires
- * one side to be the RWT mint via `0x1781 — Neither token is RWT_MINT`),
+ * Generic OT↔RWT pool builder. The Testnet bootstrap pairs every OT
+ * against RWT (the native DEX requires one side to be the RWT mint via
+ * `0x1781 — Neither token is RWT_MINT`),
  * so the only varying input is the OT mint + its label + decimals.
  */
 function buildOtRwtEntry(opts: {
@@ -121,7 +121,7 @@ function buildOtRwtEntry(opts: {
 	};
 }
 
-/** SPRK mint (Sparkles OT) created by `scripts/lib/create-sparkles-ot.ts`. */
+/** SPRK mint (Sparkles OT), created by the Testnet bootstrap (bootstrap-init.ts). */
 const SPRK_MINT = new PublicKey('ApLvdzo2SrsXrC3C6z88uQxxhtvQtME8DpGdp5Xu9Q3J');
 const SPRK_DECIMALS = 6;
 
