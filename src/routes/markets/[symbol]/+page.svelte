@@ -371,8 +371,15 @@
 		const decA = tokenA?.decimals ?? 6;
 		const decB = tokenB?.decimals ?? 6;
 
-		const priceA = tokenA?.priceUsdc ?? null;
-		const priceB = tokenB?.priceUsdc ?? null;
+		// USDC is the unit of account and is NOT enumerated in
+		// `markets.tokens` (which lists only RWT + OTs), so its `priceUsdc`
+		// would resolve to null and blank out the spot label, allocation bar,
+		// and per-side USD values. Pin the cluster USDC mint to $1.
+		const usdcMintStr = network.usdcMint.toBase58();
+		const priceA =
+			raw.tokenAMint.toBase58() === usdcMintStr ? 1 : (tokenA?.priceUsdc ?? null);
+		const priceB =
+			raw.tokenBMint.toBase58() === usdcMintStr ? 1 : (tokenB?.priceUsdc ?? null);
 
 		// Spot price: A in B units. Avoids division-by-zero on freshly-created
 		// pools (display falls back to em-dash).
