@@ -30,10 +30,27 @@
 			label: 'Documentation',
 			dotColor: 'var(--color-teal-900)',
 			links: [
-				{ label: 'Introduction', href: '/docs' },
-				{ label: 'Architecture', href: '/docs/architecture' },
-				{ label: 'Ownership Tokens', href: '/docs/ownership-tokens' },
-				{ label: 'RWT Token', href: '/docs/rwt' },
+				{
+					label: 'Introduction',
+					href: 'https://docs.areal.finance/get-started/introduction',
+					external: true
+				},
+				{
+					label: 'Architecture',
+					href: 'https://docs.areal.finance/architecture/overview',
+					external: true
+				},
+				{
+					label: 'Ownership Tokens',
+					href: 'https://docs.areal.finance/economics/ownership-tokens',
+					external: true
+				},
+				{
+					label: 'RWT Token',
+					href: 'https://docs.areal.finance/economics/rwt-real-world-token',
+					external: true
+				},
+				// Placeholder — no dedicated SPRK doc page yet (SPRK is a demo OT).
 				{ label: 'SPRK Token', href: '/docs/sprk' }
 			]
 		},
@@ -41,11 +58,15 @@
 			label: 'About',
 			dotColor: 'var(--color-magenta-900)',
 			links: [
-				{ label: 'Vision', href: '/about/vision' },
-				{ label: 'Problem', href: '/about/problem' },
-				{ label: 'Solution', href: '/about/solution' },
-				{ label: 'Tokens', href: '/about/tokens' },
-				{ label: 'Changelog', href: '/changelog' }
+				{ label: 'Vision', href: 'https://docs.areal.finance/areal/vision', external: true },
+				{ label: 'Problem', href: 'https://docs.areal.finance/areal/problem', external: true },
+				{ label: 'Solution', href: 'https://docs.areal.finance/areal/solution', external: true },
+				{ label: 'Tokens', href: 'https://docs.areal.finance/economics/tokens', external: true },
+				{
+					label: 'Changelog',
+					href: 'https://docs.areal.finance/changelog/overview',
+					external: true
+				}
 			]
 		},
 		{
@@ -60,11 +81,24 @@
 	];
 
 	const defaultLegal: FooterLink[] = [
+		// Privacy Policy + Terms of Use have no docs page yet — left as placeholders.
 		{ label: 'Privacy Policy', href: '/privacy' },
 		{ label: 'Terms of Use', href: '/terms' },
-		{ label: 'Disclaimer', href: '/disclaimer' },
-		{ label: 'Legal Architecture', href: '/legal' },
-		{ label: 'Risk Disclosure', href: '/risk' }
+		{
+			label: 'Disclaimer',
+			href: 'https://docs.areal.finance/security/disclaimer',
+			external: true
+		},
+		{
+			label: 'Legal Architecture',
+			href: 'https://docs.areal.finance/security/legal-architecture',
+			external: true
+		},
+		{
+			label: 'Risk Disclosure',
+			href: 'https://docs.areal.finance/security/risk-disclosure',
+			external: true
+		}
 	];
 
 	let {
@@ -155,7 +189,10 @@
 			</span>
 			<nav class="footer-legal-links" aria-label="Legal">
 				{#each legalLinks as link}
-					<a href={link.href}>{link.label}</a>
+					<a
+						href={link.href}
+						target={link.external ? '_blank' : undefined}
+						rel={link.external ? 'noopener noreferrer' : undefined}>{link.label}</a>
 				{/each}
 			</nav>
 		</div>
