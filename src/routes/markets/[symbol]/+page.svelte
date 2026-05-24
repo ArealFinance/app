@@ -371,10 +371,25 @@
 		const decA = tokenA?.decimals ?? 6;
 		const decB = tokenB?.decimals ?? 6;
 
+		const priceA = tokenA?.priceUsdc ?? null;
+		const priceB = tokenB?.priceUsdc ?? null;
+
 		// Spot price: A in B units. Avoids division-by-zero on freshly-created
 		// pools (display falls back to em-dash).
+		//
+		// Concentrated master pools (Monotonic Ladder) are single-sided: the
+		// reserves are a Nexus-funded USDC bid wall + an organic RWT ask, NOT
+		// a constant-product pair. Their reserve ratio is meaningless as a
+		// price (e.g. 90 USDC / 10 RWT would read "9.0000" while RWT NAV is
+		// ~$1). For these pools derive spot from the token USD prices instead
+		// (RWT price is NAV-derived in the SDK snapshot). StandardCurve pools
+		// keep the reserve ratio — there it IS the true marginal spot price.
 		let spotLabel = EM_DASH;
-		if (raw.reserveA > 0n && raw.reserveB > 0n) {
+		if (lp.kind === 'Concentrated') {
+			if (priceA !== null && priceB !== null && priceB > 0) {
+				spotLabel = `1 ${lp.pairA.symbol} = ${(priceA / priceB).toFixed(4)} ${lp.pairB.symbol}`;
+			}
+		} else if (raw.reserveA > 0n && raw.reserveB > 0n) {
 			const num = Number(raw.reserveB) / 10 ** decB;
 			const den = Number(raw.reserveA) / 10 ** decA;
 			if (den > 0) {
@@ -386,8 +401,6 @@
 		// pure reserve ratio so the bar still renders for unpriced pairs.
 		let aPct = 50;
 		let bPct = 50;
-		const priceA = tokenA?.priceUsdc ?? null;
-		const priceB = tokenB?.priceUsdc ?? null;
 		if (priceA !== null && priceB !== null) {
 			const aSide = (Number(raw.reserveA) / 10 ** decA) * priceA;
 			const bSide = (Number(raw.reserveB) / 10 ** decB) * priceB;
