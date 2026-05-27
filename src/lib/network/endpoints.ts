@@ -12,10 +12,19 @@
  * across the codebase; the user-facing label is "Testnet".
  */
 import { PublicKey } from '@solana/web3.js';
-import { PROGRAM_IDS, RWT_MINTS, USDC_MINTS } from '@areal/sdk/network';
+import { PROGRAM_IDS, RWT_MINTS, USDC_MINTS, getProgramIds } from '@areal/sdk/network';
 
 /** Public RPC URL for the Areal-hosted test-validator. */
 const TESTNET_RPC_URL = 'https://rpc.areal.finance';
+
+/**
+ * Helius devnet RPC for Areal devnet (Phase 12.1+). Carries an API key as
+ * a query string — keep at the boundary of the network config since both
+ * SOL JSON-RPC and the WS subscription share the same URL on Helius. Replace
+ * with a private node only if Helius rate limits become an issue.
+ */
+const HELIUS_DEVNET_RPC_URL =
+	'https://devnet.helius-rpc.com/?api-key=4e2f4597-b7dc-4258-9d59-449f4fe3a776';
 
 /*
  * In `npm run dev`, point backend + realtime URLs at the Vite dev server's
@@ -139,11 +148,24 @@ export const ENDPOINTS: Record<NetworkId, NetworkEndpoint> = {
 	devnet: {
 		id: 'devnet',
 		label: 'Devnet',
-		rpcUrl: 'https://api.devnet.solana.com',
+		// Helius devnet RPC — the public `api.devnet.solana.com` aggressively
+		// rate-limits and silently drops subscriptions, so all Areal devnet
+		// reads go through Helius. Same URL serves both HTTP JSON-RPC and the
+		// WS endpoint (Helius derives the WS scheme from the HTTPS host).
+		rpcUrl: HELIUS_DEVNET_RPC_URL,
 		backendApiUrl: AREAL_BACKEND_URL,
 		realtimeWsUrl: AREAL_REALTIME_WS_URL,
-		programIds: PROGRAM_IDS,
-		usdcMint: USDC_MINTS.devnet
+		// Devnet has its own program-ID bundle (separate vanity keypairs
+		// from mainnet — see `data/devnet-addresses.json::programs`). Pull
+		// via `getProgramIds('devnet')` instead of the deprecated mainnet
+		// `PROGRAM_IDS` shim so the right .so addresses are resolved.
+		programIds: getProgramIds('devnet'),
+		// Devnet USDC + RWT come from the SDK's per-cluster mint table
+		// (sdk 0.13.1+); both are real on-chain mints produced by
+		// `scripts/bootstrap-init.ts` and pinned in
+		// `data/devnet-addresses.json::mints`.
+		usdcMint: USDC_MINTS.devnet,
+		rwtMint: RWT_MINTS.devnet
 	},
 	mainnet: {
 		id: 'mainnet',
