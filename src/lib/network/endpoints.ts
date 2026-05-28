@@ -12,7 +12,7 @@
  * across the codebase; the user-facing label is "Testnet".
  */
 import { PublicKey } from '@solana/web3.js';
-import { PROGRAM_IDS, RWT_MINTS, USDC_MINTS, getProgramIds } from '@areal/sdk/network';
+import { RWT_MINTS, USDC_MINTS, getProgramIds } from '@areal/sdk/network';
 
 /** Public RPC URL for the Areal-hosted test-validator. */
 const TESTNET_RPC_URL = 'https://rpc.areal.finance';
@@ -117,8 +117,12 @@ export const NETWORK_IDS: NetworkId[] = ['localnet', 'devnet', 'mainnet'];
 export const SELECTABLE_NETWORK_IDS: NetworkId[] = ['localnet', 'devnet'];
 
 /**
- * `PROGRAM_IDS` from the SDK is a single map (program IDs are network-agnostic
- * because the same deployer publishes the same address on every cluster).
+ * Program IDs are resolved per-cluster via `getProgramIds(cluster)` — devnet
+ * has its own vanity-key bundle (M4 cluster-aware fix in SDK 0.13.2). Mainnet
+ * + localnet still share the same set (localnet uses mainnet pubkeys today
+ * because the test-validator deploys the same keypairs), but we keep the
+ * `getProgramIds(...)` call at each site so a future localnet rebuild with
+ * distinct pubkeys won't require chasing this file down again.
  * `USDC_MINTS` does vary per network — devnet/localnet share the devnet mint.
  */
 export const ENDPOINTS: Record<NetworkId, NetworkEndpoint> = {
@@ -128,7 +132,7 @@ export const ENDPOINTS: Record<NetworkId, NetworkEndpoint> = {
 		rpcUrl: TESTNET_RPC_URL,
 		backendApiUrl: AREAL_BACKEND_URL,
 		realtimeWsUrl: AREAL_REALTIME_WS_URL,
-		programIds: PROGRAM_IDS,
+		programIds: getProgramIds('localnet'),
 		// Pull canonical Testnet mint pubkeys from SDK 0.12.4+:
 		//   - `USDC_MINTS.localnet`  — test USDC mint on the Areal VPS validator
 		//   - `RWT_MINTS.localnet`   — RWT mint pinned via R20 migrate-mints
@@ -176,7 +180,7 @@ export const ENDPOINTS: Record<NetworkId, NetworkEndpoint> = {
 		// goes live.
 		backendApiUrl: AREAL_BACKEND_URL,
 		realtimeWsUrl: AREAL_REALTIME_WS_URL,
-		programIds: PROGRAM_IDS,
+		programIds: getProgramIds('mainnet'),
 		usdcMint: USDC_MINTS.mainnet
 	}
 };
