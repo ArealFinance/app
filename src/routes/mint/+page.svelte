@@ -143,15 +143,33 @@
 	// 429 on the second claim) — the button is just a UI affordance for a
 	// public faucet, so always-show is fine. Hidden on devnet/mainnet so
 	// production-side users don't get a misleading "Get test USDC" button.
-	const showFaucetButton = $derived(
+	const showUsdcFaucet = $derived(
 		wallet.isConnected && network.current === 'localnet'
 	);
-	const faucetInFlight = $derived(faucet.state.inFlight);
+	// Testnet RWT faucet — visible on both `localnet` (Areal Testnet) and
+	// `devnet`. Unlike USDC, RWT is also useful on devnet for testing
+	// downstream flows (swap, dex liquidity, OT mint) without burning real
+	// USDC. Backend only registers the endpoint on devnet+localnet
+	// (mainnet returns 404), but we still hide the button by cluster so
+	// users never see a card whose CTA 404s. Not tied to RWT balance —
+	// users may want to top up for different test scenarios.
+	const showRwtFaucet = $derived(
+		wallet.isConnected &&
+			(network.current === 'localnet' || network.current === 'devnet')
+	);
+	const usdcFaucetInFlight = $derived(faucet.state.usdcInFlight);
+	const rwtFaucetInFlight = $derived(faucet.state.rwtInFlight);
 
-	function handleFaucetClick() {
+	function handleUsdcFaucetClick() {
 		const pk = wallet.publicKey;
 		if (!pk) return;
-		void faucet.claim(pk.toBase58());
+		void faucet.claimUsdc(pk.toBase58());
+	}
+
+	function handleRwtFaucetClick() {
+		const pk = wallet.publicKey;
+		if (!pk) return;
+		void faucet.claimRwt(pk.toBase58());
 	}
 
 	const usdcBalanceDisplay = $derived(
@@ -482,7 +500,7 @@
 			</Button>
 		</section>
 
-		{#if showFaucetButton}
+		{#if showUsdcFaucet}
 			<!--
 			 Testnet USDC faucet — its own card between the mint form and the
 			 "Why mint RWT?" panel. Placing it INSIDE the mint form (between
@@ -490,9 +508,9 @@
 			 section now: still highly visible, but doesn't clutter the input
 			 sequence. Backend rate-limits to 1 claim per wallet per 24h.
 			-->
-			<section class="faucet-card" aria-labelledby="faucet-card-title">
+			<section class="faucet-card" aria-labelledby="usdc-faucet-card-title">
 				<div class="faucet-text">
-					<h3 id="faucet-card-title" class="faucet-title">Need test USDC?</h3>
+					<h3 id="usdc-faucet-card-title" class="faucet-title">Need test USDC?</h3>
 					<p class="faucet-sub">
 						Claim 1000 test USDC on Testnet to start minting RWT. One claim per
 						wallet every 24 hours.
@@ -501,10 +519,39 @@
 				<button
 					class="faucet-btn"
 					type="button"
-					disabled={faucetInFlight}
-					onclick={handleFaucetClick}
+					disabled={usdcFaucetInFlight}
+					onclick={handleUsdcFaucetClick}
 				>
-					{faucetInFlight ? 'Sending…' : 'Claim 1000 USDC'}
+					{usdcFaucetInFlight ? 'Sending…' : 'Claim 1000 USDC'}
+				</button>
+			</section>
+		{/if}
+
+		{#if showRwtFaucet}
+			<!--
+			 Testnet RWT faucet — twin of the USDC card, but reachable on
+			 both Areal Testnet (`localnet`) and Solana devnet. Useful for
+			 topping up RWT directly when testing downstream flows (swap,
+			 dex liquidity, OT mint) without burning USDC through the mint
+			 pipeline. Backend rate-limits to 1 claim per wallet per 24h
+			 and returns 404 on mainnet — we gate by cluster so the card
+			 never renders where the endpoint isn't available.
+			-->
+			<section class="faucet-card" aria-labelledby="rwt-faucet-card-title">
+				<div class="faucet-text">
+					<h3 id="rwt-faucet-card-title" class="faucet-title">Need test RWT?</h3>
+					<p class="faucet-sub">
+						Claim 100 test RWT to try swaps, liquidity, and OT flows. One claim
+						per wallet every 24 hours.
+					</p>
+				</div>
+				<button
+					class="faucet-btn"
+					type="button"
+					disabled={rwtFaucetInFlight}
+					onclick={handleRwtFaucetClick}
+				>
+					{rwtFaucetInFlight ? 'Sending…' : 'Claim 100 RWT'}
 				</button>
 			</section>
 		{/if}
