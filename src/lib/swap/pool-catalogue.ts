@@ -16,7 +16,7 @@
 import { PublicKey } from '@solana/web3.js';
 import { findDexConfigPda, findPoolStatePda } from '@areal/sdk/pda';
 import { isMasterPool } from '@areal/sdk/markets';
-import { PROGRAM_IDS, RWT_MINTS, USDC_MINTS } from '@areal/sdk/network';
+import { getProgramIds, RWT_MINTS, USDC_MINTS } from '@areal/sdk/network';
 
 import { ENDPOINTS, type NetworkId } from '$lib/network/endpoints';
 
@@ -101,8 +101,9 @@ function buildOtRwtEntry(opts: {
 	const rwt = ep.rwtMint ?? RWT_MINTS[opts.cluster];
 	const { mintA, mintB } = canonicalMintOrder(opts.otMint, rwt);
 	const otIsA = mintA.equals(opts.otMint);
-	const [poolPda] = findPoolStatePda(mintA, mintB, PROGRAM_IDS.nativeDex);
-	const [dexConfigPda] = findDexConfigPda(PROGRAM_IDS.nativeDex);
+	const dexProgramId = getProgramIds(opts.cluster).nativeDex;
+	const [poolPda] = findPoolStatePda(mintA, mintB, dexProgramId);
+	const [dexConfigPda] = findDexConfigPda(dexProgramId);
 	return {
 		label: opts.otLabel ?? `${opts.otSymbol} / RWT`,
 		mintA,
@@ -153,8 +154,9 @@ function buildUsdcRwtEntry(cluster: NetworkId): PoolEntry {
 	const { mintA, mintB } = canonicalMintOrder(usdc, rwt);
 	const usdcIsA = mintA.equals(usdc);
 
-	const [poolPda] = findPoolStatePda(mintA, mintB, PROGRAM_IDS.nativeDex);
-	const [dexConfigPda] = findDexConfigPda(PROGRAM_IDS.nativeDex);
+	const dexProgramId = getProgramIds(cluster).nativeDex;
+	const [poolPda] = findPoolStatePda(mintA, mintB, dexProgramId);
+	const [dexConfigPda] = findDexConfigPda(dexProgramId);
 
 	return {
 		label: 'USDC / RWT',
