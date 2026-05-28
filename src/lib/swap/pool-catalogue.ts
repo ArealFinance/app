@@ -121,8 +121,20 @@ function buildOtRwtEntry(opts: {
 	};
 }
 
-/** SPRK mint (Sparkles OT), created by the Testnet bootstrap (bootstrap-init.ts). */
-const SPRK_MINT = new PublicKey('ApLvdzo2SrsXrC3C6z88uQxxhtvQtME8DpGdp5Xu9Q3J');
+/** SPRK mint (Sparkles OT) per cluster.
+ *
+ * Devnet/localnet are bootstrap-created mints that get regenerated on every
+ * fresh deploy — re-pin these constants after each bootstrap-init.ts run.
+ * See `data/devnet-addresses.json::mints.sprk_ot` (devnet) and
+ * `data/e2e-bootstrap.json::mints.sprk_ot_mint` (localnet).
+ *
+ * Mainnet stays null until SPRK ships in production.
+ */
+const SPRK_MINTS: Record<NetworkId, PublicKey | null> = {
+	devnet: new PublicKey('C6PnrSdfzMyR6WrJbmbDxtacp6K6Km4AXPPaxsmL34PX'),
+	localnet: new PublicKey('ApLvdzo2SrsXrC3C6z88uQxxhtvQtME8DpGdp5Xu9Q3J'),
+	mainnet: null
+};
 const SPRK_DECIMALS = 6;
 
 /** Build a USDC↔RWT pool entry for a given cluster.
@@ -175,15 +187,31 @@ export const KNOWN_POOLS_BY_CLUSTER: Record<NetworkId, PoolEntry[]> = {
 	// and the quote engine doesn't price concentrated pools yet), so it
 	// goes first to give a useful out-of-the-box experience.
 	localnet: [
-		buildOtRwtEntry({
-			cluster: 'localnet',
-			otMint: SPRK_MINT,
-			otSymbol: 'SPRK',
-			otDecimals: SPRK_DECIMALS
-		}),
+		...(SPRK_MINTS.localnet
+			? [
+					buildOtRwtEntry({
+						cluster: 'localnet',
+						otMint: SPRK_MINTS.localnet,
+						otSymbol: 'SPRK',
+						otDecimals: SPRK_DECIMALS
+					})
+				]
+			: []),
 		buildUsdcRwtEntry('localnet')
 	],
-	devnet: [buildUsdcRwtEntry('devnet')],
+	devnet: [
+		...(SPRK_MINTS.devnet
+			? [
+					buildOtRwtEntry({
+						cluster: 'devnet',
+						otMint: SPRK_MINTS.devnet,
+						otSymbol: 'SPRK',
+						otDecimals: SPRK_DECIMALS
+					})
+				]
+			: []),
+		buildUsdcRwtEntry('devnet')
+	],
 	mainnet: []
 };
 
